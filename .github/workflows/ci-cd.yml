@@ -27,13 +27,14 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore VectorSearch.Api/VectorSearch.Api.csproj
 
-      - name: Build solution
-        run: dotnet build VectorSearch.Api/VectorSearch.Api.csproj --configuration Release --no-restore
+      - name: Build entire solution
+        run: dotnet build VectorSearch.Api/VectorSearch.Api.sln --configuration Release --no-restore
 
       - name: Run integration tests
         run: |
+          # build will run automatically so we don't need --no-build
           dotnet test VectorSearch.IntegrationTests/VectorSearch.IntegrationTests.csproj \
-            --configuration Release --no-build --verbosity normal
+            --configuration Release --verbosity normal
 
   deploy:
     name: Deploy to App Runner
