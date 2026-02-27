@@ -1,0 +1,82 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore VectorSearch.Api/VectorSearch.Api.csproj
+
+      - name: Build solution
+        run: dotnet build VectorSearch.Api/VectorSearch.Api.csproj --configuration Release --no-restore
+
+      - name: Run integration tests
+        run: |
+          dotnet test VectorSearch.IntegrationTests/VectorSearch.IntegrationTests.csproj \
+            --configuration Release --no-build --verbosity normal
+
+  deploy:
+    name: Deploy to App Runner
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && success()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push Docker image to ECR
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+        run: |
+          # ensure ECR repository exists (creates if not)
+          aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" \
+            || aws ecr create-repository --repository-name "$ECR_REPOSITORY" \
+                --image-tag-mutability IMMUTABLE \
+                --region "$AWS_REGION" > /dev/null
+
+          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest"
+          docker build -t $IMAGE_URI ./VectorSearch.Api
+          docker push $IMAGE_URI
+
+      - name: Update App Runner service
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          APP_RUNNER_SERVICE_ARN: ${{ secrets.APP_RUNNER_SERVICE_ARN }}
+        run: |
+          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest"
+          aws apprunner update-service \
+            --service-arn "$APP_RUNNER_SERVICE_ARN" \
+            --source-configuration ImageRepository={ImageIdentifier="$IMAGE_URI",ImageConfiguration={Port="8080"},ImageRepositoryType="ECR"}

@@ -1,0 +1,1 @@
+Use chore:, feat:, fix:, docs commit prefixes

@@ -544,6 +544,24 @@ docker build -t vectorsearch-api -f VectorSearch.Api/Dockerfile .
 docker run -p 8080:8080 vectorsearch-api
 ```
 
+### GitHub Actions CI/CD
+
+A workflow is included at `.github/workflows/ci-cd.yml` that:
+1. Builds the API and runs the integration tests on every push/PR to `main`.
+2. When a merge to `main` succeeds, builds a Docker image, pushes it to Amazon ECR
+   and updates an AWS App Runner service.
+
+**Secrets required** (set in repository settings):
+- `AWS_ACCESS_KEY_ID` – IAM user with ECR/App Runner permissions
+- `AWS_SECRET_ACCESS_KEY` – corresponding secret key
+- `AWS_REGION` – e.g. `us-east-1`
+- `AWS_ACCOUNT_ID` – numeric AWS account ID used for ECR URI
+- `ECR_REPOSITORY` – name of the ECR repo (will be created automatically)
+- `APP_RUNNER_SERVICE_ARN` – ARN of an existing App Runner service
+
+The workflow uses the Dockerfile already present in the `VectorSearch.Api` project
+and tags the image with `:latest`.
+
 ---
 
 ## AWS S3 Vectors Setup
