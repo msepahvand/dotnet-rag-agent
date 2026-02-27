@@ -25,7 +25,8 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore VectorSearch.Api/VectorSearch.Api.csproj
+        # restore all projects via solution to ensure test project packages are restored
+        run: dotnet restore VectorSearch.Api/VectorSearch.Api.sln
 
       - name: Build entire solution
         run: dotnet build VectorSearch.Api/VectorSearch.Api.sln --configuration Release --no-restore
