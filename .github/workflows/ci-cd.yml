@@ -121,7 +121,8 @@ jobs:
           ECR_REPOSITORY_VALUE="${{ secrets.ECR_REPOSITORY || 'dotnet-vector-search' }}"
 
           if [ -z "$AWS_ACCOUNT_ID_VALUE" ]; then
-            AWS_ACCOUNT_ID_VALUE=$(aws sts get-caller-identity --query Account --output text)
+            echo "AWS_ACCOUNT_ID secret is required" >&2
+            exit 1
           fi
 
           echo "AWS_REGION=$AWS_REGION_VALUE" >> $GITHUB_ENV
