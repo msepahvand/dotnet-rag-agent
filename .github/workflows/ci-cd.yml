@@ -167,11 +167,19 @@ jobs:
           IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG"
           SERVICE_ARN="$APP_RUNNER_SERVICE_ARN"
 
-          if [ -z "$SERVICE_ARN" ]; then
-            SERVICE_ARN=$(aws apprunner list-services --region "$AWS_REGION" --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE_NAME']|[0].ServiceArn" --output text)
-            if [ "$SERVICE_ARN" = "None" ]; then
-              SERVICE_ARN=""
-            fi
+          if [ -n "$SERVICE_ARN" ]; then
+            echo "APP_RUNNER_CREATED=false" >> $GITHUB_ENV
+            echo "APP_RUNNER_SERVICE_ARN=$SERVICE_ARN" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          if ! SERVICE_ARN=$(aws apprunner list-services --region "$AWS_REGION" --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE_NAME']|[0].ServiceArn" --output text); then
+            echo "Unable to call apprunner:ListServices. Set APP_RUNNER_SERVICE_ARN secret or grant apprunner:ListServices and apprunner:CreateService." >&2
+            exit 1
+          fi
+
+          if [ "$SERVICE_ARN" = "None" ]; then
+            SERVICE_ARN=""
           fi
 
           if [ -z "$SERVICE_ARN" ]; then
