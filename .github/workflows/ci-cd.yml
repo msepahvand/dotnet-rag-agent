@@ -142,7 +142,7 @@ jobs:
                 --region "$AWS_REGION" > /dev/null
 
           IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest"
-          docker build -t $IMAGE_URI ./VectorSearch.Api
+          docker build -f VectorSearch.Api/Dockerfile -t $IMAGE_URI .
           docker push $IMAGE_URI
 
       - name: Update App Runner service

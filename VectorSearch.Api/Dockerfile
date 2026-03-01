@@ -12,16 +12,19 @@ EXPOSE 8081
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["VectorSearch.Api.csproj", "."]
-RUN dotnet restore "./VectorSearch.Api.csproj"
+COPY ["VectorSearch.Api/VectorSearch.Api.csproj", "VectorSearch.Api/"]
+COPY ["VectorSearch.Core/VectorSearch.Core.csproj", "VectorSearch.Core/"]
+COPY ["VectorSearch.S3/VectorSearch.S3.csproj", "VectorSearch.S3/"]
+COPY ["VectorSearch.Redis/VectorSearch.Redis.csproj", "VectorSearch.Redis/"]
+RUN dotnet restore "VectorSearch.Api/VectorSearch.Api.csproj"
 COPY . .
-WORKDIR "/src/."
-RUN dotnet build "./VectorSearch.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
+WORKDIR "/src/VectorSearch.Api"
+RUN dotnet build "VectorSearch.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 # This stage is used to publish the service project to be copied to the final stage
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./VectorSearch.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "VectorSearch.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
 FROM base AS final
