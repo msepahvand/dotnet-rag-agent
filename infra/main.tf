@@ -3,12 +3,6 @@ provider "aws" {
   region = var.aws_region
 }
 
-# S3 bucket for Terraform state
-resource "aws_s3_bucket" "tf_state" {
-  bucket = var.tf_state_bucket_name
-  force_destroy = true
-}
-
 terraform {
   backend "s3" {
     bucket = "dotnet-vector-search-tf-state"
@@ -62,14 +56,7 @@ resource "aws_iam_role" "github_actions" {
   name               = var.iam_role_name
   assume_role_policy = data.aws_iam_policy_document.github_assume.json
 }
-            ,"s3:ListBucket"
-            ,"s3:GetObject"
-            ,"s3:PutObject"
 
-          resources = [
-            "arn:aws:s3:::dotnet-vector-search-tf-state",
-            "arn:aws:s3:::dotnet-vector-search-tf-state/*"
-          ]
 data "aws_iam_policy_document" "github_policy" {
 
   statement {
