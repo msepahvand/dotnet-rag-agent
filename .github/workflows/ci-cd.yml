@@ -87,7 +87,7 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-latest
     # run only after the build-and-test job succeeds and on the primary branches
-    if: needs.build-and-test.result == 'success' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && secrets.APP_RUNNER_SERVICE_ARN != ''
+    if: needs.build-and-test.result == 'success' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
 
     steps:
       - name: Checkout repository
@@ -119,6 +119,9 @@ jobs:
           AWS_REGION_VALUE="${AWS_REGION:-us-east-1}"
           AWS_ACCOUNT_ID_VALUE="${{ secrets.AWS_ACCOUNT_ID }}"
           ECR_REPOSITORY_VALUE="${{ secrets.ECR_REPOSITORY || 'dotnet-vector-search' }}"
+          APP_RUNNER_SERVICE_NAME_VALUE="${{ secrets.APP_RUNNER_SERVICE_NAME || 'dotnet-vector-search' }}"
+          APP_RUNNER_SERVICE_ARN_VALUE="${{ secrets.APP_RUNNER_SERVICE_ARN }}"
+          APP_RUNNER_ECR_ACCESS_ROLE_ARN_VALUE="${{ secrets.APP_RUNNER_ECR_ACCESS_ROLE_ARN }}"
 
           if [ -z "$AWS_ACCOUNT_ID_VALUE" ]; then
             echo "AWS_ACCOUNT_ID secret is required" >&2
@@ -128,6 +131,9 @@ jobs:
           echo "AWS_REGION=$AWS_REGION_VALUE" >> $GITHUB_ENV
           echo "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID_VALUE" >> $GITHUB_ENV
           echo "ECR_REPOSITORY=$ECR_REPOSITORY_VALUE" >> $GITHUB_ENV
+          echo "APP_RUNNER_SERVICE_NAME=$APP_RUNNER_SERVICE_NAME_VALUE" >> $GITHUB_ENV
+          echo "APP_RUNNER_SERVICE_ARN=$APP_RUNNER_SERVICE_ARN_VALUE" >> $GITHUB_ENV
+          echo "APP_RUNNER_ECR_ACCESS_ROLE_ARN=$APP_RUNNER_ECR_ACCESS_ROLE_ARN_VALUE" >> $GITHUB_ENV
 
       - name: Build, tag, and push Docker image to ECR
         env:
@@ -145,12 +151,52 @@ jobs:
           docker build -f VectorSearch.Api/Dockerfile -t $IMAGE_URI .
           docker push $IMAGE_URI
 
-      - name: Update App Runner service
+      - name: Ensure App Runner service exists
         env:
           AWS_ACCOUNT_ID: ${{ env.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ env.AWS_REGION }}
           ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
-          APP_RUNNER_SERVICE_ARN: ${{ secrets.APP_RUNNER_SERVICE_ARN }}
+          APP_RUNNER_SERVICE_NAME: ${{ env.APP_RUNNER_SERVICE_NAME }}
+          APP_RUNNER_SERVICE_ARN: ${{ env.APP_RUNNER_SERVICE_ARN }}
+          APP_RUNNER_ECR_ACCESS_ROLE_ARN: ${{ env.APP_RUNNER_ECR_ACCESS_ROLE_ARN }}
+        run: |
+          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest"
+          SERVICE_ARN="$APP_RUNNER_SERVICE_ARN"
+
+          if [ -z "$SERVICE_ARN" ]; then
+            SERVICE_ARN=$(aws apprunner list-services --region "$AWS_REGION" --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE_NAME']|[0].ServiceArn" --output text)
+            if [ "$SERVICE_ARN" = "None" ]; then
+              SERVICE_ARN=""
+            fi
+          fi
+
+          if [ -z "$SERVICE_ARN" ]; then
+            if [ -z "$APP_RUNNER_ECR_ACCESS_ROLE_ARN" ]; then
+              echo "APP_RUNNER_ECR_ACCESS_ROLE_ARN secret is required to create a new App Runner service" >&2
+              exit 1
+            fi
+
+            SERVICE_ARN=$(aws apprunner create-service \
+              --region "$AWS_REGION" \
+              --service-name "$APP_RUNNER_SERVICE_NAME" \
+              --source-configuration "AuthenticationConfiguration={AccessRoleArn=$APP_RUNNER_ECR_ACCESS_ROLE_ARN},ImageRepository={ImageIdentifier=$IMAGE_URI,ImageConfiguration={Port=8080},ImageRepositoryType=ECR}" \
+              --query "Service.ServiceArn" \
+              --output text)
+
+            echo "APP_RUNNER_CREATED=true" >> $GITHUB_ENV
+          else
+            echo "APP_RUNNER_CREATED=false" >> $GITHUB_ENV
+          fi
+
+          echo "APP_RUNNER_SERVICE_ARN=$SERVICE_ARN" >> $GITHUB_ENV
+
+      - name: Update App Runner service
+        if: env.APP_RUNNER_CREATED != 'true'
+        env:
+          AWS_ACCOUNT_ID: ${{ env.AWS_ACCOUNT_ID }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          APP_RUNNER_SERVICE_ARN: ${{ env.APP_RUNNER_SERVICE_ARN }}
         run: |
           IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest"
           aws apprunner update-service \
