@@ -11,9 +11,9 @@ resource "aws_s3_bucket" "tf_state" {
 
 terraform {
   backend "s3" {
-    bucket = "${var.tf_state_bucket_name}"
+    bucket = "dotnet-vector-search-tf-state"
     key    = "global/terraform.tfstate"
-    region = var.aws_region
+    region = "us-east-1"
     encrypt = true
   }
 }
