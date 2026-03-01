@@ -182,6 +182,29 @@ jobs:
             echo "APP_RUNNER_EXISTS=true" >> $GITHUB_ENV
           fi
 
+      - name: Resolve App Runner instance role for existing service
+        if: env.APP_RUNNER_EXISTS == 'true'
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          APP_RUNNER_SERVICE_ARN: ${{ env.APP_RUNNER_SERVICE_ARN }}
+          APP_RUNNER_INSTANCE_ROLE_ARN: ${{ env.APP_RUNNER_INSTANCE_ROLE_ARN }}
+        run: |
+          ROLE_ARN="$APP_RUNNER_INSTANCE_ROLE_ARN"
+
+          if [ -z "$ROLE_ARN" ]; then
+            if ! ROLE_ARN=$(aws apprunner describe-service --region "$AWS_REGION" --service-arn "$APP_RUNNER_SERVICE_ARN" --query "Service.InstanceConfiguration.InstanceRoleArn" --output text); then
+              echo "Unable to call apprunner:DescribeService. Set APP_RUNNER_INSTANCE_ROLE_ARN secret or grant apprunner:DescribeService." >&2
+              exit 1
+            fi
+          fi
+
+          if [ "$ROLE_ARN" = "None" ] || [ -z "$ROLE_ARN" ]; then
+            echo "Existing App Runner service has no instance role. Set APP_RUNNER_INSTANCE_ROLE_ARN and update service instance configuration manually once." >&2
+            exit 1
+          fi
+
+          echo "APP_RUNNER_INSTANCE_ROLE_ARN=$ROLE_ARN" >> $GITHUB_ENV
+
       - name: Create App Runner service if missing
         if: env.APP_RUNNER_EXISTS == 'false'
         env:

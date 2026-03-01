@@ -26,8 +26,16 @@ public class Program
         {
             using (var scope = app.Services.CreateScope())
             {
+                var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
                 var vectorService = scope.ServiceProvider.GetRequiredService<IVectorService>();
-                await vectorService.EnsureInitializedAsync();
+                try
+                {
+                    await vectorService.EnsureInitializedAsync();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Vector store initialization failed at startup. Service will continue running.");
+                }
             }
         }
 
