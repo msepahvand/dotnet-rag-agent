@@ -119,7 +119,7 @@ jobs:
           AWS_REGION_VALUE="${AWS_REGION:-us-east-1}"
           AWS_ACCOUNT_ID_VALUE="${{ secrets.AWS_ACCOUNT_ID }}"
           ECR_REPOSITORY_VALUE="${{ secrets.ECR_REPOSITORY || 'dotnet-vector-search' }}"
-          IMAGE_TAG_VALUE="${GITHUB_SHA::12}"
+          IMAGE_TAG_VALUE="${GITHUB_SHA::12}-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
           APP_RUNNER_SERVICE_NAME_VALUE="${{ secrets.APP_RUNNER_SERVICE_NAME || 'dotnet-vector-search' }}"
           APP_RUNNER_SERVICE_ARN_VALUE="${{ secrets.APP_RUNNER_SERVICE_ARN }}"
           APP_RUNNER_ECR_ACCESS_ROLE_ARN_VALUE="${{ secrets.APP_RUNNER_ECR_ACCESS_ROLE_ARN }}"
