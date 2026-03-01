@@ -123,9 +123,15 @@ jobs:
           APP_RUNNER_SERVICE_NAME_VALUE="${{ secrets.APP_RUNNER_SERVICE_NAME || 'dotnet-vector-search' }}"
           APP_RUNNER_SERVICE_ARN_VALUE="${{ secrets.APP_RUNNER_SERVICE_ARN }}"
           APP_RUNNER_ECR_ACCESS_ROLE_ARN_VALUE="${{ secrets.APP_RUNNER_ECR_ACCESS_ROLE_ARN }}"
+          APP_RUNNER_INSTANCE_ROLE_ARN_VALUE="${{ secrets.APP_RUNNER_INSTANCE_ROLE_ARN }}"
 
           if [ -z "$AWS_ACCOUNT_ID_VALUE" ]; then
             echo "AWS_ACCOUNT_ID secret is required" >&2
+            exit 1
+          fi
+
+          if [ -z "$APP_RUNNER_INSTANCE_ROLE_ARN_VALUE" ]; then
+            echo "APP_RUNNER_INSTANCE_ROLE_ARN secret is required" >&2
             exit 1
           fi
 
@@ -136,6 +142,7 @@ jobs:
           echo "APP_RUNNER_SERVICE_NAME=$APP_RUNNER_SERVICE_NAME_VALUE" >> $GITHUB_ENV
           echo "APP_RUNNER_SERVICE_ARN=$APP_RUNNER_SERVICE_ARN_VALUE" >> $GITHUB_ENV
           echo "APP_RUNNER_ECR_ACCESS_ROLE_ARN=$APP_RUNNER_ECR_ACCESS_ROLE_ARN_VALUE" >> $GITHUB_ENV
+          echo "APP_RUNNER_INSTANCE_ROLE_ARN=$APP_RUNNER_INSTANCE_ROLE_ARN_VALUE" >> $GITHUB_ENV
 
       - name: Build, tag, and push Docker image to ECR
         env:
@@ -163,6 +170,7 @@ jobs:
           APP_RUNNER_SERVICE_NAME: ${{ env.APP_RUNNER_SERVICE_NAME }}
           APP_RUNNER_SERVICE_ARN: ${{ env.APP_RUNNER_SERVICE_ARN }}
           APP_RUNNER_ECR_ACCESS_ROLE_ARN: ${{ env.APP_RUNNER_ECR_ACCESS_ROLE_ARN }}
+          APP_RUNNER_INSTANCE_ROLE_ARN: ${{ env.APP_RUNNER_INSTANCE_ROLE_ARN }}
         run: |
           IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG"
           SERVICE_ARN="$APP_RUNNER_SERVICE_ARN"
@@ -191,6 +199,7 @@ jobs:
             SERVICE_ARN=$(aws apprunner create-service \
               --region "$AWS_REGION" \
               --service-name "$APP_RUNNER_SERVICE_NAME" \
+              --instance-configuration "InstanceRoleArn=$APP_RUNNER_INSTANCE_ROLE_ARN" \
               --source-configuration "AuthenticationConfiguration={AccessRoleArn=$APP_RUNNER_ECR_ACCESS_ROLE_ARN},ImageRepository={ImageIdentifier=$IMAGE_URI,ImageConfiguration={Port=8080},ImageRepositoryType=ECR}" \
               --query "Service.ServiceArn" \
               --output text)
@@ -210,8 +219,10 @@ jobs:
           ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
           APP_RUNNER_SERVICE_ARN: ${{ env.APP_RUNNER_SERVICE_ARN }}
+          APP_RUNNER_INSTANCE_ROLE_ARN: ${{ env.APP_RUNNER_INSTANCE_ROLE_ARN }}
         run: |
           IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG"
           aws apprunner update-service \
             --service-arn "$APP_RUNNER_SERVICE_ARN" \
+            --instance-configuration "InstanceRoleArn=$APP_RUNNER_INSTANCE_ROLE_ARN" \
             --source-configuration ImageRepository={ImageIdentifier="$IMAGE_URI",ImageConfiguration={Port="8080"},ImageRepositoryType="ECR"}
