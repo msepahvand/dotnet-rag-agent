@@ -562,6 +562,23 @@ A workflow is included at `.github/workflows/ci-cd.yml` that:
 The workflow uses the Dockerfile already present in the `VectorSearch.Api` project
 and tags the image with `:latest`.
 
+### Infrastructure deployment
+The pipeline now includes an **infrastructure job** that applies the Terraform code stored
+in the `infra/` directory.  It runs on every push and will:
+
+1. Initialize Terraform.
+2. Apply the configuration with the repository and branch automatically filled from
+   `github.repository` and `github.ref`.
+
+Required additional secret:
+- `AWS_INFRA_ROLE_ARN` – ARN of a role which the workflow can assume to create IAM
+  resources (this could be the same role you later use in the `Configure AWS credentials`
+  step or a more privileged bootstrap role).
+
+When the Terraform job runs successfully it makes the OIDC provider and the
+`GitHubActionsDeployRole` available, allowing subsequent jobs to use those
+credentials for ECR/App Runner operations.
+
 ---
 
 ## AWS S3 Vectors Setup
