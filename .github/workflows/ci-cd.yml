@@ -72,6 +72,31 @@ jobs:
           echo "calling sts get-caller-identity"
           aws sts get-caller-identity || true
 
+      - name: Bootstrap Terraform backend S3 permissions
+        run: |
+          ROLE_ARN="${{ secrets.AWS_INFRA_ROLE_ARN }}"
+          ROLE_NAME="${ROLE_ARN##*/}"
+          echo "Ensuring S3 backend permissions for role: $ROLE_NAME"
+
+          aws iam put-role-policy \
+            --role-name "$ROLE_NAME" \
+            --policy-name "GitHubActionsTerraformBackendBootstrap" \
+            --policy-document '{
+              "Version":"2012-10-17",
+              "Statement":[
+                {
+                  "Effect":"Allow",
+                  "Action":["s3:ListBucket"],
+                  "Resource":["arn:aws:s3:::dotnet-vector-search-tf-state"]
+                },
+                {
+                  "Effect":"Allow",
+                  "Action":["s3:GetObject","s3:PutObject"],
+                  "Resource":["arn:aws:s3:::dotnet-vector-search-tf-state/*"]
+                }
+              ]
+            }'
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
