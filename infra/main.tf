@@ -17,7 +17,3 @@ data "aws_caller_identity" "current" {}
 locals {
   github_oidc_provider_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${replace(var.github_oidc_url, "https://", "")}" 
 }
-
-data "aws_iam_role" "github_actions" {
-  name = var.iam_role_name
-}
