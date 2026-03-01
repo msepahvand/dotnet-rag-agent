@@ -1,3 +1,9 @@
+variable "tf_state_bucket_name" {
+  description = "Name of the S3 bucket for Terraform state"
+  type        = string
+  default     = "dotnet-vector-search-tf-state"
+}
+
 variable "github_repo" {
   description = "GitHub repository in the form owner/name"
   type        = string

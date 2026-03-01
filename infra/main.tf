@@ -1,5 +1,21 @@
+
 provider "aws" {
   region = var.aws_region
+}
+
+# S3 bucket for Terraform state
+resource "aws_s3_bucket" "tf_state" {
+  bucket = var.tf_state_bucket_name
+  force_destroy = true
+}
+
+terraform {
+  backend "s3" {
+    bucket = "${var.tf_state_bucket_name}"
+    key    = "global/terraform.tfstate"
+    region = var.aws_region
+    encrypt = true
+  }
 }
 
 data "aws_caller_identity" "current" {}
@@ -61,6 +77,7 @@ data "aws_iam_policy_document" "github_policy" {
       "ecr:UploadLayerPart",
       "ecr:CompleteLayerUpload",
       "ecr:ListImages"
+        ,"iam:CreateOpenIDConnectProvider"
     ]
     resources = ["*"]
   }
