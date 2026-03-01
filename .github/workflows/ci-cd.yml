@@ -30,7 +30,18 @@ jobs:
             exit 1
           fi
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (static)
+        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' && secrets.AWS_SECRET_ACCESS_KEY != '' }}
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+
+      - name: Configure AWS credentials (role)
+        if: ${{ secrets.AWS_ACCESS_KEY_ID == '' || secrets.AWS_SECRET_ACCESS_KEY == '' }}
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: ${{ secrets.AWS_INFRA_ROLE_ARN }}
