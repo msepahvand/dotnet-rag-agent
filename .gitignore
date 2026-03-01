@@ -487,3 +487,8 @@ docker-compose.override.yml
 
 # Qdrant data (from docker-compose volume)
 qdrant_storage/
+
+# Terraform state and cache files
+infra/.terraform/
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
