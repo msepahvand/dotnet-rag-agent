@@ -22,10 +22,13 @@ data "aws_iam_policy_document" "github_assume" {
 
     actions = ["sts:AssumeRoleWithWebIdentity"]
 
+    # The OIDC `sub` claim typically contains the repository and
+    # may also include a ref suffix (e.g. "repo:owner/repo:ref:refs/heads/master").
+    # Use StringLike with a wildcard so the exact format doesn't matter.
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}"]
+      values   = ["repo:${var.github_repo}*"]
     }
 
     dynamic "condition" {
