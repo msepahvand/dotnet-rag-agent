@@ -156,73 +156,69 @@ jobs:
           docker build -f VectorSearch.Api/Dockerfile -t $IMAGE_URI .
           docker push $IMAGE_URI
 
-      - name: Ensure App Runner service exists
+      - name: Resolve App Runner service ARN
         env:
-          AWS_ACCOUNT_ID: ${{ env.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ env.AWS_REGION }}
-          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
-          IMAGE_TAG: ${{ env.IMAGE_TAG }}
           APP_RUNNER_SERVICE_NAME: ${{ env.APP_RUNNER_SERVICE_NAME }}
           APP_RUNNER_SERVICE_ARN: ${{ env.APP_RUNNER_SERVICE_ARN }}
-          APP_RUNNER_ECR_ACCESS_ROLE_ARN: ${{ env.APP_RUNNER_ECR_ACCESS_ROLE_ARN }}
-          APP_RUNNER_INSTANCE_ROLE_ARN: ${{ env.APP_RUNNER_INSTANCE_ROLE_ARN }}
         run: |
-          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG"
           SERVICE_ARN="$APP_RUNNER_SERVICE_ARN"
 
-          if [ -n "$SERVICE_ARN" ]; then
-            if [ -z "$APP_RUNNER_INSTANCE_ROLE_ARN" ]; then
-              APP_RUNNER_INSTANCE_ROLE_ARN=$(aws apprunner describe-service --region "$AWS_REGION" --service-arn "$SERVICE_ARN" --query "Service.InstanceConfiguration.InstanceRoleArn" --output text)
-              if [ "$APP_RUNNER_INSTANCE_ROLE_ARN" = "None" ]; then
-                APP_RUNNER_INSTANCE_ROLE_ARN=""
-              fi
-            fi
-
-            if [ -z "$APP_RUNNER_INSTANCE_ROLE_ARN" ]; then
-              echo "APP_RUNNER_INSTANCE_ROLE_ARN secret is required (or service must already have an instance role)." >&2
+          if [ -z "$SERVICE_ARN" ]; then
+            if ! SERVICE_ARN=$(aws apprunner list-services --region "$AWS_REGION" --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE_NAME']|[0].ServiceArn" --output text); then
+              echo "Unable to call apprunner:ListServices. Set APP_RUNNER_SERVICE_ARN secret or grant apprunner:ListServices and apprunner:CreateService." >&2
               exit 1
             fi
-
-            echo "APP_RUNNER_CREATED=false" >> $GITHUB_ENV
-            echo "APP_RUNNER_SERVICE_ARN=$SERVICE_ARN" >> $GITHUB_ENV
-            echo "APP_RUNNER_INSTANCE_ROLE_ARN=$APP_RUNNER_INSTANCE_ROLE_ARN" >> $GITHUB_ENV
-            exit 0
-          fi
-
-          if ! SERVICE_ARN=$(aws apprunner list-services --region "$AWS_REGION" --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE_NAME']|[0].ServiceArn" --output text); then
-            echo "Unable to call apprunner:ListServices. Set APP_RUNNER_SERVICE_ARN secret or grant apprunner:ListServices and apprunner:CreateService." >&2
-            exit 1
           fi
 
           if [ "$SERVICE_ARN" = "None" ]; then
             SERVICE_ARN=""
           fi
 
+          echo "APP_RUNNER_SERVICE_ARN=$SERVICE_ARN" >> $GITHUB_ENV
           if [ -z "$SERVICE_ARN" ]; then
-            if [ -z "$APP_RUNNER_ECR_ACCESS_ROLE_ARN" ]; then
-              echo "APP_RUNNER_ECR_ACCESS_ROLE_ARN secret is required to create a new App Runner service" >&2
-              exit 1
-            fi
-
-            if [ -z "$APP_RUNNER_INSTANCE_ROLE_ARN" ]; then
-              echo "APP_RUNNER_INSTANCE_ROLE_ARN secret is required to create a new App Runner service" >&2
-              exit 1
-            fi
-
-            SERVICE_ARN=$(aws apprunner create-service \
-              --region "$AWS_REGION" \
-              --service-name "$APP_RUNNER_SERVICE_NAME" \
-              --instance-configuration "InstanceRoleArn=$APP_RUNNER_INSTANCE_ROLE_ARN" \
-              --source-configuration "AuthenticationConfiguration={AccessRoleArn=$APP_RUNNER_ECR_ACCESS_ROLE_ARN},ImageRepository={ImageIdentifier=$IMAGE_URI,ImageConfiguration={Port=8080},ImageRepositoryType=ECR}" \
-              --query "Service.ServiceArn" \
-              --output text)
-
-            echo "APP_RUNNER_CREATED=true" >> $GITHUB_ENV
+            echo "APP_RUNNER_EXISTS=false" >> $GITHUB_ENV
           else
-            echo "APP_RUNNER_CREATED=false" >> $GITHUB_ENV
+            echo "APP_RUNNER_EXISTS=true" >> $GITHUB_ENV
           fi
 
+      - name: Create App Runner service if missing
+        if: env.APP_RUNNER_EXISTS == 'false'
+        env:
+          AWS_ACCOUNT_ID: ${{ env.AWS_ACCOUNT_ID }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          APP_RUNNER_SERVICE_NAME: ${{ env.APP_RUNNER_SERVICE_NAME }}
+          APP_RUNNER_ECR_ACCESS_ROLE_ARN: ${{ env.APP_RUNNER_ECR_ACCESS_ROLE_ARN }}
+          APP_RUNNER_INSTANCE_ROLE_ARN: ${{ env.APP_RUNNER_INSTANCE_ROLE_ARN }}
+        run: |
+          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG"
+
+          if [ -z "$APP_RUNNER_ECR_ACCESS_ROLE_ARN" ]; then
+            echo "APP_RUNNER_ECR_ACCESS_ROLE_ARN secret is required to create a new App Runner service" >&2
+            exit 1
+          fi
+
+          if [ -z "$APP_RUNNER_INSTANCE_ROLE_ARN" ]; then
+            echo "APP_RUNNER_INSTANCE_ROLE_ARN secret is required to create a new App Runner service" >&2
+            exit 1
+          fi
+
+          SERVICE_ARN=$(aws apprunner create-service \
+            --region "$AWS_REGION" \
+            --service-name "$APP_RUNNER_SERVICE_NAME" \
+            --instance-configuration "InstanceRoleArn=$APP_RUNNER_INSTANCE_ROLE_ARN" \
+            --source-configuration "AuthenticationConfiguration={AccessRoleArn=$APP_RUNNER_ECR_ACCESS_ROLE_ARN},ImageRepository={ImageIdentifier=$IMAGE_URI,ImageConfiguration={Port=8080},ImageRepositoryType=ECR}" \
+            --query "Service.ServiceArn" \
+            --output text)
+
+          echo "APP_RUNNER_CREATED=true" >> $GITHUB_ENV
           echo "APP_RUNNER_SERVICE_ARN=$SERVICE_ARN" >> $GITHUB_ENV
+
+      - name: Mark existing App Runner service
+        if: env.APP_RUNNER_EXISTS == 'true'
+        run: echo "APP_RUNNER_CREATED=false" >> $GITHUB_ENV
 
       - name: Update App Runner service
         if: env.APP_RUNNER_CREATED != 'true'
