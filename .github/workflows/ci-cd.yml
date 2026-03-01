@@ -119,6 +119,7 @@ jobs:
           AWS_REGION_VALUE="${AWS_REGION:-us-east-1}"
           AWS_ACCOUNT_ID_VALUE="${{ secrets.AWS_ACCOUNT_ID }}"
           ECR_REPOSITORY_VALUE="${{ secrets.ECR_REPOSITORY || 'dotnet-vector-search' }}"
+          IMAGE_TAG_VALUE="${GITHUB_SHA::12}"
           APP_RUNNER_SERVICE_NAME_VALUE="${{ secrets.APP_RUNNER_SERVICE_NAME || 'dotnet-vector-search' }}"
           APP_RUNNER_SERVICE_ARN_VALUE="${{ secrets.APP_RUNNER_SERVICE_ARN }}"
           APP_RUNNER_ECR_ACCESS_ROLE_ARN_VALUE="${{ secrets.APP_RUNNER_ECR_ACCESS_ROLE_ARN }}"
@@ -131,6 +132,7 @@ jobs:
           echo "AWS_REGION=$AWS_REGION_VALUE" >> $GITHUB_ENV
           echo "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID_VALUE" >> $GITHUB_ENV
           echo "ECR_REPOSITORY=$ECR_REPOSITORY_VALUE" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$IMAGE_TAG_VALUE" >> $GITHUB_ENV
           echo "APP_RUNNER_SERVICE_NAME=$APP_RUNNER_SERVICE_NAME_VALUE" >> $GITHUB_ENV
           echo "APP_RUNNER_SERVICE_ARN=$APP_RUNNER_SERVICE_ARN_VALUE" >> $GITHUB_ENV
           echo "APP_RUNNER_ECR_ACCESS_ROLE_ARN=$APP_RUNNER_ECR_ACCESS_ROLE_ARN_VALUE" >> $GITHUB_ENV
@@ -140,6 +142,7 @@ jobs:
           AWS_ACCOUNT_ID: ${{ env.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ env.AWS_REGION }}
           ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           # ensure ECR repository exists (creates if not)
           aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" \
@@ -147,7 +150,7 @@ jobs:
                 --image-tag-mutability IMMUTABLE \
                 --region "$AWS_REGION" > /dev/null
 
-          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest"
+          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG"
           docker build -f VectorSearch.Api/Dockerfile -t $IMAGE_URI .
           docker push $IMAGE_URI
 
@@ -156,11 +159,12 @@ jobs:
           AWS_ACCOUNT_ID: ${{ env.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ env.AWS_REGION }}
           ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
           APP_RUNNER_SERVICE_NAME: ${{ env.APP_RUNNER_SERVICE_NAME }}
           APP_RUNNER_SERVICE_ARN: ${{ env.APP_RUNNER_SERVICE_ARN }}
           APP_RUNNER_ECR_ACCESS_ROLE_ARN: ${{ env.APP_RUNNER_ECR_ACCESS_ROLE_ARN }}
         run: |
-          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest"
+          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG"
           SERVICE_ARN="$APP_RUNNER_SERVICE_ARN"
 
           if [ -z "$SERVICE_ARN" ]; then
@@ -196,9 +200,10 @@ jobs:
           AWS_ACCOUNT_ID: ${{ env.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ env.AWS_REGION }}
           ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
           APP_RUNNER_SERVICE_ARN: ${{ env.APP_RUNNER_SERVICE_ARN }}
         run: |
-          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest"
+          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG"
           aws apprunner update-service \
             --service-arn "$APP_RUNNER_SERVICE_ARN" \
             --source-configuration ImageRepository={ImageIdentifier="$IMAGE_URI",ImageConfiguration={Port="8080"},ImageRepositoryType="ECR"}
