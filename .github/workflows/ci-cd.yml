@@ -114,11 +114,25 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v1
 
+      - name: Resolve deploy variables
+        run: |
+          AWS_REGION_VALUE="${AWS_REGION:-us-east-1}"
+          AWS_ACCOUNT_ID_VALUE="${{ secrets.AWS_ACCOUNT_ID }}"
+          ECR_REPOSITORY_VALUE="${{ secrets.ECR_REPOSITORY || 'dotnet-vector-search' }}"
+
+          if [ -z "$AWS_ACCOUNT_ID_VALUE" ]; then
+            AWS_ACCOUNT_ID_VALUE=$(aws sts get-caller-identity --query Account --output text)
+          fi
+
+          echo "AWS_REGION=$AWS_REGION_VALUE" >> $GITHUB_ENV
+          echo "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID_VALUE" >> $GITHUB_ENV
+          echo "ECR_REPOSITORY=$ECR_REPOSITORY_VALUE" >> $GITHUB_ENV
+
       - name: Build, tag, and push Docker image to ECR
         env:
-          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          AWS_ACCOUNT_ID: ${{ env.AWS_ACCOUNT_ID }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
         run: |
           # ensure ECR repository exists (creates if not)
           aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" \
@@ -132,11 +146,16 @@ jobs:
 
       - name: Update App Runner service
         env:
-          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          AWS_ACCOUNT_ID: ${{ env.AWS_ACCOUNT_ID }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
           APP_RUNNER_SERVICE_ARN: ${{ secrets.APP_RUNNER_SERVICE_ARN }}
         run: |
+          if [ -z "$APP_RUNNER_SERVICE_ARN" ]; then
+            echo "APP_RUNNER_SERVICE_ARN secret is required" >&2
+            exit 1
+          fi
+
           IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest"
           aws apprunner update-service \
             --service-arn "$APP_RUNNER_SERVICE_ARN" \
