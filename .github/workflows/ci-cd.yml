@@ -31,7 +31,11 @@ jobs:
           fi
 
       - name: Dump role ARN
-        run: echo "role = '${{ secrets.AWS_INFRA_ROLE_ARN }}'"
+        run: |
+          secret="${{ secrets.AWS_INFRA_ROLE_ARN }}"
+          echo "role length = ${#secret}"
+          echo "role prefix = ${secret:0:10}"
+          echo "role suffix = ${secret: -10}"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -107,7 +111,11 @@ jobs:
             exit 1
           fi
       - name: Dump role ARN
-        run: echo "role = '${{ secrets.AWS_INFRA_ROLE_ARN }}'"
+        run: |
+          secret="${{ secrets.AWS_INFRA_ROLE_ARN }}"
+          echo "role length = ${#secret}"
+          echo "role prefix = ${secret:0:10}"
+          echo "role suffix = ${secret: -10}"
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
