@@ -14,10 +14,8 @@ terraform {
 
 data "aws_caller_identity" "current" {}
 
-resource "aws_iam_openid_connect_provider" "github" {
-  url             = var.github_oidc_url
-  client_id_list  = [var.github_oidc_client_id]
-  thumbprint_list = [var.github_oidc_thumbprint]
+locals {
+  github_oidc_provider_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${replace(var.github_oidc_url, "https://", "")}" 
 }
 
 # Policy document for trust relationship
@@ -27,7 +25,7 @@ data "aws_iam_policy_document" "github_assume" {
 
     principals {
       type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github.arn]
+      identifiers = [local.github_oidc_provider_arn]
     }
 
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -70,8 +68,7 @@ data "aws_iam_policy_document" "github_policy" {
       "ecr:InitiateLayerUpload",
       "ecr:UploadLayerPart",
       "ecr:CompleteLayerUpload",
-      "ecr:ListImages",
-      "iam:CreateOpenIDConnectProvider"
+      "ecr:ListImages"
     ]
     resources = ["*"]
   }
