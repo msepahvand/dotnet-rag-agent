@@ -71,6 +71,7 @@ resource "aws_iam_role" "github_actions" {
             "arn:aws:s3:::dotnet-vector-search-tf-state/*"
           ]
 data "aws_iam_policy_document" "github_policy" {
+
   statement {
     effect    = "Allow"
     actions   = [
@@ -82,10 +83,22 @@ data "aws_iam_policy_document" "github_policy" {
       "ecr:InitiateLayerUpload",
       "ecr:UploadLayerPart",
       "ecr:CompleteLayerUpload",
-      "ecr:ListImages"
-        ,"iam:CreateOpenIDConnectProvider"
+      "ecr:ListImages",
+      "iam:CreateOpenIDConnectProvider"
     ]
     resources = ["*"]
+  }
+
+  statement {
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
+    resources = ["arn:aws:s3:::dotnet-vector-search-tf-state"]
+  }
+
+  statement {
+    effect    = "Allow"
+    actions   = ["s3:GetObject", "s3:PutObject"]
+    resources = ["arn:aws:s3:::dotnet-vector-search-tf-state/*"]
   }
 
   statement {
