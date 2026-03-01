@@ -130,11 +130,6 @@ jobs:
             exit 1
           fi
 
-          if [ -z "$APP_RUNNER_INSTANCE_ROLE_ARN_VALUE" ]; then
-            echo "APP_RUNNER_INSTANCE_ROLE_ARN secret is required" >&2
-            exit 1
-          fi
-
           echo "AWS_REGION=$AWS_REGION_VALUE" >> $GITHUB_ENV
           echo "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID_VALUE" >> $GITHUB_ENV
           echo "ECR_REPOSITORY=$ECR_REPOSITORY_VALUE" >> $GITHUB_ENV
@@ -176,8 +171,21 @@ jobs:
           SERVICE_ARN="$APP_RUNNER_SERVICE_ARN"
 
           if [ -n "$SERVICE_ARN" ]; then
+            if [ -z "$APP_RUNNER_INSTANCE_ROLE_ARN" ]; then
+              APP_RUNNER_INSTANCE_ROLE_ARN=$(aws apprunner describe-service --region "$AWS_REGION" --service-arn "$SERVICE_ARN" --query "Service.InstanceConfiguration.InstanceRoleArn" --output text)
+              if [ "$APP_RUNNER_INSTANCE_ROLE_ARN" = "None" ]; then
+                APP_RUNNER_INSTANCE_ROLE_ARN=""
+              fi
+            fi
+
+            if [ -z "$APP_RUNNER_INSTANCE_ROLE_ARN" ]; then
+              echo "APP_RUNNER_INSTANCE_ROLE_ARN secret is required (or service must already have an instance role)." >&2
+              exit 1
+            fi
+
             echo "APP_RUNNER_CREATED=false" >> $GITHUB_ENV
             echo "APP_RUNNER_SERVICE_ARN=$SERVICE_ARN" >> $GITHUB_ENV
+            echo "APP_RUNNER_INSTANCE_ROLE_ARN=$APP_RUNNER_INSTANCE_ROLE_ARN" >> $GITHUB_ENV
             exit 0
           fi
 
@@ -193,6 +201,11 @@ jobs:
           if [ -z "$SERVICE_ARN" ]; then
             if [ -z "$APP_RUNNER_ECR_ACCESS_ROLE_ARN" ]; then
               echo "APP_RUNNER_ECR_ACCESS_ROLE_ARN secret is required to create a new App Runner service" >&2
+              exit 1
+            fi
+
+            if [ -z "$APP_RUNNER_INSTANCE_ROLE_ARN" ]; then
+              echo "APP_RUNNER_INSTANCE_ROLE_ARN secret is required to create a new App Runner service" >&2
               exit 1
             fi
 
