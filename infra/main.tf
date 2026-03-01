@@ -62,8 +62,14 @@ resource "aws_iam_role" "github_actions" {
   name               = var.iam_role_name
   assume_role_policy = data.aws_iam_policy_document.github_assume.json
 }
+            ,"s3:ListBucket"
+            ,"s3:GetObject"
+            ,"s3:PutObject"
 
-# Inline permissions policy
+          resources = [
+            "arn:aws:s3:::dotnet-vector-search-tf-state",
+            "arn:aws:s3:::dotnet-vector-search-tf-state/*"
+          ]
 data "aws_iam_policy_document" "github_policy" {
   statement {
     effect    = "Allow"
