@@ -46,10 +46,6 @@ jobs:
         with:
           terraform_version: '1.5.0'
 
-      - name: Validate S3 backend permissions
-        run: |
-          aws s3api head-bucket --bucket dotnet-vector-search-tf-state
-
       - name: Terraform apply
         working-directory: infra
         run: |
