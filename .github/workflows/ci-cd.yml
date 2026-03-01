@@ -43,27 +43,25 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_INFRA_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-        env:
-          AWS_REGION: ${{ env.AWS_REGION }}
 
-        - name: Log environment and OIDC info
-          run: |
-            echo "GITHUB_REF: $GITHUB_REF"
-            echo "GITHUB_REPOSITORY: $GITHUB_REPOSITORY"
-            echo "GITHUB_ACTOR: $GITHUB_ACTOR"
-            echo "AWS_REGION: $AWS_REGION"
-            echo "AWS_INFRA_ROLE_ARN: ${{ secrets.AWS_INFRA_ROLE_ARN }}"
-            echo "Listing OIDC token claims (if available):"
-            if [ -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ]; then
-              echo "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" | base64 -d | jq . || echo "jq not available"
-            else
-              echo "No OIDC token found."
-            fi
+      - name: Log environment and OIDC info
+        run: |
+          echo "GITHUB_REF: $GITHUB_REF"
+          echo "GITHUB_REPOSITORY: $GITHUB_REPOSITORY"
+          echo "GITHUB_ACTOR: $GITHUB_ACTOR"
+          echo "AWS_REGION: $AWS_REGION"
+          echo "AWS_INFRA_ROLE_ARN: ${{ secrets.AWS_INFRA_ROLE_ARN }}"
+          echo "Listing OIDC token claims (if available):"
+          if [ -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ]; then
+            echo "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" | base64 -d | jq . || echo "jq not available"
+          else
+            echo "No OIDC token found."
+          fi
 
-        - name: Verify assumed identity with debug
-          run: |
-            echo "calling sts get-caller-identity with debug output"
-            aws sts get-caller-identity --debug || true
+      - name: Verify assumed identity with debug
+        run: |
+          echo "calling sts get-caller-identity with debug output"
+          aws sts get-caller-identity --debug || true
 
       - name: Verify assumed identity
         run: |
