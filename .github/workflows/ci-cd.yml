@@ -88,7 +88,9 @@ jobs:
         working-directory: infra
         run: |
           echo "Remote backend init failed. Bootstrapping IAM policy with local state."
-          terraform init -backend=false
+          rm -rf .terraform
+          rm -f .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
+          terraform init -backend=false -reconfigure
           terraform apply -auto-approve \
             -var="github_repo=${{ github.repository }}" \
             -var="github_branch=${{ github.ref }}" \
