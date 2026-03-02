@@ -1,3 +1,4 @@
+using Microsoft.OpenApi.Models;
 using VectorSearch.Core;
 using VectorSearch.S3;
 
@@ -17,7 +18,15 @@ public class Program
         
         // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
         builder.Services.AddEndpointsApiExplorer();
-        builder.Services.AddSwaggerGen();
+        builder.Services.AddSwaggerGen(options =>
+        {
+            options.SwaggerDoc("v1", new OpenApiInfo
+            {
+                Title = "Vector Search API",
+                Version = "v1",
+                Description = "Semantic search API powered by vector embeddings."
+            });
+        });
 
         var vectorProvider = builder.Configuration["VectorStore:Provider"] ?? "S3Vectors";
         var initializeOnStartupOverride = builder.Configuration.GetValue<bool?>("VectorStore:InitializeOnStartup");
@@ -47,10 +56,15 @@ public class Program
         }
 
         // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
+            var swaggerEnabled = app.Configuration.GetValue<bool?>("Swagger:Enabled") ?? app.Environment.IsDevelopment();
+            if (swaggerEnabled)
             {
                 app.UseSwagger();
-                app.UseSwaggerUI();
+                app.UseSwaggerUI(options =>
+                {
+                    options.SwaggerEndpoint("/swagger/v1/swagger.json", "Vector Search API v1");
+                    options.RoutePrefix = "swagger";
+                });
             }
 
             app.UseHttpsRedirection();
