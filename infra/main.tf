@@ -45,3 +45,14 @@ resource "aws_iam_role_policy" "apprunner_instance_runtime" {
   role   = var.apprunner_instance_role_name
   policy = data.aws_iam_policy_document.apprunner_instance_runtime.json
 }
+
+module "s3_vectors" {
+  source = "./modules/s3_vectors"
+
+  aws_region       = var.aws_region
+  vector_bucket_name = var.vector_bucket_name
+  vector_index_name  = var.vector_index_name
+  vector_dimension   = var.vector_dimension
+  distance_metric    = var.vector_distance_metric
+  data_type          = var.vector_data_type
+}

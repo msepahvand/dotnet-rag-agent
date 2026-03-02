@@ -68,3 +68,33 @@ variable "embedding_model_id" {
   type        = string
   default     = "amazon.titan-embed-text-v2:0"
 }
+
+variable "vector_bucket_name" {
+  description = "S3 Vectors bucket name used by the application"
+  type        = string
+  default     = "posts-semantic-search"
+}
+
+variable "vector_index_name" {
+  description = "S3 Vectors index name used by the application"
+  type        = string
+  default     = "posts-content-index"
+}
+
+variable "vector_dimension" {
+  description = "Vector dimension for the S3 Vectors index"
+  type        = number
+  default     = 1024
+}
+
+variable "vector_distance_metric" {
+  description = "Distance metric for the S3 Vectors index"
+  type        = string
+  default     = "cosine"
+}
+
+variable "vector_data_type" {
+  description = "Vector data type for the S3 Vectors index"
+  type        = string
+  default     = "float32"
+}
