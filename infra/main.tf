@@ -18,13 +18,6 @@ locals {
   github_oidc_provider_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${replace(var.github_oidc_url, "https://", "")}"
 }
 
-resource "aws_iam_openid_connect_provider" "github" {
-  url = var.github_oidc_url
-
-  client_id_list  = [var.github_oidc_client_id]
-  thumbprint_list = [var.github_oidc_thumbprint]
-}
-
 data "aws_iam_policy_document" "github_assume" {
   statement {
     effect  = "Allow"
@@ -32,7 +25,7 @@ data "aws_iam_policy_document" "github_assume" {
 
     principals {
       type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github.arn]
+      identifiers = [local.github_oidc_provider_arn]
     }
 
     condition {
