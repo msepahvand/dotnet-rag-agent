@@ -54,8 +54,15 @@
     {
       "Effect": "Allow",
       "Action": [
-        "iam:GetRole",
         "iam:ListAttachedRolePolicies",
+        "iam:ListRolePolicies"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
         "iam:GetRolePolicy",
         "iam:ListRolePolicies"
       ],
