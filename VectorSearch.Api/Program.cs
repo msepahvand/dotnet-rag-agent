@@ -19,10 +19,17 @@ public class Program
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
 
+        var vectorProvider = builder.Configuration["VectorStore:Provider"] ?? "S3Vectors";
+        var initializeOnStartupOverride = builder.Configuration.GetValue<bool?>("VectorStore:InitializeOnStartup");
+        var requiresStartupInitialization =
+            vectorProvider.Equals("Qdrant", StringComparison.OrdinalIgnoreCase) ||
+            vectorProvider.Equals("Redis", StringComparison.OrdinalIgnoreCase);
+        var shouldInitializeOnStartup = initializeOnStartupOverride ?? requiresStartupInitialization;
+
         var app = builder.Build();
 
-        // Ensure vector store is initialized (skip in test environment)
-        if (!app.Environment.IsEnvironment("Testing"))
+        // Ensure vector store is initialized only when required (skip in test environment)
+        if (!app.Environment.IsEnvironment("Testing") && shouldInitializeOnStartup)
         {
             using (var scope = app.Services.CreateScope())
             {
