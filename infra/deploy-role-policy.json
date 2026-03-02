@@ -19,6 +19,16 @@
     {
       "Effect": "Allow",
       "Action": [
+        "s3vectors:CreateVectorBucket",
+        "s3vectors:ListVectorBuckets",
+        "s3vectors:CreateIndex",
+        "s3vectors:ListIndexes"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
         "apprunner:CreateService",
         "apprunner:DescribeService",
         "apprunner:ListServices",
