@@ -19,7 +19,7 @@ locals {
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
-  url = replace(var.github_oidc_url, "https://", "")
+  url = var.github_oidc_url
 
   client_id_list  = [var.github_oidc_client_id]
   thumbprint_list = [var.github_oidc_thumbprint]
