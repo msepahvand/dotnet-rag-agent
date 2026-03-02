@@ -15,7 +15,7 @@ terraform {
 data "aws_caller_identity" "current" {}
 
 locals {
-  effective_aws_region  = trimspace(var.aws_region) != "" ? var.aws_region : "us-east-1"
+  effective_aws_region     = trimspace(var.aws_region) != "" ? var.aws_region : "us-east-1"
   github_oidc_provider_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${replace(var.github_oidc_url, "https://", "")}"
 }
 
@@ -58,26 +58,3 @@ module "s3_vectors" {
   data_type          = var.vector_data_type
 }
 
-removed {
-  from = aws_iam_openid_connect_provider.github
-
-  lifecycle {
-    destroy = false
-  }
-}
-
-removed {
-  from = aws_iam_role.github_actions
-
-  lifecycle {
-    destroy = false
-  }
-}
-
-removed {
-  from = aws_iam_role_policy.github_actions_policy
-
-  lifecycle {
-    destroy = false
-  }
-}
