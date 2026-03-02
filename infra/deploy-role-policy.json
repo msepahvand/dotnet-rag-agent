@@ -29,7 +29,10 @@
     {
       "Effect": "Allow",
       "Action": "iam:PassRole",
-      "Resource": "*"
+      "Resource": [
+        "arn:aws:iam::599080142044:role/AppRunnerEcrAccessRole",
+        "arn:aws:iam::599080142044:role/AppRunnerInstanceRole"
+      ]
     }
   ]
 }
