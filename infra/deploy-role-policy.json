@@ -43,6 +43,22 @@
         "iam:DeleteRolePolicy"
       ],
       "Resource": "arn:aws:iam::__AWS_ACCOUNT_ID__:role/AppRunnerInstanceRole"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetOpenIDConnectProvider"
+      ],
+      "Resource": "arn:aws:iam::__AWS_ACCOUNT_ID__:oidc-provider/token.actions.githubusercontent.com"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
+        "iam:GetRolePolicy",
+        "iam:ListRolePolicies"
+      ],
+      "Resource": "arn:aws:iam::__AWS_ACCOUNT_ID__:role/GitHubActionsDeployRole"
     }
   ]
 }
