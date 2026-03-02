@@ -1,0 +1,174 @@
+{
+  "info": {
+    "_postman_id": "8e42d2ec-b2a2-4fdd-a4b3-b3d95e1b2f01",
+    "name": "VectorSearch API",
+    "description": "Collection for testing VectorSearch API endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5080",
+      "type": "string"
+    },
+    {
+      "key": "postId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "query",
+      "value": "technology",
+      "type": "string"
+    },
+    {
+      "key": "topK",
+      "value": "5",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Posts",
+      "item": [
+        {
+          "name": "Get All Posts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Post By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "posts",
+                "{{postId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Indexing",
+      "item": [
+        {
+          "name": "Index All Posts",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/index/all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "index",
+                "all"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Index Single Post",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/index/{{postId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "index",
+                "{{postId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "item": [
+        {
+          "name": "Semantic Search",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?query={{query}}&topK={{topK}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "{{query}}"
+                },
+                {
+                  "key": "topK",
+                  "value": "{{topK}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Swagger",
+      "item": [
+        {
+          "name": "Swagger JSON",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/swagger/v1/swagger.json",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swagger",
+                "v1",
+                "swagger.json"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

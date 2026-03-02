@@ -33,6 +33,16 @@
         "arn:aws:iam::__AWS_ACCOUNT_ID__:role/AppRunnerEcrAccessRole",
         "arn:aws:iam::__AWS_ACCOUNT_ID__:role/AppRunnerInstanceRole"
       ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRolePolicy",
+        "iam:ListRolePolicies",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy"
+      ],
+      "Resource": "arn:aws:iam::__AWS_ACCOUNT_ID__:role/AppRunnerInstanceRole"
     }
   ]
 }
