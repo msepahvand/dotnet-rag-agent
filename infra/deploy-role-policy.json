@@ -55,6 +55,7 @@
       "Effect": "Allow",
       "Action": [
         "iam:GetRole",
+        "iam:ListAttachedRolePolicies",
         "iam:GetRolePolicy",
         "iam:ListRolePolicies"
       ],
