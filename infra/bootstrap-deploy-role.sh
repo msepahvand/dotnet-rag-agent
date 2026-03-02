@@ -12,10 +12,21 @@ set -euo pipefail
 ROLE_NAME="GitHubActionsDeployRole"
 POLICY_NAME="GitHubActionsECRAppRunner"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+POLICY_TEMPLATE="${SCRIPT_DIR}/deploy-role-policy.json"
+RENDERED_POLICY="$(mktemp)"
+
+trap 'rm -f "$RENDERED_POLICY"' EXIT
+
+sed \
+  -e "s/__AWS_ACCOUNT_ID__/${AWS_ACCOUNT_ID}/g" \
+  -e "s/__AWS_REGION__/${AWS_REGION}/g" \
+  "$POLICY_TEMPLATE" > "$RENDERED_POLICY"
 
 aws iam put-role-policy \
   --role-name "$ROLE_NAME" \
   --policy-name "$POLICY_NAME" \
-  --policy-document "file://${SCRIPT_DIR}/deploy-role-policy.json"
+  --policy-document "file://${RENDERED_POLICY}"
 
 echo "Updated inline policy '$POLICY_NAME' on role '$ROLE_NAME'."

@@ -24,14 +24,14 @@
         "apprunner:ListServices",
         "apprunner:UpdateService"
       ],
-      "Resource": "arn:aws:apprunner:us-east-1:599080142044:service/*"
+      "Resource": "arn:aws:apprunner:__AWS_REGION__:__AWS_ACCOUNT_ID__:service/*"
     },
     {
       "Effect": "Allow",
       "Action": "iam:PassRole",
       "Resource": [
-        "arn:aws:iam::599080142044:role/AppRunnerEcrAccessRole",
-        "arn:aws:iam::599080142044:role/AppRunnerInstanceRole"
+        "arn:aws:iam::__AWS_ACCOUNT_ID__:role/AppRunnerEcrAccessRole",
+        "arn:aws:iam::__AWS_ACCOUNT_ID__:role/AppRunnerInstanceRole"
       ]
     }
   ]
