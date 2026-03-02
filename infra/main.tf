@@ -1,6 +1,6 @@
 
 provider "aws" {
-  region = var.aws_region
+  region = local.effective_aws_region
 }
 
 terraform {
@@ -15,6 +15,7 @@ terraform {
 data "aws_caller_identity" "current" {}
 
 locals {
+  effective_aws_region  = trimspace(var.aws_region) != "" ? var.aws_region : "us-east-1"
   github_oidc_provider_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${replace(var.github_oidc_url, "https://", "")}"
 }
 
@@ -26,7 +27,7 @@ data "aws_iam_policy_document" "apprunner_instance_runtime" {
       "bedrock:InvokeModel"
     ]
     resources = [
-      "arn:aws:bedrock:${var.aws_region}::foundation-model/${var.embedding_model_id}"
+      "arn:aws:bedrock:${local.effective_aws_region}::foundation-model/${var.embedding_model_id}"
     ]
   }
 
@@ -49,10 +50,34 @@ resource "aws_iam_role_policy" "apprunner_instance_runtime" {
 module "s3_vectors" {
   source = "./modules/s3_vectors"
 
-  aws_region       = var.aws_region
+  aws_region         = local.effective_aws_region
   vector_bucket_name = var.vector_bucket_name
   vector_index_name  = var.vector_index_name
   vector_dimension   = var.vector_dimension
   distance_metric    = var.vector_distance_metric
   data_type          = var.vector_data_type
+}
+
+removed {
+  from = aws_iam_openid_connect_provider.github
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = aws_iam_role.github_actions
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = aws_iam_role_policy.github_actions_policy
+
+  lifecycle {
+    destroy = false
+  }
 }

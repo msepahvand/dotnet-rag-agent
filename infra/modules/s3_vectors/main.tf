@@ -6,16 +6,21 @@ resource "terraform_data" "vector_bucket" {
 
   provisioner "local-exec" {
     command = <<-EOT
-      set -euo pipefail
+      set -eu
+
+      region="${var.aws_region}"
+      if [ -z "$region" ]; then
+        region="us-east-1"
+      fi
 
       existing_bucket=$(aws s3vectors list-vector-buckets \
-        --region "${var.aws_region}" \
+        --region "$region" \
         --query "vectorBuckets[?vectorBucketName=='${var.vector_bucket_name}'].vectorBucketName | [0]" \
         --output text)
 
       if [ "$existing_bucket" = "None" ] || [ -z "$existing_bucket" ]; then
         aws s3vectors create-vector-bucket \
-          --region "${var.aws_region}" \
+          --region "$region" \
           --vector-bucket-name "${var.vector_bucket_name}" > /dev/null
       fi
     EOT
@@ -36,17 +41,22 @@ resource "terraform_data" "vector_index" {
 
   provisioner "local-exec" {
     command = <<-EOT
-      set -euo pipefail
+      set -eu
+
+      region="${var.aws_region}"
+      if [ -z "$region" ]; then
+        region="us-east-1"
+      fi
 
       existing_index=$(aws s3vectors list-indexes \
-        --region "${var.aws_region}" \
+        --region "$region" \
         --vector-bucket-name "${var.vector_bucket_name}" \
         --query "indexes[?indexName=='${var.vector_index_name}'].indexName | [0]" \
         --output text)
 
       if [ "$existing_index" = "None" ] || [ -z "$existing_index" ]; then
         aws s3vectors create-index \
-          --region "${var.aws_region}" \
+          --region "$region" \
           --vector-bucket-name "${var.vector_bucket_name}" \
           --index-name "${var.vector_index_name}" \
           --data-type "${var.data_type}" \

@@ -53,7 +53,7 @@ jobs:
           terraform apply -auto-approve \
             -var="github_repo=${{ github.repository }}" \
             -var="github_branch=${{ github.ref }}" \
-            -var="aws_region=${{ secrets.AWS_REGION }}"
+            -var="aws_region=${{ env.AWS_REGION }}"
 
   build-and-test:
     name: Build & Test
