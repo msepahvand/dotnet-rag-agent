@@ -50,3 +50,21 @@ variable "iam_policy_name" {
   type        = string
   default     = "GitHubActionsECRAppRunner"
 }
+
+variable "apprunner_instance_role_name" {
+  description = "Name of the App Runner instance IAM role used by the running service"
+  type        = string
+  default     = "AppRunnerInstanceRole"
+}
+
+variable "apprunner_instance_policy_name" {
+  description = "Name of the inline IAM policy attached to the App Runner instance role"
+  type        = string
+  default     = "AppRunnerVectorSearchRuntime"
+}
+
+variable "embedding_model_id" {
+  description = "Bedrock embedding model ID used by the application"
+  type        = string
+  default     = "amazon.titan-embed-text-v2:0"
+}
