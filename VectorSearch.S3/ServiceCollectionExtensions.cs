@@ -13,6 +13,8 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        var chatModelId = configuration["AWS:ChatModelId"] ?? "anthropic.claude-3-haiku-20240307-v1:0";
+
         // Register HttpClient for JSONPlaceholder
         services.AddHttpClient<IPostService, JsonPlaceholderService>();
 
@@ -27,6 +29,7 @@ public static class ServiceCollectionExtensions
             // Configure Semantic Kernel with Bedrock embeddings
             services.AddBedrockEmbeddingGenerator(
                 configuration["AWS:EmbeddingModelId"] ?? "amazon.titan-embed-text-v2:0");
+            services.AddBedrockChatCompletionService(chatModelId);
             
             // Register Kernel
             services.AddTransient(sp => new Kernel(sp));
@@ -52,6 +55,7 @@ public static class ServiceCollectionExtensions
             // Configure Semantic Kernel with Bedrock embeddings
             services.AddBedrockEmbeddingGenerator(
                 configuration["AWS:EmbeddingModelId"] ?? "amazon.titan-embed-text-v2:0");
+            services.AddBedrockChatCompletionService(chatModelId);
             
             // Register Kernel
             services.AddTransient(sp => new Kernel(sp));
@@ -66,6 +70,7 @@ public static class ServiceCollectionExtensions
             // Configure Semantic Kernel with Bedrock embeddings
             services.AddBedrockEmbeddingGenerator(
                 configuration["AWS:EmbeddingModelId"] ?? "amazon.titan-embed-text-v2:0");
+            services.AddBedrockChatCompletionService(chatModelId);
             
             // Register Kernel
             services.AddTransient(sp => new Kernel(sp));

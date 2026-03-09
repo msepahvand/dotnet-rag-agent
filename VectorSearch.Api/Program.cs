@@ -1,4 +1,5 @@
 using Microsoft.OpenApi.Models;
+using Microsoft.SemanticKernel.ChatCompletion;
 using VectorSearch.Core;
 using VectorSearch.S3;
 
@@ -118,7 +119,7 @@ public class Program
             .WithName("SemanticSearch")
             .WithOpenApi();
 
-            app.MapPost("/api/agent/ask", async (AgentAskRequest request, IVectorService vectorService, IPostService postService) =>
+            app.MapPost("/api/agent/ask", async (AgentAskRequest request, IVectorService vectorService, IPostService postService, IServiceProvider serviceProvider, ILogger<Program> logger) =>
             {
                 if (string.IsNullOrWhiteSpace(request.Question))
                     return Results.BadRequest(new { Message = "Question cannot be empty" });
@@ -158,7 +159,7 @@ public class Program
                     .Where(source => !string.IsNullOrWhiteSpace(source.Title))
                     .ToList();
 
-                var answer = BuildGroundedAnswer(request.Question, sources);
+                var answer = await BuildGroundedAnswerAsync(request.Question, sources, serviceProvider, logger);
 
                 return Results.Ok(new AgentAskResponse
                 {
@@ -190,18 +191,53 @@ public class Program
         app.Run();
     }
 
-    private static string BuildGroundedAnswer(string question, List<AgentSource> sources)
+    private static async Task<string> BuildGroundedAnswerAsync(string question, List<AgentSource> sources, IServiceProvider serviceProvider, ILogger logger)
     {
         if (sources.Count == 0)
         {
             return "I couldn't produce a grounded answer because there were no supporting sources.";
         }
 
+        var deterministicAnswer = BuildDeterministicGroundedAnswer(question, sources);
+
+        try
+        {
+            var chatService = serviceProvider.GetService(typeof(IChatCompletionService)) as IChatCompletionService;
+            if (chatService == null)
+            {
+                return deterministicAnswer;
+            }
+
+            var sourceContext = string.Join(
+                "\n",
+                sources.Select(source =>
+                    $"[PostId: {source.PostId}] Title: {source.Title}\nSnippet: {source.Snippet}"));
+
+            var chatHistory = new ChatHistory();
+            chatHistory.AddSystemMessage("You are a grounded assistant. Answer only from the provided sources. If the sources are insufficient, say you do not have enough information. Include citations using [PostId: N] for each key claim.");
+            chatHistory.AddUserMessage($"Question:\n{question}\n\nSources:\n{sourceContext}\n\nProvide a concise answer with citations.");
+
+            var response = await chatService.GetChatMessageContentsAsync(chatHistory);
+            var llmAnswer = response.FirstOrDefault()?.Content?.Trim();
+
+            return string.IsNullOrWhiteSpace(llmAnswer)
+                ? deterministicAnswer
+                : llmAnswer;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falling back to deterministic grounded answer because Bedrock chat generation failed.");
+            return deterministicAnswer;
+        }
+    }
+
+    private static string BuildDeterministicGroundedAnswer(string question, List<AgentSource> sources)
+    {
         var topSources = sources.Take(3).ToList();
         var evidence = string.Join(
             "\n",
             topSources.Select((source, index) =>
-                $"{index + 1}. {source.Title} (PostId: {source.PostId}) - {source.Snippet}"));
+                $"{index + 1}. {source.Title} [PostId: {source.PostId}] - {source.Snippet}"));
 
         return $"Grounded answer for: {question}\n\nSupporting evidence:\n{evidence}";
     }
