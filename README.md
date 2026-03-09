@@ -391,6 +391,49 @@ curl "http://localhost:5000/api/search?query=user%20interface&topK=5"
 }
 ```
 
+### Agentic Ask (Single Tool: Semantic Search)
+
+```http
+POST /api/agent/ask
+```
+
+**Request Body:**
+```json
+{
+  "question": "What is this post about?",
+  "topK": 5
+}
+```
+
+**Behavior:**
+- Agent receives user question
+- Agent calls one tool: semantic search
+- API returns a grounded answer with supporting sources
+
+**Example:**
+```powershell
+curl -X POST "http://localhost:5000/api/agent/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"What is post 1 about?","topK":5}'
+```
+
+**Response:**
+```json
+{
+  "toolUsed": "semantic-search",
+  "grounded": true,
+  "answer": "Grounded answer for: What is post 1 about?...",
+  "sources": [
+    {
+      "postId": 1,
+      "title": "sunt aut facere repellat provident occaecati...",
+      "snippet": "quia et suscipit suscipit recusandae...",
+      "distance": 0.09
+    }
+  ]
+}
+```
+
 ---
 
 ## Docker & Local Development

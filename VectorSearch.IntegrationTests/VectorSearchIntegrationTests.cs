@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
+using FluentAssertions;
 using VectorSearch.Core;
 
 namespace VectorSearch.IntegrationTests;
@@ -28,9 +29,9 @@ public class VectorSearchIntegrationTests
         response.EnsureSuccessStatusCode();
         var posts = await response.Content.ReadFromJsonAsync<List<Post>>();
         
-        Assert.NotNull(posts);
-        Assert.NotEmpty(posts);
-        Assert.Equal(100, posts.Count); // JSONPlaceholder has 100 posts
+        posts.Should().NotBeNull();
+        posts.Should().NotBeEmpty();
+        posts!.Count.Should().Be(100); // JSONPlaceholder has 100 posts
     }
 
     [Theory]
@@ -49,10 +50,10 @@ public class VectorSearchIntegrationTests
         response.EnsureSuccessStatusCode();
         var post = await response.Content.ReadFromJsonAsync<Post>();
         
-        Assert.NotNull(post);
-        Assert.Equal(1, post.Id);
-        Assert.NotNull(post.Title);
-        Assert.NotNull(post.Body);
+        post.Should().NotBeNull();
+        post!.Id.Should().Be(1);
+        post.Title.Should().NotBeNull();
+        post.Body.Should().NotBeNull();
     }
 
     [Theory]
@@ -68,7 +69,7 @@ public class VectorSearchIntegrationTests
         var response = await client.GetAsync("/api/posts/999999");
 
         // Assert
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Theory]
@@ -94,9 +95,9 @@ public class VectorSearchIntegrationTests
         searchResponse.EnsureSuccessStatusCode();
         var results = await searchResponse.Content.ReadFromJsonAsync<List<SearchResult>>();
         
-        Assert.NotNull(results);
-        Assert.NotEmpty(results);
-        Assert.Contains(results, r => r.PostId == 1);
+        results.Should().NotBeNull();
+        results.Should().NotBeEmpty();
+        results.Should().Contain(r => r.PostId == 1);
     }
 
     [Theory]
@@ -125,9 +126,9 @@ public class VectorSearchIntegrationTests
         searchResponse.EnsureSuccessStatusCode();
         var results = await searchResponse.Content.ReadFromJsonAsync<List<SearchResult>>();
         
-        Assert.NotNull(results);
-        Assert.NotEmpty(results);
-        Assert.All(results, r => Assert.InRange(r.PostId, 1, 5));
+        results.Should().NotBeNull();
+        results.Should().NotBeEmpty();
+        results.Should().OnlyContain(r => r.PostId >= 1 && r.PostId <= 5);
     }
 
     [Theory]
@@ -146,7 +147,7 @@ public class VectorSearchIntegrationTests
         response.EnsureSuccessStatusCode();
         var results = await response.Content.ReadFromJsonAsync<List<SearchResult>>();
         
-        Assert.NotNull(results);
+        results.Should().NotBeNull();
         // Might be empty if nothing is indexed
     }
 
@@ -163,7 +164,57 @@ public class VectorSearchIntegrationTests
         var response = await client.GetAsync("/api/search?query=&topK=5");
 
         // Assert
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Theory]
+    [MemberData(nameof(VectorProviders))]
+    public async Task AgentAsk_UsesSemanticSearchAndReturnsGroundedSources(string provider)
+    {
+        // Arrange
+        await using var factory = new VectorSearchWebApplicationFactory(provider);
+        await factory.InitializeAsync();
+        var client = factory.CreateClient();
+
+        var indexResponse = await client.PostAsync("/api/index/1", null);
+        indexResponse.EnsureSuccessStatusCode();
+
+        await Task.Delay(2000);
+
+        // Act
+        var response = await client.PostAsJsonAsync("/api/agent/ask", new
+        {
+            question = "What is post 1 about?",
+            topK = 5
+        });
+
+        // Assert
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<AgentAskResponseDto>();
+
+        result.Should().NotBeNull();
+        result!.ToolUsed.Should().Be("semantic-search");
+        result.Grounded.Should().BeTrue();
+        result.Sources.Should().NotBeNull();
+        result.Sources.Should().NotBeEmpty();
+        result.Sources.Should().Contain(source => source.PostId == 1);
+        string.IsNullOrWhiteSpace(result.Answer).Should().BeFalse();
+    }
+
+    private sealed record AgentAskResponseDto
+    {
+        public string ToolUsed { get; init; } = string.Empty;
+        public bool Grounded { get; init; }
+        public string Answer { get; init; } = string.Empty;
+        public List<AgentSourceDto> Sources { get; init; } = [];
+    }
+
+    private sealed record AgentSourceDto
+    {
+        public int PostId { get; init; }
+        public string Title { get; init; } = string.Empty;
+        public string Snippet { get; init; } = string.Empty;
+        public double Distance { get; init; }
     }
 }
 

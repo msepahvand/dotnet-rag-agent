@@ -118,6 +118,59 @@ public class Program
             .WithName("SemanticSearch")
             .WithOpenApi();
 
+            app.MapPost("/api/agent/ask", async (AgentAskRequest request, IVectorService vectorService, IPostService postService) =>
+            {
+                if (string.IsNullOrWhiteSpace(request.Question))
+                    return Results.BadRequest(new { Message = "Question cannot be empty" });
+
+                var topK = request.TopK <= 0 ? 5 : Math.Min(request.TopK, 10);
+                var searchResults = await vectorService.SemanticSearchAsync(request.Question, topK);
+
+                if (searchResults.Count == 0)
+                {
+                    return Results.Ok(new AgentAskResponse
+                    {
+                        ToolUsed = "semantic-search",
+                        Grounded = false,
+                        Answer = "I couldn't find supporting sources in the indexed content. Try indexing more data or rephrasing the question.",
+                        Sources = []
+                    });
+                }
+
+                var sourceCandidates = await Task.WhenAll(
+                    searchResults.Select(async result =>
+                    {
+                        var post = await postService.GetPostByIdAsync(result.PostId);
+                        var snippet = post == null
+                            ? string.Empty
+                            : TrimForSnippet(post.Body, 220);
+
+                        return new AgentSource
+                        {
+                            PostId = result.PostId,
+                            Title = result.Title,
+                            Distance = result.Distance,
+                            Snippet = snippet
+                        };
+                    }));
+
+                var sources = sourceCandidates
+                    .Where(source => !string.IsNullOrWhiteSpace(source.Title))
+                    .ToList();
+
+                var answer = BuildGroundedAnswer(request.Question, sources);
+
+                return Results.Ok(new AgentAskResponse
+                {
+                    ToolUsed = "semantic-search",
+                    Grounded = sources.Count > 0,
+                    Answer = answer,
+                    Sources = sources
+                });
+            })
+            .WithName("AgentAsk")
+            .WithOpenApi();
+
             app.MapGet("/api/posts", async (IPostService postService) =>
             {
                 var posts = await postService.GetAllPostsAsync();
@@ -136,4 +189,57 @@ public class Program
 
         app.Run();
     }
+
+    private static string BuildGroundedAnswer(string question, List<AgentSource> sources)
+    {
+        if (sources.Count == 0)
+        {
+            return "I couldn't produce a grounded answer because there were no supporting sources.";
+        }
+
+        var topSources = sources.Take(3).ToList();
+        var evidence = string.Join(
+            "\n",
+            topSources.Select((source, index) =>
+                $"{index + 1}. {source.Title} (PostId: {source.PostId}) - {source.Snippet}"));
+
+        return $"Grounded answer for: {question}\n\nSupporting evidence:\n{evidence}";
+    }
+
+    private static string TrimForSnippet(string content, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return string.Empty;
+        }
+
+        if (content.Length <= maxLength)
+        {
+            return content;
+        }
+
+        return $"{content[..maxLength].TrimEnd()}...";
+    }
+}
+
+public record AgentAskRequest
+{
+    public string Question { get; init; } = string.Empty;
+    public int TopK { get; init; } = 5;
+}
+
+public record AgentSource
+{
+    public int PostId { get; init; }
+    public string Title { get; init; } = string.Empty;
+    public string Snippet { get; init; } = string.Empty;
+    public double Distance { get; init; }
+}
+
+public record AgentAskResponse
+{
+    public string ToolUsed { get; init; } = "semantic-search";
+    public bool Grounded { get; init; }
+    public string Answer { get; init; } = string.Empty;
+    public List<AgentSource> Sources { get; init; } = [];
 }
