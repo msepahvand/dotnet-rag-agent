@@ -76,6 +76,7 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
             services.RemoveAll<Amazon.S3Vectors.IAmazonS3Vectors>();
             services.RemoveAll<Microsoft.SemanticKernel.Embeddings.ITextEmbeddingGenerationService>();
             services.RemoveAll<Microsoft.SemanticKernel.Kernel>();
+            services.RemoveAll<IAgentAnswerService>();
             
             // Remove and replace the IVectorStore implementation based on provider
             services.RemoveAll<IVectorStore>();
@@ -98,6 +99,10 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
             // This eliminates the need for AWS Bedrock credentials
             services.RemoveAll<IEmbeddingService>();
             services.AddScoped<IEmbeddingService, MockEmbeddingService>();
+
+            // Replace grounded answer generation with a test implementation
+            // so agent endpoint tests do not depend on Bedrock runtime services.
+            services.AddScoped<IAgentAnswerService, TestAgentAnswerService>();
         });
 
         builder.UseEnvironment("Testing");

@@ -3,15 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.36930.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorSearch.Api", "VectorSearch.Api.csproj", "{5F52BB67-6978-4622-9E91-FF90C248D6C4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorSearch.Api", "VectorSearch.Api\VectorSearch.Api.csproj", "{5F52BB67-6978-4622-9E91-FF90C248D6C4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorSearch.S3", "..\VectorSearch.S3\VectorSearch.S3.csproj", "{DD9C64DA-DFCD-44E2-B702-9DE303E685C4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorSearch.S3", "VectorSearch.S3\VectorSearch.S3.csproj", "{DD9C64DA-DFCD-44E2-B702-9DE303E685C4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorSearch.Redis", "..\VectorSearch.Redis\VectorSearch.Redis.csproj", "{4B07FD59-6AB2-4F8A-9460-445B92B1D3EB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorSearch.Redis", "VectorSearch.Redis\VectorSearch.Redis.csproj", "{4B07FD59-6AB2-4F8A-9460-445B92B1D3EB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorSearch.IntegrationTests", "..\VectorSearch.IntegrationTests\VectorSearch.IntegrationTests.csproj", "{CF63AD65-11F0-4206-B0A4-55826D2D9BC6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorSearch.IntegrationTests", "VectorSearch.IntegrationTests\VectorSearch.IntegrationTests.csproj", "{CF63AD65-11F0-4206-B0A4-55826D2D9BC6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorSearch.Core", "..\VectorSearch.Core\VectorSearch.Core.csproj", "{C97FE870-EC08-49BC-A760-5798B19387E2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorSearch.Core", "VectorSearch.Core\VectorSearch.Core.csproj", "{C97FE870-EC08-49BC-A760-5798B19387E2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -15,6 +15,9 @@ public static class ServiceCollectionExtensions
     {
         var chatModelId = configuration["AWS:ChatModelId"] ?? "anthropic.claude-3-haiku-20240307-v1:0";
 
+        // Required by Bedrock chat/embedding connectors regardless of vector store provider.
+        services.AddAWSService<IAmazonBedrockRuntime>();
+
         // Register HttpClient for JSONPlaceholder
         services.AddHttpClient<IPostService, JsonPlaceholderService>();
 
@@ -78,13 +81,13 @@ public static class ServiceCollectionExtensions
             // Register embedding service
             services.AddScoped<IEmbeddingService, EmbeddingService>();
             
-            services.AddAWSService<IAmazonBedrockRuntime>();
             services.AddAWSService<IAmazonS3Vectors>();
             services.AddScoped<IVectorStore, S3VectorStore>();
         }
 
         // Register the main vector service
         services.AddScoped<IVectorService, VectorService>();
+        services.AddScoped<IAgentAnswerService, GroundedAgentAnswerService>();
 
         return services;
     }
