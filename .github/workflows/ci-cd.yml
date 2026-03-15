@@ -85,10 +85,10 @@ jobs:
 
       - name: Restore dependencies
         # restore all projects via solution to ensure test project packages are restored
-        run: dotnet restore VectorSearch.Api/VectorSearch.Api.sln
+        run: dotnet restore VectorSearch.Api.sln
 
       - name: Build entire solution
-        run: dotnet build VectorSearch.Api/VectorSearch.Api.sln --configuration Release --no-restore
+        run: dotnet build VectorSearch.Api.sln --configuration Release --no-restore
 
       - name: Run integration tests
         run: |
