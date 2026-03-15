@@ -12,3 +12,18 @@ output "vector_index_name" {
   description = "Configured S3 Vectors index name"
   value       = module.s3_vectors.vector_index_name
 }
+
+output "vector_dimension" {
+  description = "Configured S3 Vectors index dimension"
+  value       = module.s3_vectors.vector_dimension
+}
+
+output "vector_distance_metric" {
+  description = "Configured S3 Vectors index distance metric"
+  value       = module.s3_vectors.distance_metric
+}
+
+output "vector_data_type" {
+  description = "Configured S3 Vectors index data type"
+  value       = module.s3_vectors.data_type
+}
