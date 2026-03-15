@@ -1,45 +1,29 @@
 using Microsoft.AspNetCore.Mvc;
-using VectorSearch.Core;
+using VectorSearch.Api.Contracts.Responses;
+using VectorSearch.Api.Services;
 
 namespace VectorSearch.Api.Controllers;
 
 [ApiController]
 [Route("api/index")]
-public sealed class IndexController(
-    IPostService postService,
-    IEmbeddingService embeddingService,
-    IVectorService vectorService) : ControllerBase
+public sealed class IndexController(IPostIndexingService postIndexingService) : ControllerBase
 {
     [HttpPost("all")]
     public async Task<IActionResult> IndexAll()
     {
-        var posts = await postService.GetAllPostsAsync();
-        var embeddings = await embeddingService.GenerateEmbeddingsAsync(posts);
-
-        var postsWithEmbeddings = posts
-            .Join(embeddings,
-                post => post.Id,
-                embedding => embedding.PostId,
-                (post, embedding) => (Post: post, Embedding: embedding.Embedding))
-            .ToList();
-
-        await vectorService.IndexPostsBatchAsync(postsWithEmbeddings);
-
-        return Ok(new { Message = $"Indexed {posts.Count} posts successfully", Count = posts.Count });
+        var result = await postIndexingService.IndexAllAsync();
+        return Ok(new IndexAllPostsResponse($"Indexed {result.Count} posts successfully", result.Count));
     }
 
     [HttpPost("{id:int}")]
     public async Task<IActionResult> IndexSingle(int id)
     {
-        var post = await postService.GetPostByIdAsync(id);
-        if (post == null)
+        var result = await postIndexingService.IndexSingleAsync(id);
+        if (result == null)
         {
-            return NotFound(new { Message = $"Post {id} not found" });
+            return NotFound(new MessageResponse($"Post {id} not found"));
         }
 
-        var embedding = await embeddingService.GenerateEmbeddingAsync($"{post.Title}\n\n{post.Body}");
-        await vectorService.IndexPostAsync(post, embedding);
-
-        return Ok(new { Message = $"Indexed post {id} successfully", Post = post });
+        return Ok(new IndexSinglePostResponse($"Indexed post {id} successfully", result.Post));
     }
 }
