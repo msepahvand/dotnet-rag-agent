@@ -57,6 +57,41 @@ jobs:
             -var="github_branch=${{ github.ref }}" \
             -var="aws_region=${{ env.AWS_REGION }}"
 
+      - name: Verify S3 Vectors resources
+        working-directory: infra
+        run: |
+          REGION="${AWS_REGION:-us-east-1}"
+
+          VECTOR_BUCKET_NAME=$(terraform output -raw vector_bucket_name)
+          VECTOR_INDEX_NAME=$(terraform output -raw vector_index_name)
+
+          echo "Verifying S3 Vectors resources in region: $REGION"
+          echo "Expected bucket: $VECTOR_BUCKET_NAME"
+          echo "Expected index: $VECTOR_INDEX_NAME"
+
+          BUCKET_FOUND=$(aws s3vectors list-vector-buckets \
+            --region "$REGION" \
+            --query "vectorBuckets[?vectorBucketName=='$VECTOR_BUCKET_NAME'].vectorBucketName | [0]" \
+            --output text)
+
+          if [ "$BUCKET_FOUND" = "None" ] || [ -z "$BUCKET_FOUND" ]; then
+            echo "S3 Vectors bucket '$VECTOR_BUCKET_NAME' was not found in region '$REGION'." >&2
+            exit 1
+          fi
+
+          INDEX_FOUND=$(aws s3vectors list-indexes \
+            --region "$REGION" \
+            --vector-bucket-name "$VECTOR_BUCKET_NAME" \
+            --query "indexes[?indexName=='$VECTOR_INDEX_NAME'].indexName | [0]" \
+            --output text)
+
+          if [ "$INDEX_FOUND" = "None" ] || [ -z "$INDEX_FOUND" ]; then
+            echo "S3 Vectors index '$VECTOR_INDEX_NAME' was not found in bucket '$VECTOR_BUCKET_NAME' (region '$REGION')." >&2
+            exit 1
+          fi
+
+          echo "S3 Vectors verification succeeded: bucket and index are present."
+
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
@@ -256,6 +291,33 @@ jobs:
           APP_RUNNER_SERVICE_ARN: ${{ env.APP_RUNNER_SERVICE_ARN }}
         run: |
           IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG"
-          aws apprunner update-service \
-            --service-arn "$APP_RUNNER_SERVICE_ARN" \
-            --source-configuration "ImageRepository={ImageIdentifier=$IMAGE_URI,ImageConfiguration={Port=8080},ImageRepositoryType=ECR}"
+
+          attempts=20
+          delay_seconds=15
+
+          for i in $(seq 1 $attempts); do
+            set +e
+            update_output=$(aws apprunner update-service \
+              --service-arn "$APP_RUNNER_SERVICE_ARN" \
+              --source-configuration "ImageRepository={ImageIdentifier=$IMAGE_URI,ImageConfiguration={Port=8080},ImageRepositoryType=ECR}" 2>&1)
+            update_exit=$?
+            set -e
+
+            if [ $update_exit -eq 0 ]; then
+              echo "$update_output"
+              echo "App Runner update-service succeeded."
+              exit 0
+            fi
+
+            if echo "$update_output" | grep -Eq "InvalidStateException|OPERATION_IN_PROGRESS"; then
+              echo "App Runner is busy (attempt $i/$attempts). Retrying in $delay_seconds seconds..."
+              sleep $delay_seconds
+              continue
+            fi
+
+            echo "$update_output" >&2
+            exit $update_exit
+          done
+
+          echo "Timed out waiting for App Runner service to become updatable after $attempts attempts." >&2
+          exit 1
