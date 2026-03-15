@@ -100,6 +100,11 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
             services.RemoveAll<IEmbeddingService>();
             services.AddScoped<IEmbeddingService, MockEmbeddingService>();
 
+            // Replace external post source with deterministic test data
+            // to keep integration tests stable regardless of appsettings data source.
+            services.RemoveAll<IPostService>();
+            services.AddScoped<IPostService, TestPostService>();
+
             // Replace grounded answer generation with a test implementation
             // so agent endpoint tests do not depend on Bedrock runtime services.
             services.AddScoped<IAgentAnswerService, TestAgentAnswerService>();

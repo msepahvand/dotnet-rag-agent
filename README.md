@@ -23,7 +23,7 @@ A comprehensive .NET 8.0 solution demonstrating semantic search using vector emb
 ## Overview
 
 This project demonstrates production-ready semantic search implementation using:
-- **Data Source**: JSONPlaceholder API (100 free posts for testing)
+- **Data Source**: Configurable (`JsonPlaceholder` or `HackerNews`)
 - **Embeddings**: AWS Bedrock Titan Embed Text v2 (1024 dimensions)
 - **Vector Stores**: Redis Stack, Qdrant, or AWS S3 Vectors
 - **Framework**: ASP.NET Core 8.0 Minimal APIs
@@ -160,6 +160,10 @@ docker-compose up qdrant   # Qdrant only
 ```powershell
 # Get posts from JSONPlaceholder
 curl http://localhost:5000/api/posts
+
+# Optional: use HackerNews as a real-English source
+# In appsettings.json set:
+# "DataSource": { "Provider": "HackerNews", "HackerNews": { "TopStoriesCount": 100 } }
 
 # Index a single post
 curl -X POST http://localhost:5000/api/index/1
@@ -341,7 +345,7 @@ $env:AWS_REGION="us-east-1"
 ```http
 GET /api/posts
 ```
-Fetches all 100 posts from JSONPlaceholder API.
+Fetches posts from the configured data source (`JsonPlaceholder` or `HackerNews`).
 
 ```http
 GET /api/posts/{id}
