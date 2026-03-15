@@ -15,7 +15,7 @@ public sealed class HackerNewsService(HttpClient httpClient, IConfiguration conf
     {
         httpClient.BaseAddress = new Uri(BaseUrl);
 
-        var ids = await httpClient.GetFromJsonAsync<List<int>>("/topstories.json") ?? [];
+        var ids = await httpClient.GetFromJsonAsync<List<int>>("topstories.json") ?? [];
         var selectedIds = ids.Take(_topStoriesCount).ToList();
 
         var storyTasks = selectedIds.Select(GetStoryByIdAsync);
@@ -35,7 +35,7 @@ public sealed class HackerNewsService(HttpClient httpClient, IConfiguration conf
 
     private async Task<Post?> GetStoryByIdAsync(int id)
     {
-        var item = await httpClient.GetFromJsonAsync<HackerNewsItemDto>($"/item/{id}.json");
+        var item = await httpClient.GetFromJsonAsync<HackerNewsItemDto>($"item/{id}.json");
         if (item == null || string.IsNullOrWhiteSpace(item.Title))
         {
             return null;
