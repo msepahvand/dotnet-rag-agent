@@ -52,11 +52,6 @@ jobs:
         run: |
           terraform init -reconfigure
 
-          # remove legacy IAM resources from state without destroying live resources
-          terraform state rm aws_iam_openid_connect_provider.github || true
-          terraform state rm aws_iam_role.github_actions || true
-          terraform state rm aws_iam_role_policy.github_actions_policy || true
-
           terraform apply -auto-approve \
             -var="github_repo=${{ github.repository }}" \
             -var="github_branch=${{ github.ref }}" \
