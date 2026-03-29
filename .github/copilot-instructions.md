@@ -8,6 +8,14 @@
 
 - docs: for documentation changes, such as updating README.md or adding comments to code.
 
+- Keep controllers thin: HTTP concerns stay in controllers; orchestration and business logic belong in services.
+
+- Favor provider-agnostic design in VectorSearch.Core. Shared contracts and logic in Core should not depend on Redis, S3 Vectors, or Qdrant specifics.
+
+- Test strategy: aim for roughly 70% unit tests and 30% integration tests.
+
+- Integration tests should verify core minimum functionality and API wiring, especially successful 200 OK flows for key endpoints and a small set of critical unhappy paths.
+
 - Next integrations roadmap:
 
 - Add a single-tool-calling agent first: user question → agent decides to run semantic search → returns grounded answer with sources.
