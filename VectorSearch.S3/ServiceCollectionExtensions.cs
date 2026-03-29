@@ -18,7 +18,10 @@ public static class ServiceCollectionExtensions
         // Required by Bedrock chat/embedding connectors regardless of vector store provider.
         services.AddAWSService<IAmazonBedrockRuntime>();
 
-        services.AddHttpClient<IPostService, HackerNewsService>();
+        services.AddHttpClient<IPostService, HackerNewsService>(client =>
+        {
+            client.BaseAddress = new Uri("https://hacker-news.firebaseio.com/v0/");
+        });
 
         // Register vector store based on configuration
         var vectorProvider = configuration["VectorStore:Provider"] ?? "S3Vectors";

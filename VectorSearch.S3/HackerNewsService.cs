@@ -8,13 +8,10 @@ namespace VectorSearch.S3;
 
 public sealed class HackerNewsService(HttpClient httpClient, IConfiguration configuration) : IPostService
 {
-    private const string BaseUrl = "https://hacker-news.firebaseio.com/v0";
     private readonly int _topStoriesCount = Math.Clamp(configuration.GetValue<int?>("DataSource:HackerNews:TopStoriesCount") ?? 100, 1, 200);
 
     public async Task<List<Post>> GetAllPostsAsync()
     {
-        httpClient.BaseAddress = new Uri(BaseUrl);
-
         var ids = await httpClient.GetFromJsonAsync<List<int>>("topstories.json") ?? [];
         var selectedIds = ids.Take(_topStoriesCount).ToList();
 
@@ -29,7 +26,6 @@ public sealed class HackerNewsService(HttpClient httpClient, IConfiguration conf
 
     public async Task<Post?> GetPostByIdAsync(int id)
     {
-        httpClient.BaseAddress = new Uri(BaseUrl);
         return await GetStoryByIdAsync(id);
     }
 
