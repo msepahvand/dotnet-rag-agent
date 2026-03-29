@@ -65,9 +65,6 @@ jobs:
 
           VECTOR_BUCKET_NAME=$(terraform output -raw vector_bucket_name)
           VECTOR_INDEX_NAME=$(terraform output -raw vector_index_name)
-          VECTOR_DIMENSION=$(terraform output -raw vector_dimension)
-          VECTOR_DISTANCE_METRIC=$(terraform output -raw vector_distance_metric)
-          VECTOR_DATA_TYPE=$(terraform output -raw vector_data_type)
 
           echo "Verifying S3 Vectors resources in region: $REGION"
           echo "Expected bucket: $VECTOR_BUCKET_NAME"
@@ -79,28 +76,8 @@ jobs:
             --output text)
 
           if [ "$BUCKET_FOUND" = "None" ] || [ -z "$BUCKET_FOUND" ]; then
-            echo "S3 Vectors bucket '$VECTOR_BUCKET_NAME' not found. Creating..."
-            aws s3vectors create-vector-bucket \
-              --region "$REGION" \
-              --vector-bucket-name "$VECTOR_BUCKET_NAME" > /dev/null
-
-            attempts=30
-            delay_seconds=5
-            for i in $(seq 1 $attempts); do
-              BUCKET_FOUND=$(aws s3vectors list-vector-buckets \
-                --region "$REGION" \
-                --query "vectorBuckets[?vectorBucketName=='$VECTOR_BUCKET_NAME'].vectorBucketName | [0]" \
-                --output text)
-              if [ "$BUCKET_FOUND" != "None" ] && [ -n "$BUCKET_FOUND" ]; then
-                break
-              fi
-              sleep $delay_seconds
-            done
-
-            if [ "$BUCKET_FOUND" = "None" ] || [ -z "$BUCKET_FOUND" ]; then
-              echo "S3 Vectors bucket '$VECTOR_BUCKET_NAME' was not found in region '$REGION' after create attempt." >&2
-              exit 1
-            fi
+            echo "S3 Vectors bucket '$VECTOR_BUCKET_NAME' was not found in region '$REGION'." >&2
+            exit 1
           fi
 
           INDEX_FOUND=$(aws s3vectors list-indexes \
@@ -110,33 +87,8 @@ jobs:
             --output text)
 
           if [ "$INDEX_FOUND" = "None" ] || [ -z "$INDEX_FOUND" ]; then
-            echo "S3 Vectors index '$VECTOR_INDEX_NAME' not found. Creating..."
-            aws s3vectors create-index \
-              --region "$REGION" \
-              --vector-bucket-name "$VECTOR_BUCKET_NAME" \
-              --index-name "$VECTOR_INDEX_NAME" \
-              --data-type "$VECTOR_DATA_TYPE" \
-              --dimension "$VECTOR_DIMENSION" \
-              --distance-metric "$VECTOR_DISTANCE_METRIC" > /dev/null
-
-            attempts=30
-            delay_seconds=5
-            for i in $(seq 1 $attempts); do
-              INDEX_FOUND=$(aws s3vectors list-indexes \
-                --region "$REGION" \
-                --vector-bucket-name "$VECTOR_BUCKET_NAME" \
-                --query "indexes[?indexName=='$VECTOR_INDEX_NAME'].indexName | [0]" \
-                --output text)
-              if [ "$INDEX_FOUND" != "None" ] && [ -n "$INDEX_FOUND" ]; then
-                break
-              fi
-              sleep $delay_seconds
-            done
-
-            if [ "$INDEX_FOUND" = "None" ] || [ -z "$INDEX_FOUND" ]; then
-              echo "S3 Vectors index '$VECTOR_INDEX_NAME' was not found in bucket '$VECTOR_BUCKET_NAME' (region '$REGION') after create attempt." >&2
-              exit 1
-            fi
+            echo "S3 Vectors index '$VECTOR_INDEX_NAME' was not found in bucket '$VECTOR_BUCKET_NAME' (region '$REGION')." >&2
+            exit 1
           fi
 
           echo "S3 Vectors verification succeeded: bucket and index are present."

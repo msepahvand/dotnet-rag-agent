@@ -16,6 +16,10 @@
 
 - Integration tests should verify core minimum functionality and API wiring, especially successful 200 OK flows for key endpoints and a small set of critical unhappy paths.
 
+- For Terraform changes, always run `terraform fmt -recursive` in `infra/` before finishing.
+
+- Validate Terraform via Docker because local Terraform validation may not work in this repo environment: `docker run --rm -v "<repo>\\infra:/workspace" -w /workspace hashicorp/terraform:1.5.0 validate`.
+
 - Next integrations roadmap:
 
 - Add a single-tool-calling agent first: user question → agent decides to run semantic search → returns grounded answer with sources.
