@@ -20,6 +20,7 @@ jobs:
     name: Deploy infrastructure
     runs-on: ubuntu-latest
     needs: build-and-test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
 
     steps:
       - name: Checkout repository
@@ -166,8 +167,8 @@ jobs:
       - build-and-test
       - infrastructure
     runs-on: ubuntu-latest
-    # run only after the build-and-test job succeeds and on the primary branches
-    if: needs.build-and-test.result == 'success' && needs.infrastructure.result == 'success' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    # run only after successful build + infra jobs on push events to primary branches
+    if: github.event_name == 'push' && needs.build-and-test.result == 'success' && needs.infrastructure.result == 'success' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
 
     steps:
       - name: Checkout repository
