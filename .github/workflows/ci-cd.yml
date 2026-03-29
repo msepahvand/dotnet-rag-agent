@@ -48,6 +48,43 @@ jobs:
           terraform_version: '1.5.0'
           terraform_wrapper: false
 
+      - name: Import existing S3 Vectors resources (migration)
+        working-directory: infra
+        run: |
+          terraform init -reconfigure
+
+          REGION="${AWS_REGION:-us-east-1}"
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+          VECTOR_BUCKET_NAME=$(terraform output -raw vector_bucket_name 2>/dev/null || echo "posts-semantic-search")
+          VECTOR_INDEX_NAME=$(terraform output -raw vector_index_name 2>/dev/null || echo "posts-content-index")
+
+          BUCKET_ADDRESS="module.s3_vectors.aws_s3vectors_vector_bucket.vector_bucket"
+          INDEX_ADDRESS="module.s3_vectors.aws_s3vectors_index.vector_index"
+
+          if ! terraform state show "$BUCKET_ADDRESS" >/dev/null 2>&1; then
+            BUCKET_FOUND=$(aws s3vectors list-vector-buckets \
+              --region "$REGION" \
+              --query "vectorBuckets[?vectorBucketName=='$VECTOR_BUCKET_NAME'].vectorBucketName | [0]" \
+              --output text)
+
+            if [ "$BUCKET_FOUND" != "None" ] && [ -n "$BUCKET_FOUND" ]; then
+              terraform import "$BUCKET_ADDRESS" "arn:aws:s3vectors:$REGION:$ACCOUNT_ID:bucket/$VECTOR_BUCKET_NAME"
+            fi
+          fi
+
+          if ! terraform state show "$INDEX_ADDRESS" >/dev/null 2>&1; then
+            INDEX_FOUND=$(aws s3vectors list-indexes \
+              --region "$REGION" \
+              --vector-bucket-name "$VECTOR_BUCKET_NAME" \
+              --query "indexes[?indexName=='$VECTOR_INDEX_NAME'].indexName | [0]" \
+              --output text)
+
+            if [ "$INDEX_FOUND" != "None" ] && [ -n "$INDEX_FOUND" ]; then
+              terraform import "$INDEX_ADDRESS" "arn:aws:s3vectors:$REGION:$ACCOUNT_ID:bucket/$VECTOR_BUCKET_NAME/index/$VECTOR_INDEX_NAME"
+            fi
+          fi
+
       - name: Terraform apply
         working-directory: infra
         run: |
