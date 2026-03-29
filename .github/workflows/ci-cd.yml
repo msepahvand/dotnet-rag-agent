@@ -51,6 +51,10 @@ jobs:
       - name: Import existing S3 Vectors resources (migration)
         working-directory: infra
         run: |
+          export TF_VAR_github_repo="${{ github.repository }}"
+          export TF_VAR_github_branch="${{ github.ref }}"
+          export TF_VAR_aws_region="${AWS_REGION:-us-east-1}"
+
           terraform init -reconfigure
 
           REGION="${AWS_REGION:-us-east-1}"
