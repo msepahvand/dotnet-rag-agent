@@ -31,7 +31,7 @@ public class VectorSearchIntegrationTests
         
         posts.Should().NotBeNull();
         posts.Should().NotBeEmpty();
-        posts!.Count.Should().Be(100); // JSONPlaceholder has 100 posts
+        posts!.Count.Should().Be(100); // Default HackerNews top stories count
     }
 
     [Theory]

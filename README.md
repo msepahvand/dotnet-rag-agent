@@ -23,7 +23,7 @@ A comprehensive .NET 8.0 solution demonstrating semantic search using vector emb
 ## Overview
 
 This project demonstrates production-ready semantic search implementation using:
-- **Data Source**: Configurable (`JsonPlaceholder` or `HackerNews`)
+- **Data Source**: HackerNews
 - **Embeddings**: AWS Bedrock Titan Embed Text v2 (1024 dimensions)
 - **Vector Stores**: Redis Stack, Qdrant, or AWS S3 Vectors
 - **Framework**: ASP.NET Core 8.0 Minimal APIs
@@ -40,7 +40,7 @@ dotnet-vector-search/
 │   └── Post.cs                 # Shared models
 ├── VectorSearch.S3/             # AWS & Qdrant implementations
 │   ├── EmbeddingService.cs     # Bedrock embedding service
-│   ├── JsonPlaceholderService.cs
+│   ├── HackerNewsService.cs
 │   ├── QdrantVectorStore.cs    # Qdrant implementation
 │   ├── S3VectorStore.cs        # S3 Vectors implementation
 │   └── S3VectorService.cs      # Main service implementation
@@ -126,6 +126,36 @@ VectorSearch.Core (abstractions)
     └── VectorSearch.IntegrationTests
 ```
 
+### AWS Deployment Schematic (App Runner + Bedrock + S3 Vectors)
+
+```mermaid
+flowchart LR
+  U[Client App / Postman] -->|HTTP /api/*| AR[AWS App Runner\nVectorSearch.Api]
+
+  subgraph API[API Services]
+    AR --> IDX[IndexController + PostIndexingService]
+    AR --> SRCH[SearchController + SemanticSearchService]
+    AR --> AGT[AgentController + AgentOrchestrationService]
+  end
+
+  IDX -->|Fetch posts| DS[Data Source\nHackerNews]
+  IDX -->|Generate embeddings| BR[Amazon Bedrock\nTitan Embed Text v2]
+  IDX -->|Store vectors + metadata| S3V[(Amazon S3 Vectors\nVector Bucket + Index)]
+
+  SRCH -->|Embed query| BR
+  SRCH -->|TopK semantic search| S3V
+
+  AGT -->|Retrieve grounding context| S3V
+  AGT -->|LLM answer generation| BRC[Amazon Bedrock\nClaude 3 Haiku]
+  BRC --> AGT
+
+  S3V -->|Matched chunks + scores| SRCH
+  SRCH -->|Search results| U
+  AGT -->|Grounded answer + sources| U
+```
+
+This is the default production shape: the API runs on App Runner, embeddings and answer generation are handled by Bedrock, and vectors are persisted/searched in S3 Vectors.
+
 ---
 
 ## Quick Start
@@ -158,10 +188,9 @@ docker-compose up qdrant   # Qdrant only
 ### 3. Test the API
 
 ```powershell
-# Get posts from JSONPlaceholder
+# Get posts from HackerNews
 curl http://localhost:5000/api/posts
 
-# Optional: use HackerNews as a real-English source
 # In appsettings.json set:
 # "DataSource": { "Provider": "HackerNews", "HackerNews": { "TopStoriesCount": 100 } }
 
@@ -345,7 +374,7 @@ $env:AWS_REGION="us-east-1"
 ```http
 GET /api/posts
 ```
-Fetches posts from the configured data source (`JsonPlaceholder` or `HackerNews`).
+Fetches posts from the configured data source (`HackerNews`).
 
 ```http
 GET /api/posts/{id}
@@ -518,7 +547,7 @@ dotnet test
 
 | Test | What It Validates |
 |------|-------------------|
-| `GetPosts_ReturnsSuccessAndPosts` | JSONPlaceholder API integration |
+| `GetPosts_ReturnsSuccessAndPosts` | HackerNews API integration |
 | `GetPost_WithValidId_ReturnsPost` | Single post retrieval |
 | `GetPost_WithInvalidId_ReturnsNotFound` | Error handling |
 | `IndexSinglePost_ThenSearch_ReturnsPost` | End-to-end indexing + search |
@@ -866,7 +895,6 @@ docker pull redis/redis-stack:latest
 
 - [NRedisStack](https://github.com/redis/NRedisStack) - Official Redis Stack .NET client
 - [Qdrant .NET Client](https://github.com/qdrant/qdrant-dotnet)
-- [JSONPlaceholder](https://jsonplaceholder.typicode.com/) - Free fake API
 
 ---
 
