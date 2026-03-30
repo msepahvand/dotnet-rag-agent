@@ -13,7 +13,7 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var chatModelId = configuration["AWS:ChatModelId"] ?? "anthropic.claude-3-haiku-20240307-v1:0";
+        var options = VectorSearchOptionsValidator.Parse(configuration);
 
         // Required by Bedrock chat/embedding connectors regardless of vector store provider.
         services.AddAWSService<IAmazonBedrockRuntime>();
@@ -23,74 +23,52 @@ public static class ServiceCollectionExtensions
             client.BaseAddress = new Uri("https://hacker-news.firebaseio.com/v0/");
         });
 
-        // Register vector store based on configuration
-        var vectorProvider = configuration["VectorStore:Provider"] ?? "S3Vectors";
-        
-        if (vectorProvider.Equals("Qdrant", StringComparison.OrdinalIgnoreCase))
-        {
-            // Use Qdrant for local development/testing
-            services.AddHttpClient<IVectorStore, QdrantVectorStore>();
-            
-            // Configure Semantic Kernel with Bedrock embeddings
-            services.AddBedrockEmbeddingGenerator(
-                configuration["AWS:EmbeddingModelId"] ?? "amazon.titan-embed-text-v2:0");
-            services.AddBedrockChatCompletionService(chatModelId);
-            
-            // Register Kernel
-            services.AddTransient(sp => new Kernel(sp));
-            
-            // Register embedding service
-            services.AddScoped<IEmbeddingService, EmbeddingService>();
-        }
-        else if (vectorProvider.Equals("Redis", StringComparison.OrdinalIgnoreCase))
-        {
-            // Use Redis Stack for local development/testing
-            // Note: Requires VectorSearch.Redis project reference
-            services.AddScoped<IVectorStore>(sp =>
-            {
-                var config = sp.GetRequiredService<IConfiguration>();
-                var redisStoreType = Type.GetType("VectorSearch.Redis.RedisVectorStore, VectorSearch.Redis");
-                if (redisStoreType == null)
-                {
-                    throw new InvalidOperationException("Redis provider requires VectorSearch.Redis project reference");
-                }
-                return (IVectorStore)Activator.CreateInstance(redisStoreType, config)!;
-            });
-            
-            // Configure Semantic Kernel with Bedrock embeddings
-            services.AddBedrockEmbeddingGenerator(
-                configuration["AWS:EmbeddingModelId"] ?? "amazon.titan-embed-text-v2:0");
-            services.AddBedrockChatCompletionService(chatModelId);
-            
-            // Register Kernel
-            services.AddTransient(sp => new Kernel(sp));
-            
-            // Register embedding service
-            services.AddScoped<IEmbeddingService, EmbeddingService>();
-        }
-        else
-        {
-            // Use AWS S3 Vectors for production
-            
-            // Configure Semantic Kernel with Bedrock embeddings
-            services.AddBedrockEmbeddingGenerator(
-                configuration["AWS:EmbeddingModelId"] ?? "amazon.titan-embed-text-v2:0");
-            services.AddBedrockChatCompletionService(chatModelId);
-            
-            // Register Kernel
-            services.AddTransient(sp => new Kernel(sp));
-            
-            // Register embedding service
-            services.AddScoped<IEmbeddingService, EmbeddingService>();
-            
-            services.AddAWSService<IAmazonS3Vectors>();
-            services.AddScoped<IVectorStore, S3VectorStore>();
-        }
+        // Configure Semantic Kernel + embedding pipeline once for all providers.
+        services.AddBedrockEmbeddingGenerator(options.EmbeddingModelId);
+        services.AddBedrockChatCompletionService(options.ChatModelId);
+        services.AddTransient(sp => new Kernel(sp));
+        services.AddScoped<IEmbeddingService, EmbeddingService>();
+
+        RegisterVectorStore(services, configuration, options.VectorStoreProvider);
 
         // Register the main vector service
         services.AddScoped<IVectorService, VectorService>();
         services.AddScoped<IAgentAnswerService, GroundedAgentAnswerService>();
 
         return services;
+    }
+
+    private static void RegisterVectorStore(
+        IServiceCollection services,
+        IConfiguration configuration,
+        VectorStoreProvider vectorProvider)
+    {
+        switch (vectorProvider)
+        {
+            case VectorStoreProvider.Qdrant:
+                services.AddHttpClient<IVectorStore, QdrantVectorStore>();
+                break;
+
+            case VectorStoreProvider.Redis:
+                // Late-bind Redis implementation so this project can compile/run without a hard project reference.
+                services.AddScoped<IVectorStore>(sp =>
+                {
+                    var config = sp.GetRequiredService<IConfiguration>();
+                    var redisStoreType = Type.GetType("VectorSearch.Redis.RedisVectorStore, VectorSearch.Redis");
+                    if (redisStoreType == null)
+                    {
+                        throw new InvalidOperationException("Redis provider requires VectorSearch.Redis project reference");
+                    }
+
+                    return (IVectorStore)Activator.CreateInstance(redisStoreType, config)!;
+                });
+                break;
+
+            case VectorStoreProvider.S3Vectors:
+            default:
+                services.AddAWSService<IAmazonS3Vectors>();
+                services.AddScoped<IVectorStore, S3VectorStore>();
+                break;
+        }
     }
 }

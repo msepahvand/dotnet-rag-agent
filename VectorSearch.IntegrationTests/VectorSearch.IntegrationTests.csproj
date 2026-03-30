@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\VectorSearch.Api\VectorSearch.Api.csproj" />
+    <ProjectReference Include="..\VectorSearch.S3\VectorSearch.S3.csproj" />
     <ProjectReference Include="..\VectorSearch.Redis\VectorSearch.Redis.csproj" />
     <ProjectReference Include="..\VectorSearch.Core\VectorSearch.Core.csproj" />
   </ItemGroup>
