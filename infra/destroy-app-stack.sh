@@ -17,12 +17,21 @@ ECR_REPOSITORY_NAME="${ECR_REPOSITORY_NAME:-dotnet-vector-search}"
 APP_RUNNER_SERVICE_NAME="${APP_RUNNER_SERVICE_NAME:-dotnet-vector-search}"
 VECTOR_BUCKET_NAME="${VECTOR_BUCKET_NAME:-posts-semantic-search}"
 VECTOR_INDEX_NAME="${VECTOR_INDEX_NAME:-posts-content-index}"
+GITHUB_REPO="${GITHUB_REPO:-}"
+GITHUB_BRANCH="${GITHUB_BRANCH:-}"
+
+if [ -z "$GITHUB_REPO" ]; then
+  echo "Missing required GITHUB_REPO environment variable (for Terraform variable github_repo)." >&2
+  exit 1
+fi
 
 export TF_VAR_aws_region="$AWS_REGION"
 export TF_VAR_ecr_repository_name="$ECR_REPOSITORY_NAME"
 export TF_VAR_apprunner_service_name="$APP_RUNNER_SERVICE_NAME"
 export TF_VAR_vector_bucket_name="$VECTOR_BUCKET_NAME"
 export TF_VAR_vector_index_name="$VECTOR_INDEX_NAME"
+export TF_VAR_github_repo="$GITHUB_REPO"
+export TF_VAR_github_branch="$GITHUB_BRANCH"
 
 echo "Initializing Terraform..."
 terraform init -reconfigure
@@ -30,6 +39,8 @@ terraform init -reconfigure
 echo "Destroying Terraform-managed application resources..."
 terraform destroy -auto-approve \
   -var="aws_region=$AWS_REGION" \
+  -var="github_repo=$GITHUB_REPO" \
+  -var="github_branch=$GITHUB_BRANCH" \
   -var="ecr_repository_name=$ECR_REPOSITORY_NAME" \
   -var="apprunner_service_name=$APP_RUNNER_SERVICE_NAME" \
   -var="vector_bucket_name=$VECTOR_BUCKET_NAME" \

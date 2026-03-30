@@ -117,6 +117,8 @@ jobs:
         working-directory: infra
         env:
           DESTROY_CONFIRM: "YES"
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_BRANCH: ${{ github.ref }}
           AWS_REGION: ${{ github.event.inputs.aws_region || 'us-east-1' }}
           VECTOR_BUCKET_NAME: ${{ github.event.inputs.vector_bucket_name || 'posts-semantic-search' }}
           VECTOR_INDEX_NAME: ${{ github.event.inputs.vector_index_name || 'posts-content-index' }}
