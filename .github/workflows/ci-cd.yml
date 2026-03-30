@@ -129,13 +129,19 @@ jobs:
             fi
           fi
 
+      - name: Ensure ECR repository exists (Terraform-managed)
+        working-directory: infra
+        run: |
+          terraform apply -auto-approve \
+            -target=aws_ecr_repository.api \
+            -var="github_repo=${{ github.repository }}" \
+            -var="github_branch=${{ github.ref }}" \
+            -var="aws_region=$REGION"
+
       - name: Push bootstrap image to ECR if empty
         run: |
           ECR_REPO="${{ secrets.ECR_REPOSITORY || env.ECR_REPO_DEFAULT }}"
           ECR_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$ECR_REPO"
-
-          aws ecr describe-repositories --repository-names "$ECR_REPO" --region "$REGION" >/dev/null 2>&1 \
-            || aws ecr create-repository --repository-name "$ECR_REPO" --image-tag-mutability IMMUTABLE --region "$REGION" >/dev/null
 
           IMAGE_COUNT=$(aws ecr list-images --repository-name "$ECR_REPO" --region "$REGION" \
             --query 'length(imageIds)' --output text 2>/dev/null || echo "0")
@@ -147,16 +153,6 @@ jobs:
             docker push "$ECR_URI:latest"
           else
             echo "ECR already has $IMAGE_COUNT image(s) — skipping bootstrap."
-          fi
-
-      - name: Import ECR repo created by bootstrap into state
-        working-directory: infra
-        run: |
-          ECR_REPO="${{ secrets.ECR_REPOSITORY || env.ECR_REPO_DEFAULT }}"
-          if ! terraform state show "aws_ecr_repository.api" >/dev/null 2>&1; then
-            if aws ecr describe-repositories --region "$REGION" --repository-names "$ECR_REPO" >/dev/null 2>&1; then
-              terraform import "aws_ecr_repository.api" "$ECR_REPO"
-            fi
           fi
 
       - name: Terraform apply
