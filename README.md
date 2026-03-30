@@ -26,7 +26,16 @@ This project demonstrates production-ready semantic search implementation using:
 - **Data Source**: HackerNews
 - **Embeddings**: AWS Bedrock Titan Embed Text v2 (1024 dimensions)
 - **Vector Stores**: Redis Stack, Qdrant, or AWS S3 Vectors
-- **Framework**: ASP.NET Core 8.0 Minimal APIs
+- **Framework**: ASP.NET Core 8.0 Web API (controllers)
+```
+HTTP request
+-> ASP.NET controller/service
+-> Semantic Kernel prompt execution
+-> Bedrock model sees available tools
+-> Semantic Kernel calls local C# plugin method if the model chooses it
+-> tool result goes back into model completion
+-> final answer returns to API caller
+```
 
 ### Project Structure
 
@@ -47,9 +56,9 @@ dotnet-vector-search/
 ├── VectorSearch.Redis/          # Redis Stack implementation
 │   └── RedisVectorStore.cs
 ├── VectorSearch.Api/            # Web API
-│   └── Program.cs              # Minimal API endpoints
+│   └── Program.cs              # DI, middleware, and controller mapping
 └── VectorSearch.IntegrationTests/
-    └── VectorSearchIntegrationTests.cs  # 14 tests (7 × 2 providers)
+  └── VectorSearchIntegrationTests.cs  # Integration coverage for API flows
 ```
 
 ---
@@ -88,7 +97,7 @@ dotnet-vector-search/
 ```
 ┌──────────────────────────────────┐
 │      VectorSearch.Api            │
-│      (Minimal APIs)              │
+│      (Controllers)               │
 └────────────┬─────────────────────┘
              │
              ▼
@@ -102,10 +111,10 @@ dotnet-vector-search/
     ┌────────┴────────┐
     │                 │
     ▼                 ▼
-┌─────────┐    ┌─────────────┐
-│IEmbedding│   │IVectorStore │
-│ Service │    │             │
-└─────────┘    └──────┬──────┘
+┌──────────┐    ┌─────────────┐
+│IEmbedding│    │IVectorStore │
+│ Service  │    │             │
+└──────────┘    └──────┬──────┘
                       │
          ┌────────────┼────────────┐
          │            │            │
@@ -169,7 +178,7 @@ This is the default production shape: the API runs on App Runner, embeddings and
 ### 1. Clone & Build
 
 ```powershell
-git clone https://github.com/mohammad-sepahvand_xero/dotnet-vector-search.git
+git clone https://github.com/msepahvand/dotnet-vector-search.git
 cd dotnet-vector-search
 dotnet build
 ```
@@ -208,7 +217,7 @@ cd VectorSearch.IntegrationTests
 dotnet test
 ```
 
-**Test Results**: 14 tests (7 tests × Redis and Qdrant providers)
+**Test Results**: Integration tests run across supported local providers (Redis and Qdrant).
 
 ---
 
@@ -410,18 +419,14 @@ curl "http://localhost:5000/api/search?query=user%20interface&topK=5"
 
 **Response:**
 ```json
-{
-  "query": "user interface",
-  "topK": 5,
-  "results": [
-    {
-      "distance": 0.85,
-      "title": "Post about UI design",
-      "postId": 42,
-      "userId": 5
-    }
-  ]
-}
+[
+  {
+    "distance": 0.85,
+    "title": "Post about UI design",
+    "postId": 42,
+    "userId": 5
+  }
+]
 ```
 
 ### Agentic Ask (Single Tool: Semantic Search)
@@ -440,6 +445,7 @@ POST /api/agent/ask
 
 **Behavior:**
 - Agent receives user question
+- Agent ensures posts are indexed if the vector index is empty
 - Agent calls one tool: semantic search
 - API returns a grounded answer with supporting sources
 
