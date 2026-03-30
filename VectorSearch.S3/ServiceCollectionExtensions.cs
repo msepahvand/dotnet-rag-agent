@@ -26,7 +26,18 @@ public static class ServiceCollectionExtensions
         // Configure Semantic Kernel + embedding pipeline once for all providers.
         services.AddBedrockEmbeddingGenerator(options.EmbeddingModelId);
         services.AddBedrockChatCompletionService(options.ChatModelId);
-        services.AddTransient(sp => new Kernel(sp));
+        services.AddScoped<IFunctionInvocationFilter, ToolInvocationFilter>();
+        services.AddTransient(sp =>
+        {
+            var kernel = new Kernel(sp);
+
+            foreach (var filter in sp.GetServices<IFunctionInvocationFilter>())
+            {
+                kernel.FunctionInvocationFilters.Add(filter);
+            }
+
+            return kernel;
+        });
         services.AddScoped<IEmbeddingService, EmbeddingService>();
         services.AddScoped<IndexingPlugin>();
         services.AddScoped<SemanticSearchPlugin>();
