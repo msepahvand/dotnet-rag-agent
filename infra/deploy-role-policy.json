@@ -43,6 +43,7 @@
         "apprunner:DeleteService",
         "apprunner:DescribeService",
         "apprunner:ListServices",
+        "apprunner:ListTagsForResource",
         "apprunner:UpdateService"
       ],
       "Resource": "arn:aws:apprunner:__AWS_REGION__:__AWS_ACCOUNT_ID__:service/*"
