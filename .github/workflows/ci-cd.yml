@@ -63,9 +63,13 @@ jobs:
 
           VECTOR_BUCKET_NAME=$(terraform output -raw vector_bucket_name 2>/dev/null || echo "posts-semantic-search")
           VECTOR_INDEX_NAME=$(terraform output -raw vector_index_name 2>/dev/null || echo "posts-content-index")
+          ECR_REPOSITORY_NAME=$(terraform output -raw ecr_repository_name 2>/dev/null || echo "dotnet-vector-search")
+          APP_RUNNER_SERVICE_NAME="${{ secrets.APP_RUNNER_SERVICE_NAME || 'dotnet-vector-search' }}"
 
           BUCKET_ADDRESS="module.s3_vectors.aws_s3vectors_vector_bucket.vector_bucket"
           INDEX_ADDRESS="module.s3_vectors.aws_s3vectors_index.vector_index"
+          ECR_ADDRESS="aws_ecr_repository.api"
+          APP_RUNNER_ADDRESS="aws_apprunner_service.api"
 
           if ! terraform state show "$BUCKET_ADDRESS" >/dev/null 2>&1; then
             BUCKET_FOUND=$(aws s3vectors list-vector-buckets \
@@ -87,6 +91,23 @@ jobs:
 
             if [ "$INDEX_FOUND" != "None" ] && [ -n "$INDEX_FOUND" ]; then
               terraform import "$INDEX_ADDRESS" "arn:aws:s3vectors:$REGION:$ACCOUNT_ID:bucket/$VECTOR_BUCKET_NAME/index/$VECTOR_INDEX_NAME"
+            fi
+          fi
+
+          if ! terraform state show "$ECR_ADDRESS" >/dev/null 2>&1; then
+            if aws ecr describe-repositories --region "$REGION" --repository-names "$ECR_REPOSITORY_NAME" >/dev/null 2>&1; then
+              terraform import "$ECR_ADDRESS" "$ECR_REPOSITORY_NAME"
+            fi
+          fi
+
+          if ! terraform state show "$APP_RUNNER_ADDRESS" >/dev/null 2>&1; then
+            APP_RUNNER_ARN=$(aws apprunner list-services \
+              --region "$REGION" \
+              --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE_NAME'].ServiceArn | [0]" \
+              --output text)
+
+            if [ "$APP_RUNNER_ARN" != "None" ] && [ -n "$APP_RUNNER_ARN" ]; then
+              terraform import "$APP_RUNNER_ADDRESS" "$APP_RUNNER_ARN"
             fi
           fi
 

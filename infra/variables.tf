@@ -57,6 +57,12 @@ variable "apprunner_instance_role_name" {
   default     = "AppRunnerInstanceRole"
 }
 
+variable "apprunner_ecr_access_role_name" {
+  description = "Name of the App Runner access role used to pull images from ECR"
+  type        = string
+  default     = "AppRunnerEcrAccessRole"
+}
+
 variable "apprunner_instance_policy_name" {
   description = "Name of the inline IAM policy attached to the App Runner instance role"
   type        = string
@@ -97,4 +103,22 @@ variable "vector_data_type" {
   description = "Vector data type for the S3 Vectors index"
   type        = string
   default     = "float32"
+}
+
+variable "ecr_repository_name" {
+  description = "ECR repository name used for the API container image"
+  type        = string
+  default     = "dotnet-vector-search"
+}
+
+variable "apprunner_service_name" {
+  description = "App Runner service name for the API"
+  type        = string
+  default     = "dotnet-vector-search"
+}
+
+variable "apprunner_bootstrap_image_tag" {
+  description = "Bootstrap tag used by Terraform when creating App Runner service before CI updates image"
+  type        = string
+  default     = "latest"
 }

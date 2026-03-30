@@ -27,3 +27,18 @@ output "vector_data_type" {
   description = "Configured S3 Vectors index data type"
   value       = module.s3_vectors.data_type
 }
+
+output "ecr_repository_name" {
+  description = "ECR repository name used by the API"
+  value       = aws_ecr_repository.api.name
+}
+
+output "ecr_repository_url" {
+  description = "ECR repository URL used by the API"
+  value       = aws_ecr_repository.api.repository_url
+}
+
+output "apprunner_service_arn" {
+  description = "ARN of the App Runner service"
+  value       = aws_apprunner_service.api.arn
+}

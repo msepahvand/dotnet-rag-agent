@@ -1,0 +1,132 @@
+name: Destroy Infrastructure
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type DESTROY to continue"
+        required: true
+        type: string
+      aws_region:
+        description: "AWS region"
+        required: false
+        default: "us-east-1"
+        type: string
+      vector_bucket_name:
+        description: "S3 Vectors bucket name"
+        required: false
+        default: "posts-semantic-search"
+        type: string
+      vector_index_name:
+        description: "S3 Vectors index name"
+        required: false
+        default: "posts-content-index"
+        type: string
+      ecr_repository_name:
+        description: "ECR repository name"
+        required: false
+        default: "dotnet-vector-search"
+        type: string
+      apprunner_service_name:
+        description: "App Runner service name"
+        required: false
+        default: "dotnet-vector-search"
+        type: string
+      approval_environment:
+        description: "Protected environment requiring approval"
+        required: true
+        type: environment
+
+jobs:
+  destroy:
+    name: Destroy application infra
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirm == 'DESTROY' }}
+    environment:
+      name: ${{ github.event.inputs.approval_environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_INFRA_ROLE_ARN }}
+          aws-region: ${{ github.event.inputs.aws_region || 'us-east-1' }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.5.0"
+          terraform_wrapper: false
+
+      - name: Import existing resources into state (best effort)
+        working-directory: infra
+        env:
+          AWS_REGION: ${{ github.event.inputs.aws_region || 'us-east-1' }}
+          VECTOR_BUCKET_NAME: ${{ github.event.inputs.vector_bucket_name || 'posts-semantic-search' }}
+          VECTOR_INDEX_NAME: ${{ github.event.inputs.vector_index_name || 'posts-content-index' }}
+          ECR_REPOSITORY_NAME: ${{ github.event.inputs.ecr_repository_name || 'dotnet-vector-search' }}
+          APP_RUNNER_SERVICE_NAME: ${{ github.event.inputs.apprunner_service_name || 'dotnet-vector-search' }}
+        run: |
+          terraform init -reconfigure
+
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          BUCKET_ADDRESS="module.s3_vectors.aws_s3vectors_vector_bucket.vector_bucket"
+          INDEX_ADDRESS="module.s3_vectors.aws_s3vectors_index.vector_index"
+          ECR_ADDRESS="aws_ecr_repository.api"
+          APP_RUNNER_ADDRESS="aws_apprunner_service.api"
+
+          if ! terraform state show "$BUCKET_ADDRESS" >/dev/null 2>&1; then
+            BUCKET_FOUND=$(aws s3vectors list-vector-buckets \
+              --region "$AWS_REGION" \
+              --query "vectorBuckets[?vectorBucketName=='$VECTOR_BUCKET_NAME'].vectorBucketName | [0]" \
+              --output text)
+            if [ "$BUCKET_FOUND" != "None" ] && [ -n "$BUCKET_FOUND" ]; then
+              terraform import "$BUCKET_ADDRESS" "arn:aws:s3vectors:$AWS_REGION:$ACCOUNT_ID:bucket/$VECTOR_BUCKET_NAME"
+            fi
+          fi
+
+          if ! terraform state show "$INDEX_ADDRESS" >/dev/null 2>&1; then
+            INDEX_FOUND=$(aws s3vectors list-indexes \
+              --region "$AWS_REGION" \
+              --vector-bucket-name "$VECTOR_BUCKET_NAME" \
+              --query "indexes[?indexName=='$VECTOR_INDEX_NAME'].indexName | [0]" \
+              --output text)
+            if [ "$INDEX_FOUND" != "None" ] && [ -n "$INDEX_FOUND" ]; then
+              terraform import "$INDEX_ADDRESS" "arn:aws:s3vectors:$AWS_REGION:$ACCOUNT_ID:bucket/$VECTOR_BUCKET_NAME/index/$VECTOR_INDEX_NAME"
+            fi
+          fi
+
+          if ! terraform state show "$ECR_ADDRESS" >/dev/null 2>&1; then
+            if aws ecr describe-repositories --region "$AWS_REGION" --repository-names "$ECR_REPOSITORY_NAME" >/dev/null 2>&1; then
+              terraform import "$ECR_ADDRESS" "$ECR_REPOSITORY_NAME"
+            fi
+          fi
+
+          if ! terraform state show "$APP_RUNNER_ADDRESS" >/dev/null 2>&1; then
+            APP_RUNNER_ARN=$(aws apprunner list-services \
+              --region "$AWS_REGION" \
+              --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE_NAME'].ServiceArn | [0]" \
+              --output text)
+            if [ "$APP_RUNNER_ARN" != "None" ] && [ -n "$APP_RUNNER_ARN" ]; then
+              terraform import "$APP_RUNNER_ADDRESS" "$APP_RUNNER_ARN"
+            fi
+          fi
+
+      - name: Destroy application infrastructure
+        working-directory: infra
+        env:
+          DESTROY_CONFIRM: "YES"
+          AWS_REGION: ${{ github.event.inputs.aws_region || 'us-east-1' }}
+          VECTOR_BUCKET_NAME: ${{ github.event.inputs.vector_bucket_name || 'posts-semantic-search' }}
+          VECTOR_INDEX_NAME: ${{ github.event.inputs.vector_index_name || 'posts-content-index' }}
+          ECR_REPOSITORY_NAME: ${{ github.event.inputs.ecr_repository_name || 'dotnet-vector-search' }}
+          APP_RUNNER_SERVICE_NAME: ${{ github.event.inputs.apprunner_service_name || 'dotnet-vector-search' }}
+        run: |
+          bash ./destroy-app-stack.sh
