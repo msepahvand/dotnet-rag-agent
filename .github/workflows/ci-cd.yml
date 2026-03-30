@@ -125,6 +125,30 @@ jobs:
             fi
           fi
 
+      - name: Push bootstrap image to ECR if empty
+        run: |
+          REGION="${AWS_REGION:-us-east-1}"
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ECR_REPO="${{ secrets.ECR_REPOSITORY || 'dotnet-vector-search' }}"
+          ECR_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$ECR_REPO"
+
+          # Create repo if missing
+          aws ecr describe-repositories --repository-names "$ECR_REPO" --region "$REGION" >/dev/null 2>&1 \
+            || aws ecr create-repository --repository-name "$ECR_REPO" --image-tag-mutability IMMUTABLE --region "$REGION" >/dev/null
+
+          # Check if any image exists
+          IMAGE_COUNT=$(aws ecr list-images --repository-name "$ECR_REPO" --region "$REGION" \
+            --query 'length(imageIds)' --output text 2>/dev/null || echo "0")
+
+          if [ "$IMAGE_COUNT" = "0" ] || [ "$IMAGE_COUNT" = "None" ]; then
+            echo "ECR is empty — building and pushing bootstrap image..."
+            aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
+            docker build -f VectorSearch.Api/Dockerfile -t "$ECR_URI:latest" .
+            docker push "$ECR_URI:latest"
+          else
+            echo "ECR already has $IMAGE_COUNT image(s) — skipping bootstrap."
+          fi
+
       - name: Terraform apply
         working-directory: infra
         run: |
