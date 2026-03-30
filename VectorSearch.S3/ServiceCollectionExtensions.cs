@@ -28,8 +28,9 @@ public static class ServiceCollectionExtensions
         services.AddBedrockChatCompletionService(options.ChatModelId);
         services.AddTransient(sp => new Kernel(sp));
         services.AddScoped<IEmbeddingService, EmbeddingService>();
+        services.AddScoped<SemanticSearchPlugin>();
 
-        RegisterVectorStore(services, configuration, options.VectorStoreProvider);
+        RegisterVectorStore(services, options.VectorStoreProvider);
 
         // Register the main vector service
         services.AddScoped<IVectorService, VectorService>();
@@ -40,7 +41,6 @@ public static class ServiceCollectionExtensions
 
     private static void RegisterVectorStore(
         IServiceCollection services,
-        IConfiguration configuration,
         VectorStoreProvider vectorProvider)
     {
         switch (vectorProvider)

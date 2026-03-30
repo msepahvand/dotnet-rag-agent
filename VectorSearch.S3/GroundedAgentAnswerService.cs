@@ -1,10 +1,13 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using VectorSearch.Core;
 
 namespace VectorSearch.S3;
 
 public sealed class GroundedAgentAnswerService(
+    Kernel kernel,
+    SemanticSearchPlugin semanticSearchPlugin,
     IChatCompletionService? chatCompletionService,
     ILogger<GroundedAgentAnswerService> logger) : IAgentAnswerService
 {
@@ -24,17 +27,30 @@ public sealed class GroundedAgentAnswerService(
 
         try
         {
-            var sourceContext = string.Join(
-                "\n",
-                sources.Select(source =>
-                    $"[PostId: {source.PostId}] Title: {source.Title}\nSnippet: {source.Snippet}"));
+            RegisterPluginOnce(kernel, semanticSearchPlugin);
 
-            var chatHistory = new ChatHistory();
-            chatHistory.AddSystemMessage("You are a grounded assistant. Answer only from the provided sources. If the sources are insufficient, say you do not have enough information. Include citations using [PostId: N] for each key claim.");
-            chatHistory.AddUserMessage($"Question:\n{question}\n\nSources:\n{sourceContext}\n\nProvide a concise answer with citations.");
+            var initialTopK = Math.Clamp(sources.Count, 1, 10);
+            var prompt =
+                "You are a grounded assistant. " +
+                "Use the SemanticSearch.search_posts function to retrieve supporting sources before answering. " +
+                "Answer only from returned sources. If there is not enough evidence, say so. " +
+                "Cite key claims with [PostId: N].\n\n" +
+                "Question: {{$question}}\n" +
+                "PreferredTopK: {{$topK}}\n" +
+                "Provide a concise answer with citations.";
 
-            var response = await chatCompletionService.GetChatMessageContentsAsync(chatHistory);
-            var llmAnswer = response.FirstOrDefault()?.Content?.Trim();
+            var arguments = new KernelArguments(
+                new PromptExecutionSettings
+                {
+                    FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+                })
+            {
+                ["question"] = question,
+                ["topK"] = initialTopK
+            };
+
+            var response = await kernel.InvokePromptAsync(prompt, arguments);
+            var llmAnswer = response.GetValue<string>()?.Trim();
 
             return string.IsNullOrWhiteSpace(llmAnswer)
                 ? deterministicAnswer
@@ -56,5 +72,16 @@ public sealed class GroundedAgentAnswerService(
                 $"{index + 1}. {source.Title} [PostId: {source.PostId}] - {source.Snippet}"));
 
         return $"Grounded answer for: {question}\n\nSupporting evidence:\n{evidence}";
+    }
+
+    private static void RegisterPluginOnce(Kernel kernel, SemanticSearchPlugin semanticSearchPlugin)
+    {
+        var alreadyRegistered = kernel.Plugins.Any(plugin =>
+            string.Equals(plugin.Name, SemanticSearchPlugin.PluginName, StringComparison.Ordinal));
+
+        if (!alreadyRegistered)
+        {
+            kernel.Plugins.AddFromObject(semanticSearchPlugin, SemanticSearchPlugin.PluginName);
+        }
     }
 }
