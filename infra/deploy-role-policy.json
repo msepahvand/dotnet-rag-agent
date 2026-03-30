@@ -12,6 +12,7 @@
         "ecr:DescribeRepositories",
         "ecr:GetAuthorizationToken",
         "ecr:InitiateLayerUpload",
+        "ecr:ListTagsForResource",
         "ecr:ListImages",
         "ecr:PutImage",
         "ecr:UploadLayerPart"
@@ -57,12 +58,16 @@
     {
       "Effect": "Allow",
       "Action": [
+        "iam:GetRole",
         "iam:GetRolePolicy",
         "iam:ListRolePolicies",
         "iam:PutRolePolicy",
         "iam:DeleteRolePolicy"
       ],
-      "Resource": "arn:aws:iam::__AWS_ACCOUNT_ID__:role/AppRunnerInstanceRole"
+      "Resource": [
+        "arn:aws:iam::__AWS_ACCOUNT_ID__:role/AppRunnerInstanceRole",
+        "arn:aws:iam::__AWS_ACCOUNT_ID__:role/AppRunnerEcrAccessRole"
+      ]
     },
     {
       "Effect": "Allow",
