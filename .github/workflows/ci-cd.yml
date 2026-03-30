@@ -149,6 +149,16 @@ jobs:
             echo "ECR already has $IMAGE_COUNT image(s) — skipping bootstrap."
           fi
 
+      - name: Import ECR repo created by bootstrap into state
+        working-directory: infra
+        run: |
+          ECR_REPO="${{ secrets.ECR_REPOSITORY || env.ECR_REPO_DEFAULT }}"
+          if ! terraform state show "aws_ecr_repository.api" >/dev/null 2>&1; then
+            if aws ecr describe-repositories --region "$REGION" --repository-names "$ECR_REPO" >/dev/null 2>&1; then
+              terraform import "aws_ecr_repository.api" "$ECR_REPO"
+            fi
+          fi
+
       - name: Terraform apply
         working-directory: infra
         run: |
