@@ -14,6 +14,7 @@
         "ecr:InitiateLayerUpload",
         "ecr:ListTagsForResource",
         "ecr:ListImages",
+        "ecr:PutImageScanningConfiguration",
         "ecr:PutImage",
         "ecr:UploadLayerPart"
       ],
