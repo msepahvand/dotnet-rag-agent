@@ -24,6 +24,11 @@ public class VectorService : IVectorService
         }
     }
 
+    public Task<bool> IsIndexEmptyAsync()
+    {
+        return _vectorStore.IsEmptyAsync();
+    }
+
     public async Task IndexPostAsync(Post post, float[] embedding)
     {
         var metadata = new Dictionary<string, string>

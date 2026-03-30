@@ -29,6 +29,18 @@ public class S3VectorStore : IVectorStore
         return Task.FromResult(true);
     }
 
+    public async Task<bool> IsEmptyAsync()
+    {
+        var response = await _s3VectorsClient.ListVectorsAsync(new ListVectorsRequest
+        {
+            VectorBucketName = _vectorBucketName,
+            IndexName = _indexName,
+            MaxResults = 1
+        });
+
+        return response.Vectors == null || response.Vectors.Count == 0;
+    }
+
     public Task CreateCollectionAsync(int vectorSize)
     {
         // S3 Vectors indexes are created manually via AWS Console/CLI

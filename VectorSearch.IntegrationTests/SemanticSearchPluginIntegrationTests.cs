@@ -39,6 +39,8 @@ public class SemanticSearchPluginIntegrationTests
     {
         public Task EnsureInitializedAsync() => Task.CompletedTask;
 
+        public Task<bool> IsIndexEmptyAsync() => Task.FromResult(false);
+
         public Task IndexPostAsync(Post post, float[] embedding) => Task.CompletedTask;
 
         public Task IndexPostsBatchAsync(List<(Post Post, float[] Embedding)> posts) => Task.CompletedTask;

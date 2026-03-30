@@ -38,6 +38,17 @@ public class RedisVectorStore : IVectorStore, IDisposable
         }
     }
 
+    public async Task<bool> IsEmptyAsync()
+    {
+        if (!await CollectionExistsAsync())
+        {
+            return true;
+        }
+
+        var result = await _ft.SearchAsync(_indexName, new Query("*").Limit(0, 0));
+        return result.TotalResults == 0;
+    }
+
     public async Task CreateCollectionAsync(int vectorSize)
     {
         if (await CollectionExistsAsync())

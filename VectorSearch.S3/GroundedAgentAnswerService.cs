@@ -8,6 +8,7 @@ namespace VectorSearch.S3;
 
 public sealed class GroundedAgentAnswerService(
     Kernel kernel,
+    IndexingPlugin indexingPlugin,
     SemanticSearchPlugin semanticSearchPlugin,
     IChatCompletionService? chatCompletionService,
     ILogger<GroundedAgentAnswerService> logger) : IAgentAnswerService
@@ -15,6 +16,8 @@ public sealed class GroundedAgentAnswerService(
     public async Task<AgentAnswerResult> AnswerAsync(string question, int topK)
     {
         var normalizedTopK = topK <= 0 ? 5 : Math.Min(topK, 10);
+
+        await indexingPlugin.IndexPostsIfEmptyAsync();
 
         // Plugin is the single retrieval path — orchestrator no longer calls IVectorService directly.
         var sourcesJson = await semanticSearchPlugin.SearchPostsAsync(question, normalizedTopK);

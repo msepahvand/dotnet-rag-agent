@@ -41,6 +41,34 @@ public class QdrantVectorStore : IVectorStore
         }
     }
 
+    public async Task<bool> IsEmptyAsync()
+    {
+        if (!await CollectionExistsAsync())
+        {
+            return true;
+        }
+
+        var response = await _httpClient.GetAsync($"/collections/{_collectionName}");
+        response.EnsureSuccessStatusCode();
+
+        var jsonResponse = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(jsonResponse);
+
+        if (!document.RootElement.TryGetProperty("result", out var resultElement))
+        {
+            return true;
+        }
+
+        var pointsCount = ReadCount(resultElement, "points_count");
+        if (pointsCount.HasValue)
+        {
+            return pointsCount.Value == 0;
+        }
+
+        var vectorsCount = ReadCount(resultElement, "vectors_count");
+        return vectorsCount.GetValueOrDefault() == 0;
+    }
+
     public async Task CreateCollectionAsync(int vectorSize)
     {
         var payload = new
@@ -134,5 +162,19 @@ public class QdrantVectorStore : IVectorStore
         public object? id { get; set; }
         public double score { get; set; }
         public Dictionary<string, string>? payload { get; set; }
+    }
+
+    private static long? ReadCount(JsonElement resultElement, string propertyName)
+    {
+        if (!resultElement.TryGetProperty(propertyName, out var property) || property.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.Number when property.TryGetInt64(out var count) => count,
+            _ => null
+        };
     }
 }

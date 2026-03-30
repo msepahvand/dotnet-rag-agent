@@ -8,6 +8,7 @@ public interface IVectorStore
     Task IndexDocumentAsync(string key, float[] embedding, Dictionary<string, string> metadata);
     Task IndexDocumentsBatchAsync(List<(string Key, float[] Embedding, Dictionary<string, string> Metadata)> documents);
     Task<List<VectorSearchResult>> SearchAsync(float[] queryEmbedding, int topK = 10);
+    Task<bool> IsEmptyAsync();
     Task<bool> CollectionExistsAsync();
     Task CreateCollectionAsync(int vectorSize);
 }
