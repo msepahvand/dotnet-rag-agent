@@ -61,9 +61,18 @@ jobs:
           REGION="${AWS_REGION:-us-east-1}"
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-          VECTOR_BUCKET_NAME=$(terraform output -raw vector_bucket_name 2>/dev/null || echo "posts-semantic-search")
-          VECTOR_INDEX_NAME=$(terraform output -raw vector_index_name 2>/dev/null || echo "posts-content-index")
-          ECR_REPOSITORY_NAME=$(terraform output -raw ecr_repository_name 2>/dev/null || echo "dotnet-vector-search")
+          _raw_bucket=$(terraform output -raw vector_bucket_name 2>/dev/null || true)
+          _raw_index=$(terraform output -raw vector_index_name 2>/dev/null || true)
+          _raw_ecr=$(terraform output -raw ecr_repository_name 2>/dev/null || true)
+
+          # Guard: if terraform output returned garbage (no state yet), fall back to defaults
+          if [ -z "$_raw_bucket" ] || [ "${#_raw_bucket}" -gt 63 ]; then _raw_bucket=""; fi
+          if [ -z "$_raw_index" ]  || [ "${#_raw_index}" -gt 63 ];  then _raw_index="";  fi
+          if [ -z "$_raw_ecr" ]    || [ "${#_raw_ecr}" -gt 63 ];    then _raw_ecr="";    fi
+
+          VECTOR_BUCKET_NAME="${_raw_bucket:-posts-semantic-search}"
+          VECTOR_INDEX_NAME="${_raw_index:-posts-content-index}"
+          ECR_REPOSITORY_NAME="${_raw_ecr:-dotnet-vector-search}"
           APP_RUNNER_SERVICE_NAME="${{ secrets.APP_RUNNER_SERVICE_NAME || 'dotnet-vector-search' }}"
 
           BUCKET_ADDRESS="module.s3_vectors.aws_s3vectors_vector_bucket.vector_bucket"
