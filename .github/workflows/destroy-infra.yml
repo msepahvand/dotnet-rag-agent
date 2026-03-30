@@ -36,18 +36,12 @@ on:
         required: false
         default: "dotnet-vector-search"
         type: string
-      approval_environment:
-        description: "Protected environment requiring approval"
-        required: true
-        type: environment
 
 jobs:
   destroy:
     name: Destroy application infra
     runs-on: ubuntu-latest
     if: ${{ github.event.inputs.confirm == 'DESTROY' }}
-    environment:
-      name: ${{ github.event.inputs.approval_environment }}
 
     steps:
       - name: Checkout repository
