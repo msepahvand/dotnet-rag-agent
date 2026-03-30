@@ -36,6 +36,55 @@ export TF_VAR_github_branch="$GITHUB_BRANCH"
 echo "Initializing Terraform..."
 terraform init -reconfigure
 
+BUCKET_ADDRESS="module.s3_vectors.aws_s3vectors_vector_bucket.vector_bucket"
+INDEX_ADDRESS="module.s3_vectors.aws_s3vectors_index.vector_index"
+ECR_ADDRESS="aws_ecr_repository.api"
+APP_RUNNER_ADDRESS="aws_apprunner_service.api"
+
+echo "Cleaning up stale Terraform state entries (best effort)..."
+
+vector_bucket_exists="false"
+bucket_found=$(aws s3vectors list-vector-buckets \
+  --region "$AWS_REGION" \
+  --query "vectorBuckets[?vectorBucketName=='$VECTOR_BUCKET_NAME'].vectorBucketName | [0]" \
+  --output text 2>/dev/null || true)
+if [ "$bucket_found" != "None" ] && [ -n "$bucket_found" ]; then
+  vector_bucket_exists="true"
+elif terraform state show "$BUCKET_ADDRESS" >/dev/null 2>&1; then
+  terraform state rm "$BUCKET_ADDRESS" >/dev/null || true
+fi
+
+if [ "$vector_bucket_exists" = "true" ]; then
+  index_found=$(aws s3vectors list-indexes \
+    --region "$AWS_REGION" \
+    --vector-bucket-name "$VECTOR_BUCKET_NAME" \
+    --query "indexes[?indexName=='$VECTOR_INDEX_NAME'].indexName | [0]" \
+    --output text 2>/dev/null || true)
+  if [ "$index_found" = "None" ] || [ -z "$index_found" ]; then
+    if terraform state show "$INDEX_ADDRESS" >/dev/null 2>&1; then
+      terraform state rm "$INDEX_ADDRESS" >/dev/null || true
+    fi
+  fi
+elif terraform state show "$INDEX_ADDRESS" >/dev/null 2>&1; then
+  terraform state rm "$INDEX_ADDRESS" >/dev/null || true
+fi
+
+if ! aws ecr describe-repositories --region "$AWS_REGION" --repository-names "$ECR_REPOSITORY_NAME" >/dev/null 2>&1; then
+  if terraform state show "$ECR_ADDRESS" >/dev/null 2>&1; then
+    terraform state rm "$ECR_ADDRESS" >/dev/null || true
+  fi
+fi
+
+app_runner_arn=$(aws apprunner list-services \
+  --region "$AWS_REGION" \
+  --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE_NAME'].ServiceArn | [0]" \
+  --output text 2>/dev/null || true)
+if [ "$app_runner_arn" = "None" ] || [ -z "$app_runner_arn" ]; then
+  if terraform state show "$APP_RUNNER_ADDRESS" >/dev/null 2>&1; then
+    terraform state rm "$APP_RUNNER_ADDRESS" >/dev/null || true
+  fi
+fi
+
 echo "Destroying Terraform-managed application resources..."
 terraform destroy -auto-approve \
   -var="aws_region=$AWS_REGION" \
