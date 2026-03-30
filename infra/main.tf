@@ -4,6 +4,13 @@ provider "aws" {
 }
 
 terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 6.35.0, < 7.0.0"
+    }
+  }
+
   backend "s3" {
     bucket  = "dotnet-vector-search-tf-state"
     key     = "global/terraform.tfstate"
