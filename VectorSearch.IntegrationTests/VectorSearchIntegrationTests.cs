@@ -206,7 +206,14 @@ public class VectorSearchIntegrationTests
         public string ToolUsed { get; init; } = string.Empty;
         public bool Grounded { get; init; }
         public string Answer { get; init; } = string.Empty;
+        public List<CitationDto> Citations { get; init; } = [];
         public List<AgentSourceDto> Sources { get; init; } = [];
+    }
+
+    private sealed record CitationDto
+    {
+        public int PostId { get; init; }
+        public string Quote { get; init; } = string.Empty;
     }
 
     private sealed record AgentSourceDto

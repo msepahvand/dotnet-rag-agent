@@ -1,7 +1,10 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.SemanticKernel.PromptTemplates.Handlebars;
 using VectorSearch.Core;
 
 namespace VectorSearch.S3;
@@ -13,13 +16,19 @@ public sealed class GroundedAgentAnswerService(
     IChatCompletionService? chatCompletionService,
     ILogger<GroundedAgentAnswerService> logger) : IAgentAnswerService
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    private static KernelFunction? s_promptFunction;
+
     public async Task<AgentAnswerResult> AnswerAsync(string question, int topK)
     {
         var normalizedTopK = topK <= 0 ? 5 : Math.Min(topK, 10);
 
         await indexingPlugin.IndexPostsIfEmptyAsync();
 
-        // Plugin is the single retrieval path — orchestrator no longer calls IVectorService directly.
         var sourcesJson = await semanticSearchPlugin.SearchPostsAsync(question, normalizedTopK);
         var sources = JsonSerializer.Deserialize<List<AgentSource>>(sourcesJson) ?? [];
 
@@ -28,57 +37,95 @@ public sealed class GroundedAgentAnswerService(
             return new AgentAnswerResult
             {
                 Answer = "I couldn't find supporting sources in the indexed content. Try indexing more data or rephrasing the question.",
-                Sources = []
+                Sources = [],
+                Citations = []
             };
         }
 
-        var deterministicAnswer = BuildDeterministicGroundedAnswer(question, sources);
+        var deterministicAnswer = BuildDeterministicAnswer(question, sources);
 
         if (chatCompletionService == null)
         {
-            return new AgentAnswerResult { Answer = deterministicAnswer, Sources = sources };
+            return new AgentAnswerResult
+            {
+                Answer = deterministicAnswer,
+                Sources = sources,
+                Citations = BuildDeterministicCitations(sources)
+            };
         }
 
         try
         {
-            RegisterPluginOnce(kernel, semanticSearchPlugin);
-
-            var prompt =
-                "You are a grounded assistant. " +
-                "Use the SemanticSearch.search_posts function to retrieve supporting sources before answering. " +
-                "Answer only from returned sources. If there is not enough evidence, say so. " +
-                "Cite key claims with [PostId: N].\n\n" +
-                "Question: {{$question}}\n" +
-                "PreferredTopK: {{$topK}}\n" +
-                "Provide a concise answer with citations.";
-
-            var arguments = new KernelArguments(
-                new PromptExecutionSettings
-                {
-                    FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
-                })
+            var promptFunction = GetPromptFunction();
+            var arguments = new KernelArguments
             {
                 ["question"] = question,
-                ["topK"] = normalizedTopK
+                ["sources"] = sourcesJson
             };
 
-            var response = await kernel.InvokePromptAsync(prompt, arguments);
-            var llmAnswer = response.GetValue<string>()?.Trim();
+            var response = await promptFunction.InvokeAsync(kernel, arguments);
+            var rawOutput = response.GetValue<string>()?.Trim() ?? "";
 
-            return new AgentAnswerResult
-            {
-                Answer = string.IsNullOrWhiteSpace(llmAnswer) ? deterministicAnswer : llmAnswer,
-                Sources = sources
-            };
+            return ParseStructuredAnswer(rawOutput, sources, deterministicAnswer);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Falling back to deterministic grounded answer because Bedrock chat generation failed.");
-            return new AgentAnswerResult { Answer = deterministicAnswer, Sources = sources };
+            logger.LogWarning(ex, "Falling back to deterministic grounded answer because LLM generation failed.");
+            return new AgentAnswerResult
+            {
+                Answer = deterministicAnswer,
+                Sources = sources,
+                Citations = BuildDeterministicCitations(sources)
+            };
         }
     }
 
-    private static string BuildDeterministicGroundedAnswer(string question, List<AgentSource> sources)
+    private static AgentAnswerResult ParseStructuredAnswer(
+        string rawOutput, List<AgentSource> sources, string fallback)
+    {
+        var json = ExtractJson(rawOutput);
+
+        try
+        {
+            var structured = JsonSerializer.Deserialize<StructuredLlmAnswer>(json, JsonOptions);
+            if (structured != null && !string.IsNullOrWhiteSpace(structured.Answer))
+            {
+                return new AgentAnswerResult
+                {
+                    Answer = structured.Answer,
+                    Sources = sources,
+                    Citations = structured.Citations ?? []
+                };
+            }
+        }
+        catch (JsonException)
+        {
+            // LLM returned non-JSON; treat raw text as the answer
+        }
+
+        return new AgentAnswerResult
+        {
+            Answer = string.IsNullOrWhiteSpace(rawOutput) ? fallback : rawOutput,
+            Sources = sources,
+            Citations = []
+        };
+    }
+
+    private static string ExtractJson(string raw)
+    {
+        var fenceMatch = Regex.Match(raw, @"```(?:json)?\s*\n?(.*?)\n?\s*```", RegexOptions.Singleline);
+        if (fenceMatch.Success)
+            return fenceMatch.Groups[1].Value.Trim();
+
+        var start = raw.IndexOf('{');
+        var end = raw.LastIndexOf('}');
+        if (start >= 0 && end > start)
+            return raw[start..(end + 1)];
+
+        return raw;
+    }
+
+    private static string BuildDeterministicAnswer(string question, List<AgentSource> sources)
     {
         var topSources = sources.Take(3).ToList();
         var evidence = string.Join(
@@ -89,14 +136,38 @@ public sealed class GroundedAgentAnswerService(
         return $"Grounded answer for: {question}\n\nSupporting evidence:\n{evidence}";
     }
 
-    private static void RegisterPluginOnce(Kernel kernel, SemanticSearchPlugin semanticSearchPlugin)
+    private static List<Citation> BuildDeterministicCitations(List<AgentSource> sources)
     {
-        var alreadyRegistered = kernel.Plugins.Any(plugin =>
-            string.Equals(plugin.Name, SemanticSearchPlugin.PluginName, StringComparison.Ordinal));
-
-        if (!alreadyRegistered)
+        return sources.Take(3).Select(s => new Citation
         {
-            kernel.Plugins.AddFromObject(semanticSearchPlugin, SemanticSearchPlugin.PluginName);
-        }
+            PostId = s.PostId,
+            Quote = s.Snippet.Length > 120 ? s.Snippet[..120] : s.Snippet
+        }).ToList();
+    }
+
+    private static KernelFunction GetPromptFunction()
+    {
+        if (s_promptFunction != null) return s_promptFunction;
+
+        var assembly = typeof(GroundedAgentAnswerService).Assembly;
+        using var stream = assembly.GetManifestResourceStream("VectorSearch.S3.Prompts.GroundedAnswer.yaml")
+            ?? throw new InvalidOperationException("Embedded resource VectorSearch.S3.Prompts.GroundedAnswer.yaml not found.");
+        using var reader = new StreamReader(stream);
+        var yaml = reader.ReadToEnd();
+
+        s_promptFunction = KernelFunctionYaml.FromPromptYaml(yaml, new HandlebarsPromptTemplateFactory());
+        return s_promptFunction;
+    }
+
+    private sealed record StructuredLlmAnswer
+    {
+        [JsonPropertyName("answer")]
+        public string Answer { get; init; } = string.Empty;
+
+        [JsonPropertyName("citations")]
+        public List<Citation> Citations { get; init; } = [];
+
+        [JsonPropertyName("grounded")]
+        public bool Grounded { get; init; }
     }
 }

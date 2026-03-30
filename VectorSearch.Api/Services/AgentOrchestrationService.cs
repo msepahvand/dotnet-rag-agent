@@ -13,8 +13,9 @@ public sealed class AgentOrchestrationService(
         return new AgentAskResponse
         {
             ToolUsed = "semantic-search",
-            Grounded = result.Sources.Count > 0,
+            Grounded = result.Citations.Count > 0 || result.Sources.Count > 0,
             Answer = result.Answer,
+            Citations = result.Citations,
             Sources = result.Sources
         };
     }

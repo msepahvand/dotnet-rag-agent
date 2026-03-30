@@ -40,12 +40,19 @@ internal sealed class TestAgentAnswerService(
             .Where(s => !string.IsNullOrWhiteSpace(s.Title))
             .ToList();
 
-        var citations = string.Join(", ", sources.Take(3).Select(s => $"[PostId: {s.PostId}]"));
+        var citationList = sources.Take(3).Select(s => new Citation
+        {
+            PostId = s.PostId,
+            Quote = s.Snippet.Length > 80 ? s.Snippet[..80] : s.Snippet
+        }).ToList();
+
+        var citationRefs = string.Join(", ", citationList.Select(c => $"[PostId: {c.PostId}]"));
 
         return new AgentAnswerResult
         {
-            Answer = $"Grounded test answer for '{question}' using {citations}.",
-            Sources = sources
+            Answer = $"Grounded test answer for '{question}' using {citationRefs}.",
+            Sources = sources,
+            Citations = citationList
         };
     }
 }
