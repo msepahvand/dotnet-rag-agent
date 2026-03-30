@@ -84,22 +84,27 @@ jobs:
             BUCKET_FOUND=$(aws s3vectors list-vector-buckets \
               --region "$REGION" \
               --query "vectorBuckets[?vectorBucketName=='$VECTOR_BUCKET_NAME'].vectorBucketName | [0]" \
-              --output text)
+              --output text 2>/dev/null || true)
 
             if [ "$BUCKET_FOUND" != "None" ] && [ -n "$BUCKET_FOUND" ]; then
+              VECTOR_BUCKET_EXISTS="true"
               terraform import "$BUCKET_ADDRESS" "arn:aws:s3vectors:$REGION:$ACCOUNT_ID:bucket/$VECTOR_BUCKET_NAME"
             fi
+          else
+            VECTOR_BUCKET_EXISTS="true"
           fi
 
           if ! terraform state show "$INDEX_ADDRESS" >/dev/null 2>&1; then
-            INDEX_FOUND=$(aws s3vectors list-indexes \
-              --region "$REGION" \
-              --vector-bucket-name "$VECTOR_BUCKET_NAME" \
-              --query "indexes[?indexName=='$VECTOR_INDEX_NAME'].indexName | [0]" \
-              --output text)
+            if [ "${VECTOR_BUCKET_EXISTS:-false}" = "true" ]; then
+              INDEX_FOUND=$(aws s3vectors list-indexes \
+                --region "$REGION" \
+                --vector-bucket-name "$VECTOR_BUCKET_NAME" \
+                --query "indexes[?indexName=='$VECTOR_INDEX_NAME'].indexName | [0]" \
+                --output text 2>/dev/null || true)
 
-            if [ "$INDEX_FOUND" != "None" ] && [ -n "$INDEX_FOUND" ]; then
-              terraform import "$INDEX_ADDRESS" "arn:aws:s3vectors:$REGION:$ACCOUNT_ID:bucket/$VECTOR_BUCKET_NAME/index/$VECTOR_INDEX_NAME"
+              if [ "$INDEX_FOUND" != "None" ] && [ -n "$INDEX_FOUND" ]; then
+                terraform import "$INDEX_ADDRESS" "arn:aws:s3vectors:$REGION:$ACCOUNT_ID:bucket/$VECTOR_BUCKET_NAME/index/$VECTOR_INDEX_NAME"
+              fi
             fi
           fi
 
