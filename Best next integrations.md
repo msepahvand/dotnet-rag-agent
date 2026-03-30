@@ -1,43 +1,175 @@
-# Best Next Integrations
+# Mastering Agentic AI in .NET — Learning Roadmap
 
-Semantic Kernel opportunities that fit the current architecture.
+A progressive roadmap for building real agentic AI skills using Semantic Kernel and this repo as a working lab.
 
-## 1. Semantic Search Plugin
+## What you've already built
 
-Turn semantic search into a real Semantic Kernel plugin.
+- Single-tool-calling agent (question → semantic search → grounded answer)
+- Semantic Kernel plugins: `SemanticSearchPlugin`, `IndexingPlugin`
+- Auto function-calling via `FunctionChoiceBehavior.Auto()`
+- Function invocation filter for logging, guardrails, and topK normalization
+- Bedrock-backed embeddings and text generation
+- Provider-agnostic core with S3 Vectors / Qdrant implementations
 
-- Add plugin functions like SearchPosts(question, topK) and GetPostSnippet(postId)
-- Let the model decide when to call tools instead of forcing a fixed flow
-- Keep controller and API contracts unchanged while moving tool semantics into plugin methods
+This is a strong foundation. Everything below builds directly on it.
 
-## 2. Prompt Function for Grounded Answers
+---
 
-Move grounded answer composition into a kernel prompt function.
+## Phase 1 — Strengthen the Single-Agent Loop
 
-- Replace inline prompt strings with a reusable prompt function/template
-- Keep strict citation instructions (for example [PostId: N]) in one central place
-- Make prompt iteration and A/B testing easier without changing orchestration code
+### 1.1 Structured Output Contract
 
-## 3. Function Invocation Filters
+Force the LLM to return a validated JSON shape instead of free-form text.
 
-Use Semantic Kernel invocation filters for safety and observability.
+- Define a response contract: `{ answer, citations: [{ postId, quote }], grounded: bool }`
+- Use SK's `JsonSchemaResponseFormat` or Bedrock's `response_format` to constrain the model
+- Validate before returning from the API; fall back to the deterministic answer on parse failure
+- **Why**: Every production agent needs predictable output shapes. This is table-stakes.
 
-- Log tool call names, duration, and high-level outcomes
-- Enforce guardrails like max topK and argument normalization centrally
-- Keep cross-cutting concerns out of controllers and business services
+### 1.2 Prompt Templates as Prompt Functions
 
-## 4. Indexing Plugin
+Replace the inline prompt string in `GroundedAgentAnswerService` with a reusable YAML/Handlebars prompt function.
 
-Expose indexing actions as controlled plugin tools.
+- Create a `/Prompts` folder with `.yaml` prompt config + `.txt` Handlebars template
+- Load via `kernel.CreateFunctionFromPromptYaml()`
+- Keep citation instructions, persona, and grounding rules in one versioned place
+- **Why**: Prompt engineering iteration speed is a core agentic skill. Inline strings don't scale.
 
-- Add functions like IndexPost(postId) and IndexRecentPosts(count)
-- Reuse existing indexing and embedding services behind plugin methods
-- Support agent-driven ingestion scenarios while preserving service boundaries
+### 1.3 Chat History and Multi-Turn Conversations
 
-## 5. Structured Output Contract
+Add stateful conversation support to the `/api/agent/ask` endpoint.
 
-Require a structured grounded-answer payload from the model.
+- Maintain a `ChatHistory` per session (in-memory or Redis-backed)
+- Pass history into the kernel invocation so follow-up questions have context
+- Add a `/api/agent/conversations` endpoint to manage sessions
+- **Why**: Real agents are conversational. Single-shot Q&A is a demo; multi-turn is production.
 
-- Define a contract with answer, citations, and grounded fields
-- Validate output shape before returning API responses
-- Reduce response-format drift and simplify downstream handling
+---
+
+## Phase 2 — Multi-Tool Agent
+
+### 2.1 Give the Agent More Tools
+
+Register multiple plugins and let the model pick which to call.
+
+- Add a `SummarizePlugin` — takes a post ID and returns a condensed summary
+- Add a `ComparePostsPlugin` — takes two post IDs and returns a comparison
+- Register all plugins in the kernel; the agent decides the tool chain per question
+- **Why**: The jump from single-tool to multi-tool is where you learn how models reason about tool selection, argument planning, and chaining.
+
+### 2.2 Required vs. Auto vs. None — Function Choice Strategies
+
+Experiment with all three `FunctionChoiceBehavior` modes.
+
+- `Auto()` — model decides (current behavior)
+- `Required()` — model must call at least one function (useful for retrieval-first flows)
+- `None()` — pure chat, no tools (useful for final-answer generation after retrieval)
+- Chain them: first invocation with `Required` for retrieval, second with `None` for synthesis
+- **Why**: Understanding when to constrain tool use vs. let the model choose is a key agentic design skill.
+
+---
+
+## Phase 3 — Multi-Agent Orchestration
+
+### 3.1 Researcher + Writer Pattern
+
+Split the current monolithic agent into two collaborating agents.
+
+- **Researcher agent**: has access to `SemanticSearchPlugin`. Retrieves and ranks sources.
+- **Writer agent**: receives sources from researcher. Produces the final grounded answer.
+- Orchestrate with SK's `AgentGroupChat` or a simple sequential handoff in code
+- **Why**: This is the core multi-agent pattern. You learn agent communication, handoff protocols, and separation of concerns.
+
+### 3.2 Agent with a Critic / Self-Reflection
+
+Add a review loop where a second agent scores the first agent's output.
+
+- Critic agent checks: Are citations real? Is the answer grounded? Is it relevant?
+- If the critic rejects, loop back to the researcher with feedback
+- Cap at 2-3 iterations to avoid runaway loops
+- **Why**: Self-reflection / verification loops are what separate toy agents from reliable ones.
+
+### 3.3 SK Process Framework (Nested Steps)
+
+Rewrite the orchestration as an SK `Process` with discrete steps.
+
+- Step 1: Retrieve sources → Step 2: Generate answer → Step 3: Validate → Step 4: Respond
+- Each step is independently testable and observable
+- Add branching: if validation fails, loop back to Step 2 with adjusted prompt
+- **Why**: The Process framework is SK's answer to complex agent workflows. Learning it early gives you a structured way to build production agent pipelines.
+
+---
+
+## Phase 4 — Autonomous Agents
+
+### 4.1 Ingestion Agent
+
+Build an agent that watches for new content and autonomously indexes it.
+
+- Background service that polls for new posts on a timer
+- Chunks content, generates embeddings, upserts into the vector store
+- Uses the existing `IndexingPlugin` but runs autonomously, not on user request
+- **Why**: Not all agents are user-facing. Background autonomous agents are a huge enterprise use case (data pipelines, monitoring, ETL).
+
+### 4.2 Evaluation Agent
+
+Build an agent that scores retrieval and answer quality.
+
+- Define a test question set with expected answers / source IDs
+- Agent runs each question, compares results, and computes metrics:
+  - **Hit@k**: Did the correct source appear in top-k results?
+  - **Groundedness**: Is every claim in the answer backed by a retrieved source?
+  - **Hallucination rate**: Does the answer contain claims not in any source?
+- Output a score report as structured JSON
+- **Why**: You can't improve what you can't measure. Evaluation is the most underrated agentic skill.
+
+---
+
+## Phase 5 — Production Patterns
+
+### 5.1 Guardrails and Safety
+
+Add defense-in-depth to the agent pipeline.
+
+- Input guardrails: prompt injection detection, PII filtering, topic scoping
+- Output guardrails: content filtering, citation verification, response length limits
+- Implement as SK `IPromptRenderFilter` (input) and `IFunctionInvocationFilter` (output)
+- **Why**: Enterprise AI requires safety layers. Building them with SK's filter pipeline is the idiomatic .NET approach.
+
+### 5.2 Observability and Tracing
+
+Add end-to-end traces to the agent execution.
+
+- Integrate OpenTelemetry with SK's built-in instrumentation
+- Trace: user question → tool calls → LLM invocations → final response
+- Export to a local Aspire dashboard or Jaeger for visualization
+- **Why**: When agents misbehave in production, traces are how you debug them. This is essential operational skill.
+
+### 5.3 Streaming Responses
+
+Switch the agent endpoint from batch to streaming.
+
+- Use `IAsyncEnumerable<string>` and `GetStreamingChatMessageContentsAsync`
+- Stream partial answers to the client via SSE or chunked transfer
+- **Why**: Users expect real-time feedback from AI. Streaming is the standard UX pattern.
+
+---
+
+## Recommended Learning Order
+
+| Order | Topic | Builds On |
+|-------|-------|-----------|
+| 1 | Structured output (1.1) | Current agent |
+| 2 | Prompt templates (1.2) | Current agent |
+| 3 | Multi-turn chat (1.3) | Current agent |
+| 4 | Multi-tool agent (2.1, 2.2) | Phase 1 |
+| 5 | Researcher + Writer (3.1) | Phase 2 |
+| 6 | Self-reflection loop (3.2) | 3.1 |
+| 7 | Evaluation agent (4.2) | Phase 3 |
+| 8 | Ingestion agent (4.1) | Existing IndexingPlugin |
+| 9 | Guardrails (5.1) | Existing filters |
+| 10 | Observability (5.2) | All phases |
+| 11 | Streaming (5.3) | All phases |
+| 12 | Process framework (3.3) | Phase 3 |
+
+Start at the top, ship each one, then move on. Every item is implementable in this repo.
