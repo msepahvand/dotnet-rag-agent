@@ -2,5 +2,5 @@ namespace VectorSearch.Core;
 
 public interface IAgentAnswerService
 {
-    Task<string> BuildGroundedAnswerAsync(string question, List<AgentSource> sources);
+    Task<AgentAnswerResult> AnswerAsync(string question, int topK);
 }

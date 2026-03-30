@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -11,25 +12,34 @@ public sealed class GroundedAgentAnswerService(
     IChatCompletionService? chatCompletionService,
     ILogger<GroundedAgentAnswerService> logger) : IAgentAnswerService
 {
-    public async Task<string> BuildGroundedAnswerAsync(string question, List<AgentSource> sources)
+    public async Task<AgentAnswerResult> AnswerAsync(string question, int topK)
     {
+        var normalizedTopK = topK <= 0 ? 5 : Math.Min(topK, 10);
+
+        // Plugin is the single retrieval path — orchestrator no longer calls IVectorService directly.
+        var sourcesJson = await semanticSearchPlugin.SearchPostsAsync(question, normalizedTopK);
+        var sources = JsonSerializer.Deserialize<List<AgentSource>>(sourcesJson) ?? [];
+
         if (sources.Count == 0)
         {
-            return "I couldn't produce a grounded answer because there were no supporting sources.";
+            return new AgentAnswerResult
+            {
+                Answer = "I couldn't find supporting sources in the indexed content. Try indexing more data or rephrasing the question.",
+                Sources = []
+            };
         }
 
         var deterministicAnswer = BuildDeterministicGroundedAnswer(question, sources);
 
         if (chatCompletionService == null)
         {
-            return deterministicAnswer;
+            return new AgentAnswerResult { Answer = deterministicAnswer, Sources = sources };
         }
 
         try
         {
             RegisterPluginOnce(kernel, semanticSearchPlugin);
 
-            var initialTopK = Math.Clamp(sources.Count, 1, 10);
             var prompt =
                 "You are a grounded assistant. " +
                 "Use the SemanticSearch.search_posts function to retrieve supporting sources before answering. " +
@@ -46,20 +56,22 @@ public sealed class GroundedAgentAnswerService(
                 })
             {
                 ["question"] = question,
-                ["topK"] = initialTopK
+                ["topK"] = normalizedTopK
             };
 
             var response = await kernel.InvokePromptAsync(prompt, arguments);
             var llmAnswer = response.GetValue<string>()?.Trim();
 
-            return string.IsNullOrWhiteSpace(llmAnswer)
-                ? deterministicAnswer
-                : llmAnswer;
+            return new AgentAnswerResult
+            {
+                Answer = string.IsNullOrWhiteSpace(llmAnswer) ? deterministicAnswer : llmAnswer,
+                Sources = sources
+            };
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Falling back to deterministic grounded answer because Bedrock chat generation failed.");
-            return deterministicAnswer;
+            return new AgentAnswerResult { Answer = deterministicAnswer, Sources = sources };
         }
     }
 
