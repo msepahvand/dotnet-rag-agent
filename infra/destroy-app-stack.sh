@@ -85,6 +85,22 @@ if [ "$app_runner_arn" = "None" ] || [ -z "$app_runner_arn" ]; then
   fi
 fi
 
+# Delete all images from ECR so terraform destroy can remove the repository
+if aws ecr describe-repositories --region "$AWS_REGION" --repository-names "$ECR_REPOSITORY_NAME" >/dev/null 2>&1; then
+  echo "Deleting all images from ECR repository $ECR_REPOSITORY_NAME..."
+  IMAGE_IDS=$(aws ecr list-images \
+    --region "$AWS_REGION" \
+    --repository-name "$ECR_REPOSITORY_NAME" \
+    --query 'imageIds[*]' \
+    --output json 2>/dev/null || echo "[]")
+  if [ "$IMAGE_IDS" != "[]" ] && [ -n "$IMAGE_IDS" ]; then
+    aws ecr batch-delete-image \
+      --region "$AWS_REGION" \
+      --repository-name "$ECR_REPOSITORY_NAME" \
+      --image-ids "$IMAGE_IDS" >/dev/null 2>&1 || true
+  fi
+fi
+
 echo "Destroying Terraform-managed application resources..."
 terraform destroy -auto-approve \
   -var="aws_region=$AWS_REGION" \
