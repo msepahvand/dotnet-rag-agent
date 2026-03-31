@@ -46,14 +46,6 @@ public class EmbeddingService : IEmbeddingService
             yield return item;
     }
 
-    public async Task<List<(int PostId, float[] Embedding)>> GenerateEmbeddingsAsync(List<Post> posts)
-    {
-        var results = new List<(int PostId, float[] Embedding)>();
-        await foreach (var item in StreamEmbeddings(posts))
-            results.Add(item);
-        return results;
-    }
-
     public async Task<float[]> GenerateEmbeddingAsync(string text)
     {
         var result = await _embeddingGenerator.GenerateAsync([text]);

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.AI;
+using VectorSearch.Core;
 using VectorSearch.Core.Models;
 using VectorSearch.S3;
 
@@ -71,7 +72,7 @@ public class EmbeddingServiceBackpressureTests
     public async Task GenerateEmbeddingsAsync_ReturnsAllResults_DerivedFromStream()
     {
         var generator = new FakeEmbeddingGenerator(_ => Task.FromResult<float[]>([1.0f, 2.0f]));
-        var service = new EmbeddingService(generator);
+        IEmbeddingService service = new EmbeddingService(generator);
 
         var results = await service.GenerateEmbeddingsAsync(CreatePosts(5));
 
