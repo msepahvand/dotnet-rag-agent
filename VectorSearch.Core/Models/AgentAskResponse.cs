@@ -2,6 +2,7 @@ namespace VectorSearch.Core;
 
 public record AgentAskResponse
 {
+    public string ConversationId { get; init; } = string.Empty;
     public string ToolUsed { get; init; } = "semantic-search";
     public bool Grounded { get; init; }
     public string Answer { get; init; } = string.Empty;

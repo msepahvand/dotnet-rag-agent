@@ -6,7 +6,7 @@ internal sealed class TestAgentAnswerService(
     IVectorService vectorService,
     IPostService postService) : IAgentAnswerService
 {
-    public async Task<AgentAnswerResult> AnswerAsync(string question, int topK)
+    public async Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ChatMessage> history)
     {
         var searchResults = await vectorService.SemanticSearchAsync(question, topK);
 

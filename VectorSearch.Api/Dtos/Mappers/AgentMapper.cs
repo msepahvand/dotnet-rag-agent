@@ -5,11 +5,12 @@ namespace VectorSearch.Api.Dtos.Mappers;
 public static class AgentMapper
 {
     public static AgentAskRequest ToModel(AskRequestDto dto) =>
-        new() { Question = dto.Question, TopK = dto.TopK };
+        new() { Question = dto.Question, TopK = dto.TopK, ConversationId = dto.ConversationId };
 
     public static AskResponseDto ToDto(AgentAskResponse model) =>
         new()
         {
+            ConversationId = model.ConversationId,
             ToolUsed = model.ToolUsed,
             Grounded = model.Grounded,
             Answer = model.Answer,

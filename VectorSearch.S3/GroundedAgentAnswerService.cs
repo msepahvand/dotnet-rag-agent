@@ -23,7 +23,7 @@ public sealed class GroundedAgentAnswerService(
 
     private static KernelFunction? s_promptFunction;
 
-    public async Task<AgentAnswerResult> AnswerAsync(string question, int topK)
+    public async Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ChatMessage> history)
     {
         var normalizedTopK = topK <= 0 ? 5 : Math.Min(topK, 10);
 
@@ -58,6 +58,11 @@ public sealed class GroundedAgentAnswerService(
 
         try
         {
+            if (history.Count > 0)
+            {
+                return await AnswerWithHistoryAsync(question, sourcesJson, sources, deterministicAnswer, history);
+            }
+
             var promptFunction = GetPromptFunction();
             var arguments = new KernelArguments
             {
@@ -81,6 +86,46 @@ public sealed class GroundedAgentAnswerService(
                 Citations = BuildDeterministicCitations(sources)
             };
         }
+    }
+
+    private async Task<AgentAnswerResult> AnswerWithHistoryAsync(
+        string question,
+        string sourcesJson,
+        List<AgentSource> sources,
+        string deterministicAnswer,
+        IReadOnlyList<ChatMessage> history)
+    {
+        var assembly = typeof(GroundedAgentAnswerService).Assembly;
+        using var stream = assembly.GetManifestResourceStream("VectorSearch.S3.Prompts.GroundedAnswer.yaml")
+            ?? throw new InvalidOperationException("Embedded resource VectorSearch.S3.Prompts.GroundedAnswer.yaml not found.");
+        using var reader = new StreamReader(stream);
+        var yaml = reader.ReadToEnd();
+
+        // Extract system prompt from YAML template (content between first message block)
+        var systemPromptMatch = Regex.Match(yaml, @"\{\{#message role=\""system\""\}\}\s*(.*?)\s*\{\{/message\}\}", RegexOptions.Singleline);
+        var systemPrompt = systemPromptMatch.Success
+            ? systemPromptMatch.Groups[1].Value.Trim()
+            : "You are a grounded assistant that answers questions using ONLY the provided sources. Return your answer as JSON with fields: answer, citations, grounded.";
+
+        var chatHistory = new ChatHistory(systemPrompt);
+
+        foreach (var msg in history)
+        {
+            var role = msg.Role switch
+            {
+                "assistant" => AuthorRole.Assistant,
+                "system" => AuthorRole.System,
+                _ => AuthorRole.User
+            };
+            chatHistory.Add(new ChatMessageContent(role, msg.Content));
+        }
+
+        chatHistory.AddUserMessage($"Sources:\n{sourcesJson}\n\nQuestion: {question}");
+
+        var response = await chatCompletionService!.GetChatMessageContentsAsync(chatHistory, kernel: kernel);
+        var rawOutput = response.FirstOrDefault()?.Content?.Trim() ?? "";
+
+        return ParseStructuredAnswer(rawOutput, sources, deterministicAnswer);
     }
 
     private static AgentAnswerResult ParseStructuredAnswer(

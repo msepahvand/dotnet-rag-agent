@@ -1,6 +1,7 @@
 using Microsoft.OpenApi.Models;
 using VectorSearch.Api.Extensions;
 using VectorSearch.Api.Services;
+using VectorSearch.Core;
 using VectorSearch.S3;
 
 namespace VectorSearch.Api;
@@ -17,6 +18,7 @@ public class Program
         builder.Services.AddScoped<IPostIndexingService, PostIndexingService>();
         builder.Services.AddScoped<ISemanticSearchService, SemanticSearchService>();
         builder.Services.AddScoped<IAgentOrchestrationService, AgentOrchestrationService>();
+        builder.Services.AddSingleton<IConversationStore, InMemoryConversationStore>();
 
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen(options =>
