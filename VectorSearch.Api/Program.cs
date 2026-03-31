@@ -1,3 +1,5 @@
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.OpenApi.Models;
 using VectorSearch.Api.Extensions;
 using VectorSearch.Api.Services;
@@ -13,6 +15,8 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services.AddControllers();
+        builder.Services.AddFluentValidationAutoValidation();
+        builder.Services.AddValidatorsFromAssemblyContaining<Program>();
         builder.Services.AddVectorSearch(builder.Configuration);
         builder.Services.AddScoped<IPostsQueryService, PostsQueryService>();
         builder.Services.AddScoped<IPostIndexingService, PostIndexingService>();
