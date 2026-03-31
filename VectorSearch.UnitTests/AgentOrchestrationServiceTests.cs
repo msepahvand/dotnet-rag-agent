@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Caching.Memory;
 using VectorSearch.Api.Services;
 using VectorSearch.Core;
 using VectorSearch.Core.Models;
@@ -19,7 +20,7 @@ public class AgentOrchestrationServiceTests
             Sources = [new AgentSource { PostId = 1, Title = "T", Snippet = "S", Distance = 0.1f }],
             Citations = [new Citation { PostId = 1, Quote = "Q" }]
         });
-        var sut = new AgentOrchestrationService(stub, new InMemoryConversationStore());
+        var sut = new AgentOrchestrationService(stub, CreateStore());
 
         var response = await sut.AskAsync(new AgentAskRequest { Question = "Q?", TopK = 5 });
 
@@ -39,7 +40,7 @@ public class AgentOrchestrationServiceTests
             Sources = [new AgentSource { PostId = 1, Title = "T", Snippet = "S", Distance = 0.1f }],
             Citations = [new Citation { PostId = 1, Quote = "Q" }]
         });
-        var sut = new AgentOrchestrationService(stub, new InMemoryConversationStore());
+        var sut = new AgentOrchestrationService(stub, CreateStore());
 
         var response = await sut.AskAsync(new AgentAskRequest { Question = "Q?", TopK = 5 });
 
@@ -56,7 +57,7 @@ public class AgentOrchestrationServiceTests
             Sources = [],
             Citations = []
         });
-        var sut = new AgentOrchestrationService(stub, new InMemoryConversationStore());
+        var sut = new AgentOrchestrationService(stub, CreateStore());
 
         var response = await sut.AskAsync(new AgentAskRequest { Question = "Q?", TopK = 5 });
 
@@ -77,7 +78,7 @@ public class AgentOrchestrationServiceTests
             Sources = [source],
             Citations = [citation]
         });
-        var sut = new AgentOrchestrationService(stub, new InMemoryConversationStore());
+        var sut = new AgentOrchestrationService(stub, CreateStore());
 
         var response = await sut.AskAsync(new AgentAskRequest { Question = "Q?", TopK = 5 });
 
@@ -100,7 +101,7 @@ public class AgentOrchestrationServiceTests
     {
         int capturedTopK = 0;
         var stub = new CapturingStubAgentAnswerService(topK => capturedTopK = topK);
-        var sut = new AgentOrchestrationService(stub, new InMemoryConversationStore());
+        var sut = new AgentOrchestrationService(stub, CreateStore());
 
         await sut.AskAsync(new AgentAskRequest { Question = "Q?", TopK = requested });
 
@@ -113,7 +114,7 @@ public class AgentOrchestrationServiceTests
     public async Task AskAsync_WithNoConversationId_GeneratesNewConversationId()
     {
         var stub = new StubAgentAnswerService(new AgentAnswerResult { Answer = "ok", Grounded = true });
-        var sut = new AgentOrchestrationService(stub, new InMemoryConversationStore());
+        var sut = new AgentOrchestrationService(stub, CreateStore());
 
         var response = await sut.AskAsync(new AgentAskRequest { Question = "Q?", TopK = 5 });
 
@@ -124,7 +125,7 @@ public class AgentOrchestrationServiceTests
     public async Task AskAsync_WithExistingConversationId_ReturnsTheSameConversationId()
     {
         var stub = new StubAgentAnswerService(new AgentAnswerResult { Answer = "ok", Grounded = true });
-        var sut = new AgentOrchestrationService(stub, new InMemoryConversationStore());
+        var sut = new AgentOrchestrationService(stub, CreateStore());
         var fixedId = "conv-abc-123";
 
         var response = await sut.AskAsync(new AgentAskRequest { Question = "Q?", TopK = 5, ConversationId = fixedId });
@@ -137,7 +138,7 @@ public class AgentOrchestrationServiceTests
     {
         IReadOnlyList<ChatMessage>? capturedHistory = null;
         var stub = new CapturingHistoryStubAgentAnswerService(history => capturedHistory = history);
-        var store = new InMemoryConversationStore();
+        var store = CreateStore();
         var sut = new AgentOrchestrationService(stub, store);
 
         var firstResponse = await sut.AskAsync(new AgentAskRequest { Question = "First question", TopK = 5 });
@@ -155,7 +156,7 @@ public class AgentOrchestrationServiceTests
     public async Task AskAsync_StoresUserAndAssistantMessagesAfterEachTurn()
     {
         var stub = new StubAgentAnswerService(new AgentAnswerResult { Answer = "my answer", Grounded = true });
-        var store = new InMemoryConversationStore();
+        var store = CreateStore();
         var sut = new AgentOrchestrationService(stub, store);
 
         var response = await sut.AskAsync(new AgentAskRequest { Question = "Hello?", TopK = 5 });
@@ -170,7 +171,7 @@ public class AgentOrchestrationServiceTests
     public async Task AskAsync_TwoSeparateConversations_DoNotShareHistory()
     {
         var stub = new StubAgentAnswerService(new AgentAnswerResult { Answer = "ok", Grounded = true });
-        var store = new InMemoryConversationStore();
+        var store = CreateStore();
         var sut = new AgentOrchestrationService(stub, store);
 
         var r1 = await sut.AskAsync(new AgentAskRequest { Question = "Conv A", TopK = 5 });
@@ -180,6 +181,11 @@ public class AgentOrchestrationServiceTests
         (await store.GetHistoryAsync(r1.ConversationId)).Should().HaveCount(2);
         (await store.GetHistoryAsync(r2.ConversationId)).Should().HaveCount(2);
     }
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+
+    private static InMemoryConversationStore CreateStore() =>
+        new(new MemoryCache(new MemoryCacheOptions()));
 
     // ── Stubs ───────────────────────────────────────────────────────────────
 

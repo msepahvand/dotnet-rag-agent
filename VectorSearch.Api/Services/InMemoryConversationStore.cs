@@ -1,53 +1,56 @@
 using System.Collections.Concurrent;
+using LanguageExt;
+using Microsoft.Extensions.Caching.Memory;
 using VectorSearch.Core;
 using VectorSearch.Core.Models;
 
 namespace VectorSearch.Api.Services;
 
-public sealed class InMemoryConversationStore : IConversationStore
+public sealed class InMemoryConversationStore(IMemoryCache cache) : IConversationStore
 {
     private const int MaxMessagesPerConversation = 40;
+    private static readonly TimeSpan ConversationTtl = TimeSpan.FromMinutes(30);
 
-    private readonly ConcurrentDictionary<string, List<ChatMessage>> _store = new();
+    private readonly ConcurrentDictionary<string, Unit> _conversationIds = new();
 
     public Task<IReadOnlyList<ChatMessage>> GetHistoryAsync(string conversationId)
     {
-        if (_store.TryGetValue(conversationId, out var messages))
-        {
-            lock (messages)
-            {
-                return Task.FromResult<IReadOnlyList<ChatMessage>>([.. messages]);
-            }
-        }
-
-        return Task.FromResult<IReadOnlyList<ChatMessage>>([]);
+        var messages = cache.Get<List<ChatMessage>>(conversationId);
+        return Task.FromResult<IReadOnlyList<ChatMessage>>(messages is null ? [] : [.. messages]);
     }
 
     public Task AppendAsync(string conversationId, ChatMessage message)
     {
-        var messages = _store.GetOrAdd(conversationId, _ => []);
-
-        lock (messages)
+        var messages = cache.GetOrCreate(conversationId, entry =>
         {
-            messages.Add(message);
+            entry.SlidingExpiration = ConversationTtl;
+            entry.RegisterPostEvictionCallback(OnEviction);
+            return new List<ChatMessage>();
+        })!;
 
-            if (messages.Count > MaxMessagesPerConversation)
-            {
-                messages.RemoveRange(0, messages.Count - MaxMessagesPerConversation);
-            }
-        }
+        messages.Add(message);
 
+        if (messages.Count > MaxMessagesPerConversation)
+            messages.RemoveRange(0, messages.Count - MaxMessagesPerConversation);
+
+        _conversationIds.TryAdd(conversationId, default);
         return Task.CompletedTask;
     }
 
     public Task DeleteAsync(string conversationId)
     {
-        _store.TryRemove(conversationId, out _);
+        cache.Remove(conversationId);
+        _conversationIds.TryRemove(conversationId, out _);
         return Task.CompletedTask;
     }
 
     public Task<IReadOnlyList<string>> ListConversationIdsAsync()
     {
-        return Task.FromResult<IReadOnlyList<string>>([.. _store.Keys]);
+        return Task.FromResult<IReadOnlyList<string>>([.. _conversationIds.Keys]);
+    }
+
+    private void OnEviction(object key, object? value, EvictionReason reason, object? state)
+    {
+        _conversationIds.TryRemove(key.ToString()!, out _);
     }
 }
