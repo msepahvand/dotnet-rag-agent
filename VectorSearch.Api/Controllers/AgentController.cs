@@ -1,7 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using VectorSearch.Api.Contracts.Responses;
+using VectorSearch.Api.Dtos;
+using VectorSearch.Api.Dtos.Mappers;
 using VectorSearch.Api.Services;
-using VectorSearch.Core;
 
 namespace VectorSearch.Api.Controllers;
 
@@ -10,14 +11,14 @@ namespace VectorSearch.Api.Controllers;
 public sealed class AgentController(IAgentOrchestrationService agentOrchestrationService) : ControllerBase
 {
     [HttpPost("ask")]
-    public async Task<IActionResult> Ask([FromBody] AgentAskRequest request)
+    public async Task<IActionResult> Ask([FromBody] AskRequestDto request)
     {
         if (string.IsNullOrWhiteSpace(request.Question))
         {
             return BadRequest(new MessageResponse("Question cannot be empty"));
         }
 
-        var response = await agentOrchestrationService.AskAsync(request);
-        return Ok(response);
+        var result = await agentOrchestrationService.AskAsync(AgentMapper.ToModel(request));
+        return Ok(AgentMapper.ToDto(result));
     }
 }

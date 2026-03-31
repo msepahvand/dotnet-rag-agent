@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using VectorSearch.Api.Dtos.Mappers;
 using VectorSearch.Api.Services;
 
 namespace VectorSearch.Api.Controllers;
@@ -11,13 +12,13 @@ public sealed class PostsController(IPostsQueryService postsQueryService) : Cont
     public async Task<IActionResult> GetAll()
     {
         var posts = await postsQueryService.GetAllPostsAsync();
-        return Ok(posts);
+        return Ok(posts.Select(PostMapper.ToDto));
     }
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
         var post = await postsQueryService.GetPostByIdAsync(id);
-        return post != null ? Ok(post) : NotFound();
+        return post != null ? Ok(PostMapper.ToDto(post)) : NotFound();
     }
 }

@@ -1,5 +1,5 @@
-using VectorSearch.Core;
+using VectorSearch.Api.Dtos;
 
 namespace VectorSearch.Api.Contracts.Responses;
 
-public sealed record IndexSinglePostResponse(string Message, Post Post);
+public sealed record IndexSinglePostResponse(string Message, PostDto Post);

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using VectorSearch.Api.Contracts.Responses;
+using VectorSearch.Api.Dtos.Mappers;
 using VectorSearch.Api.Services;
 
 namespace VectorSearch.Api.Controllers;
@@ -24,6 +25,6 @@ public sealed class IndexController(IPostIndexingService postIndexingService) : 
             return NotFound(new MessageResponse($"Post {id} not found"));
         }
 
-        return Ok(new IndexSinglePostResponse($"Indexed post {id} successfully", result.Post));
+        return Ok(new IndexSinglePostResponse($"Indexed post {id} successfully", PostMapper.ToDto(result.Post)));
     }
 }

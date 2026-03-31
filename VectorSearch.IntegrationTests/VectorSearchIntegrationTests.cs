@@ -1,7 +1,7 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
-using VectorSearch.Core;
+using VectorSearch.Api.Dtos;
 
 namespace VectorSearch.IntegrationTests;
 
@@ -27,7 +27,7 @@ public class VectorSearchIntegrationTests
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var posts = await response.Content.ReadFromJsonAsync<List<Post>>();
+        var posts = await response.Content.ReadFromJsonAsync<List<PostDto>>();
         
         posts.Should().NotBeNull();
         posts.Should().NotBeEmpty();
@@ -48,7 +48,7 @@ public class VectorSearchIntegrationTests
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var post = await response.Content.ReadFromJsonAsync<Post>();
+        var post = await response.Content.ReadFromJsonAsync<PostDto>();
         
         post.Should().NotBeNull();
         post!.Id.Should().Be(1);
@@ -93,7 +93,7 @@ public class VectorSearchIntegrationTests
 
         // Assert
         searchResponse.EnsureSuccessStatusCode();
-        var results = await searchResponse.Content.ReadFromJsonAsync<List<SearchResult>>();
+        var results = await searchResponse.Content.ReadFromJsonAsync<List<SearchResultDto>>();
         
         results.Should().NotBeNull();
         results.Should().NotBeEmpty();
@@ -124,7 +124,7 @@ public class VectorSearchIntegrationTests
 
         // Assert
         searchResponse.EnsureSuccessStatusCode();
-        var results = await searchResponse.Content.ReadFromJsonAsync<List<SearchResult>>();
+        var results = await searchResponse.Content.ReadFromJsonAsync<List<SearchResultDto>>();
         
         results.Should().NotBeNull();
         results.Should().NotBeEmpty();
@@ -145,7 +145,7 @@ public class VectorSearchIntegrationTests
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var results = await response.Content.ReadFromJsonAsync<List<SearchResult>>();
+        var results = await response.Content.ReadFromJsonAsync<List<SearchResultDto>>();
         
         results.Should().NotBeNull();
         // Might be empty if nothing is indexed

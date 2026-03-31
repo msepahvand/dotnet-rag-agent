@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using VectorSearch.Api.Contracts.Responses;
+using VectorSearch.Api.Dtos.Mappers;
 using VectorSearch.Api.Services;
 
 namespace VectorSearch.Api.Controllers;
@@ -17,6 +18,6 @@ public sealed class SearchController(ISemanticSearchService semanticSearchServic
         }
 
         var results = await semanticSearchService.SearchAsync(query, topK);
-        return Ok(results);
+        return Ok(results.Select(SearchMapper.ToDto));
     }
 }
