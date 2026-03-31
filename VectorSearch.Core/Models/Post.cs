@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace VectorSearch.Core;
+namespace VectorSearch.Core.Models;
 
 public record Post(
     [property: JsonPropertyName("id")] int Id,

@@ -1,4 +1,4 @@
-using VectorSearch.Core;
+using VectorSearch.Api.Services.Contracts;
 
 namespace VectorSearch.Api.Services;
 

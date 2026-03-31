@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using Microsoft.SemanticKernel;
 using VectorSearch.Core;
+using VectorSearch.Core.Models;
 
 namespace VectorSearch.S3;
 

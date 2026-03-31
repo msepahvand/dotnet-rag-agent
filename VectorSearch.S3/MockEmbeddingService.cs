@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using VectorSearch.Core;
+using VectorSearch.Core.Models;
 
 namespace VectorSearch.S3;
 

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using VectorSearch.Core;
+using VectorSearch.Core.Models;
 
 namespace VectorSearch.Api.Services;
 

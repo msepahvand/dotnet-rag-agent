@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using VectorSearch.Core;
+using VectorSearch.Core.Models;
 using VectorSearch.S3;
 
 namespace VectorSearch.IntegrationTests;

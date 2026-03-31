@@ -1,3 +1,5 @@
+using VectorSearch.Core.Models;
+
 namespace VectorSearch.Core;
 
 public interface IEmbeddingService

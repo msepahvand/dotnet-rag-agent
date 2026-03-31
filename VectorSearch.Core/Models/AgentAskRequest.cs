@@ -1,4 +1,4 @@
-namespace VectorSearch.Core;
+namespace VectorSearch.Core.Models;
 
 public record AgentAskRequest
 {

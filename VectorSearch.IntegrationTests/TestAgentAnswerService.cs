@@ -1,4 +1,5 @@
 using VectorSearch.Core;
+using VectorSearch.Core.Models;
 
 namespace VectorSearch.IntegrationTests;
 

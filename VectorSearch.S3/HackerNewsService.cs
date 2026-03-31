@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Configuration;
 using VectorSearch.Core;
+using VectorSearch.Core.Models;
 
 namespace VectorSearch.S3;
 

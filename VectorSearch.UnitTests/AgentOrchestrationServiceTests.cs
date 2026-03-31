@@ -1,6 +1,7 @@
 using FluentAssertions;
 using VectorSearch.Api.Services;
 using VectorSearch.Core;
+using VectorSearch.Core.Models;
 
 namespace VectorSearch.UnitTests;
 

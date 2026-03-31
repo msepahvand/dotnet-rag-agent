@@ -29,7 +29,7 @@ public class VectorService : IVectorService
         return _vectorStore.IsEmptyAsync();
     }
 
-    public async Task IndexPostAsync(Post post, float[] embedding)
+    public async Task IndexPostAsync(Core.Models.Post post, float[] embedding)
     {
         var metadata = new Dictionary<string, string>
         {
@@ -41,7 +41,7 @@ public class VectorService : IVectorService
         await _vectorStore.IndexDocumentAsync(post.Id.ToString(), embedding, metadata);
     }
 
-    public async Task IndexPostsBatchAsync(List<(Post Post, float[] Embedding)> posts)
+    public async Task IndexPostsBatchAsync(List<(Core.Models.Post Post, float[] Embedding)> posts)
     {
         var documents = posts.Select(p => (
             Key: p.Post.Id.ToString(),
