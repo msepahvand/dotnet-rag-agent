@@ -37,6 +37,7 @@ public sealed class GroundedAgentAnswerService(
             return new AgentAnswerResult
             {
                 Answer = "I couldn't find supporting sources in the indexed content. Try indexing more data or rephrasing the question.",
+                Grounded = false,
                 Sources = [],
                 Citations = []
             };
@@ -49,6 +50,7 @@ public sealed class GroundedAgentAnswerService(
             return new AgentAnswerResult
             {
                 Answer = deterministicAnswer,
+                Grounded = sources.Count > 0,
                 Sources = sources,
                 Citations = BuildDeterministicCitations(sources)
             };
@@ -74,6 +76,7 @@ public sealed class GroundedAgentAnswerService(
             return new AgentAnswerResult
             {
                 Answer = deterministicAnswer,
+                Grounded = sources.Count > 0,
                 Sources = sources,
                 Citations = BuildDeterministicCitations(sources)
             };
@@ -93,6 +96,7 @@ public sealed class GroundedAgentAnswerService(
                 return new AgentAnswerResult
                 {
                     Answer = structured.Answer,
+                    Grounded = structured.Grounded,
                     Sources = sources,
                     Citations = structured.Citations ?? []
                 };
@@ -106,6 +110,7 @@ public sealed class GroundedAgentAnswerService(
         return new AgentAnswerResult
         {
             Answer = string.IsNullOrWhiteSpace(rawOutput) ? fallback : rawOutput,
+            Grounded = false,
             Sources = sources,
             Citations = []
         };

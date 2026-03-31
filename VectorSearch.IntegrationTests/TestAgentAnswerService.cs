@@ -15,6 +15,7 @@ internal sealed class TestAgentAnswerService(
             return new AgentAnswerResult
             {
                 Answer = "I couldn't find enough grounded sources.",
+                Grounded = false,
                 Sources = []
             };
         }
@@ -51,6 +52,7 @@ internal sealed class TestAgentAnswerService(
         return new AgentAnswerResult
         {
             Answer = $"Grounded test answer for '{question}' using {citationRefs}.",
+            Grounded = sources.Count > 0,
             Sources = sources,
             Citations = citationList
         };

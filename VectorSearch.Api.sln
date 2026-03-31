@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorSearch.IntegrationTes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorSearch.Core", "VectorSearch.Core\VectorSearch.Core.csproj", "{C97FE870-EC08-49BC-A760-5798B19387E2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorSearch.UnitTests", "VectorSearch.UnitTests\VectorSearch.UnitTests.csproj", "{8C09808D-F6F4-4926-AD22-BCD0D0998B70}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -83,6 +85,18 @@ Global
 		{C97FE870-EC08-49BC-A760-5798B19387E2}.Release|x64.Build.0 = Release|Any CPU
 		{C97FE870-EC08-49BC-A760-5798B19387E2}.Release|x86.ActiveCfg = Release|Any CPU
 		{C97FE870-EC08-49BC-A760-5798B19387E2}.Release|x86.Build.0 = Release|Any CPU
+		{8C09808D-F6F4-4926-AD22-BCD0D0998B70}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8C09808D-F6F4-4926-AD22-BCD0D0998B70}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8C09808D-F6F4-4926-AD22-BCD0D0998B70}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8C09808D-F6F4-4926-AD22-BCD0D0998B70}.Debug|x64.Build.0 = Debug|Any CPU
+		{8C09808D-F6F4-4926-AD22-BCD0D0998B70}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8C09808D-F6F4-4926-AD22-BCD0D0998B70}.Debug|x86.Build.0 = Debug|Any CPU
+		{8C09808D-F6F4-4926-AD22-BCD0D0998B70}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8C09808D-F6F4-4926-AD22-BCD0D0998B70}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8C09808D-F6F4-4926-AD22-BCD0D0998B70}.Release|x64.ActiveCfg = Release|Any CPU
+		{8C09808D-F6F4-4926-AD22-BCD0D0998B70}.Release|x64.Build.0 = Release|Any CPU
+		{8C09808D-F6F4-4926-AD22-BCD0D0998B70}.Release|x86.ActiveCfg = Release|Any CPU
+		{8C09808D-F6F4-4926-AD22-BCD0D0998B70}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
