@@ -1,13 +1,12 @@
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Channels;
 using VectorSearch.Core;
 using VectorSearch.Core.Models;
 
 namespace VectorSearch.S3;
 
-/// <summary>
-/// Mock embedding service for testing - generates deterministic fake embeddings
-/// </summary>
 public class MockEmbeddingService : IEmbeddingService
 {
     private readonly int _dimensions;
@@ -17,48 +16,64 @@ public class MockEmbeddingService : IEmbeddingService
         _dimensions = dimensions;
     }
 
-    public Task<float[]> GenerateEmbeddingAsync(string text)
+    public async IAsyncEnumerable<(int PostId, float[] Embedding)> StreamEmbeddings(
+        List<Post> posts,
+        int maxConcurrency = 3,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        // Generate deterministic embeddings based on text hash
-        // Similar texts will have similar embeddings
-        var embedding = GenerateDeterministicEmbedding(text);
-        return Task.FromResult(embedding);
+        var channel = Channel.CreateUnbounded<(int PostId, float[] Embedding)>();
+
+        var producer = Parallel.ForEachAsync(posts, new ParallelOptions
+        {
+            MaxDegreeOfParallelism = maxConcurrency,
+            CancellationToken = cancellationToken
+        },
+        async (post, ct) =>
+        {
+            var text = $"{post.Title} {post.Body}";
+            var embedding = await GenerateEmbeddingAsync(text);
+            await channel.Writer.WriteAsync((post.Id, embedding), ct);
+        });
+
+        _ = producer.ContinueWith(
+            t => channel.Writer.Complete(t.IsFaulted ? t.Exception!.InnerException : null),
+            TaskScheduler.Default);
+
+        await foreach (var item in channel.Reader.ReadAllAsync(cancellationToken))
+            yield return item;
     }
 
     public async Task<List<(int PostId, float[] Embedding)>> GenerateEmbeddingsAsync(List<Post> posts)
     {
-        var embeddings = new List<(int PostId, float[] Embedding)>();
-        foreach (var post in posts)
-        {
-            var text = $"{post.Title} {post.Body}";
-            var embedding = await GenerateEmbeddingAsync(text);
-            embeddings.Add((post.Id, embedding));
-        }
-        return embeddings;
+        var results = new List<(int PostId, float[] Embedding)>();
+        await foreach (var item in StreamEmbeddings(posts))
+            results.Add(item);
+        return results;
+    }
+
+    public Task<float[]> GenerateEmbeddingAsync(string text)
+    {
+        var embedding = GenerateDeterministicEmbedding(text);
+        return Task.FromResult(embedding);
     }
 
     private float[] GenerateDeterministicEmbedding(string text)
     {
-        // Create a deterministic but pseudo-random embedding based on the text
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(text ?? ""));
         var random = new Random(BitConverter.ToInt32(hash, 0));
 
         var embedding = new float[_dimensions];
-        
-        // Generate normalized random vector
+
         double sum = 0;
         for (int i = 0; i < _dimensions; i++)
         {
-            embedding[i] = (float)(random.NextDouble() * 2 - 1); // Range [-1, 1]
+            embedding[i] = (float)(random.NextDouble() * 2 - 1);
             sum += embedding[i] * embedding[i];
         }
 
-        // Normalize to unit length (for cosine similarity)
         float norm = (float)Math.Sqrt(sum);
         for (int i = 0; i < _dimensions; i++)
-        {
             embedding[i] /= norm;
-        }
 
         return embedding;
     }

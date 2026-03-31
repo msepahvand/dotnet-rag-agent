@@ -66,6 +66,14 @@ public class IndexingPluginIntegrationTests
 
         public Task<List<(int PostId, float[] Embedding)>> GenerateEmbeddingsAsync(List<Post> posts) =>
             Task.FromResult(posts.Select(post => (post.Id, new[] { 0.1f, 0.2f, 0.3f })).ToList());
+
+        public async IAsyncEnumerable<(int PostId, float[] Embedding)> StreamEmbeddings(
+            List<Post> posts, int maxConcurrency = 3, CancellationToken cancellationToken = default)
+        {
+            foreach (var post in posts)
+                yield return (post.Id, new[] { 0.1f, 0.2f, 0.3f });
+            await Task.CompletedTask;
+        }
     }
 
     private sealed class EmptyVectorService(bool isEmpty = true) : IVectorService
