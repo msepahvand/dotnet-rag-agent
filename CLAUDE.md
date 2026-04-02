@@ -5,8 +5,9 @@
 
 ## Git Workflow
 - **Never push unless explicitly asked.** Commit locally, then wait for the user to say "push".
-- **Always run `dotnet test VectorSearch.IntegrationTests` before committing.** All tests must pass. Do not commit if any test is failing.
-- **Always run `dotnet format VectorSearch.Api.sln --severity warn` before committing** if any .cs files were modified. The pre-push hook enforces this, but fixing it before the commit avoids a blocked push.
+- **For .cs changes:** always run `dotnet test VectorSearch.IntegrationTests` before committing. All tests must pass. Do not commit if any test is failing.
+- **For .cs changes:** always run `dotnet format VectorSearch.Api.sln --severity warn` before committing. The pre-push hook enforces this, but fixing it before the commit avoids a blocked push.
+- **For Terraform-only changes:** do not run dotnet tests. Instead run `terraform fmt -recursive` and `terraform validate` via Docker (see Terraform section below).
 
 ## Commit Messages
 Use conventional commit prefixes:
@@ -31,8 +32,12 @@ Use conventional commit prefixes:
 - Do not use integration tests as a substitute for focused unit coverage.
 
 ## Terraform
-- Always run `terraform fmt -recursive` in `infra/` before finishing any Terraform change.
-- Validate via Docker (local Terraform may not work): `docker run --rm -v "<repo>\\infra:/workspace" -w /workspace hashicorp/terraform:1.5.0 validate`
+- Always run `terraform fmt -recursive` and `terraform validate` before committing any Terraform change.
+- Run both via Docker (local Terraform may not work). Use `MSYS_NO_PATHCONV=1` to prevent Git Bash from mangling paths:
+  ```
+  MSYS_NO_PATHCONV=1 docker run --rm -v "c:/src/dotnet-vector-search/infra:/workspace" -w /workspace hashicorp/terraform:1.5.0 fmt -recursive
+  MSYS_NO_PATHCONV=1 docker run --rm -v "c:/src/dotnet-vector-search/infra:/workspace" -w /workspace hashicorp/terraform:1.5.0 validate
+  ```
 
 ## Roadmap (Next Integrations)
 - Single-tool-calling agent: user question → agent decides to run semantic search → grounded answer with sources
