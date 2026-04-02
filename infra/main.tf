@@ -175,44 +175,6 @@ resource "aws_iam_role_policy" "ecs_task_runtime" {
   policy = data.aws_iam_policy_document.ecs_task_runtime.json
 }
 
-# ── IAM — GitHub Actions ECS deploy permissions ────────────────────────────────
-
-data "aws_iam_role" "github_actions" {
-  name = var.iam_role_name
-}
-
-data "aws_iam_policy_document" "github_actions_ecs" {
-  statement {
-    sid    = "ECSDeployPermissions"
-    effect = "Allow"
-    actions = [
-      "ecs:DescribeServices",
-      "ecs:DescribeTaskDefinition",
-      "ecs:DescribeTasks",
-      "ecs:ListTasks",
-      "ecs:RegisterTaskDefinition",
-      "ecs:UpdateService",
-    ]
-    resources = ["*"]
-  }
-
-  statement {
-    sid     = "PassRoleToECS"
-    effect  = "Allow"
-    actions = ["iam:PassRole"]
-    resources = [
-      aws_iam_role.ecs_task_execution.arn,
-      aws_iam_role.ecs_task.arn,
-    ]
-  }
-}
-
-resource "aws_iam_role_policy" "github_actions_ecs" {
-  name   = "GitHubActionsECSDeployPolicy"
-  role   = data.aws_iam_role.github_actions.name
-  policy = data.aws_iam_policy_document.github_actions_ecs.json
-}
-
 # ── Observability ─────────────────────────────────────────────────────────────
 
 resource "aws_cloudwatch_log_group" "api" {
