@@ -68,7 +68,10 @@ public class IndexingPluginIntegrationTests
             List<Post> posts, int maxConcurrency = 3, CancellationToken cancellationToken = default)
         {
             foreach (var post in posts)
+            {
                 yield return (post.Id, new[] { 0.1f, 0.2f, 0.3f });
+            }
+
             await Task.CompletedTask;
         }
     }

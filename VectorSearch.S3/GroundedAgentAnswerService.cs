@@ -68,7 +68,11 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
         };
         var pass1 = await _chatCompletionService.GetChatMessageContentsAsync(
             chatHistory, retrievalSettings, _kernel);
-        foreach (var msg in pass1) chatHistory.Add(msg);
+
+        foreach (var msg in pass1)
+        {
+            chatHistory.Add(msg);
+        }
 
         // Pass 2 — synthesise a structured answer without further tool calls
         chatHistory.AddUserMessage(SynthesisPrompt);
@@ -94,9 +98,15 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
         var tools = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var message in history)
         {
-            if (message.Role != AuthorRole.Assistant) continue;
+            if (message.Role != AuthorRole.Assistant)
+            {
+                continue;
+            }
+
             foreach (var item in message.Items.OfType<FunctionCallContent>())
+            {
                 tools.Add(item.FunctionName);
+            }
         }
         return [.. tools];
     }
@@ -105,14 +115,23 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
     {
         foreach (var message in history)
         {
-            if (message.Role != AuthorRole.Tool) continue;
+            if (message.Role != AuthorRole.Tool)
+            {
+                continue;
+            }
+
             foreach (var item in message.Items.OfType<FunctionResultContent>())
             {
                 if (!string.Equals(item.FunctionName, "search_posts", StringComparison.OrdinalIgnoreCase))
+                {
                     continue;
+                }
+
                 var json = item.Result?.ToString();
                 if (!string.IsNullOrEmpty(json))
+                {
                     return JsonSerializer.Deserialize<List<AgentSource>>(json, JsonOptions) ?? [];
+                }
             }
         }
         return [];
@@ -160,10 +179,18 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
     private static string ExtractJson(string raw)
     {
         var fenceMatch = Regex.Match(raw, @"```(?:json)?\s*\n?(.*?)\n?\s*```", RegexOptions.Singleline);
-        if (fenceMatch.Success) return fenceMatch.Groups[1].Value.Trim();
+        if (fenceMatch.Success)
+        {
+            return fenceMatch.Groups[1].Value.Trim();
+        }
+
         var start = raw.IndexOf('{');
         var end = raw.LastIndexOf('}');
-        if (start >= 0 && end > start) return raw[start..(end + 1)];
+        if (start >= 0 && end > start)
+        {
+            return raw[start..(end + 1)];
+        }
+
         return raw;
     }
 

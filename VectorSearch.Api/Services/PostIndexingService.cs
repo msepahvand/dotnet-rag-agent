@@ -15,8 +15,12 @@ public sealed class PostIndexingService(
         var postLookup = posts.ToDictionary(p => p.Id);
         var postsWithEmbeddings = new List<(Core.Models.Post Post, float[] Embedding)>();
         await foreach (var (postId, embedding) in embeddingService.StreamEmbeddings(posts))
+        {
             if (postLookup.TryGetValue(postId, out var post))
+            {
                 postsWithEmbeddings.Add((post, embedding));
+            }
+        }
 
         await vectorService.IndexPostsBatchAsync(postsWithEmbeddings);
 

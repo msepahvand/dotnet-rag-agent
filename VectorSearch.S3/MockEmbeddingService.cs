@@ -40,7 +40,9 @@ public class MockEmbeddingService : IEmbeddingService
             TaskScheduler.Default);
 
         await foreach (var item in channel.Reader.ReadAllAsync(cancellationToken))
+        {
             yield return item;
+        }
     }
 
     public Task<float[]> GenerateEmbeddingAsync(string text)
@@ -65,7 +67,9 @@ public class MockEmbeddingService : IEmbeddingService
 
         float norm = (float)Math.Sqrt(sum);
         for (int i = 0; i < _dimensions; i++)
+        {
             embedding[i] /= norm;
+        }
 
         return embedding;
     }

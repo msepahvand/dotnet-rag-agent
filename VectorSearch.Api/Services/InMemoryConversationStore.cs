@@ -19,7 +19,11 @@ public sealed class InMemoryConversationStore(IMemoryCache cache) : IConversatio
     public IAsyncEnumerable<ConversationEvent> Subscribe(CancellationToken cancellationToken = default)
     {
         var channel = Channel.CreateUnbounded<ConversationEvent>();
-        lock (_subscribersLock) _subscribers.Add(channel.Writer);
+        lock (_subscribersLock)
+        {
+            _subscribers.Add(channel.Writer);
+        }
+
         return ReadEventsAsync(channel.Reader, channel.Writer, cancellationToken);
     }
 
@@ -41,7 +45,9 @@ public sealed class InMemoryConversationStore(IMemoryCache cache) : IConversatio
         messages.Add(message);
 
         if (messages.Count > MaxMessagesPerConversation)
+        {
             messages.RemoveRange(0, messages.Count - MaxMessagesPerConversation);
+        }
 
         _conversationIds.TryAdd(conversationId, default);
         Broadcast(new ConversationEvent.MessageAppended(conversationId, message));
@@ -66,7 +72,9 @@ public sealed class InMemoryConversationStore(IMemoryCache cache) : IConversatio
         lock (_subscribersLock)
         {
             foreach (var writer in _subscribers)
+            {
                 writer.TryWrite(evt);
+            }
         }
     }
 
@@ -78,11 +86,16 @@ public sealed class InMemoryConversationStore(IMemoryCache cache) : IConversatio
         try
         {
             await foreach (var evt in reader.ReadAllAsync(cancellationToken))
+            {
                 yield return evt;
+            }
         }
         finally
         {
-            lock (_subscribersLock) _subscribers.Remove(writer);
+            lock (_subscribersLock)
+            {
+                _subscribers.Remove(writer);
+            }
         }
     }
 

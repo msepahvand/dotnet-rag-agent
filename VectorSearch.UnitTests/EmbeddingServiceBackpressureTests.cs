@@ -16,7 +16,10 @@ public class EmbeddingServiceBackpressureTests
     {
         var results = new List<T>();
         await foreach (var item in source)
+        {
             results.Add(item);
+        }
+
         return results;
     }
 
@@ -59,7 +62,9 @@ public class EmbeddingServiceBackpressureTests
         var service = new EmbeddingService(generator);
 
         await foreach (var item in service.StreamEmbeddings(CreatePosts(5), maxConcurrency: 5))
+        {
             emitTimestamps.Add(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        }
 
         emitTimestamps.Should().HaveCount(5);
         var spread = emitTimestamps.Max() - emitTimestamps.Min();
@@ -105,7 +110,10 @@ public class EmbeddingServiceBackpressureTests
         {
             var results = new List<Embedding<float>>();
             foreach (var value in values)
+            {
                 results.Add(new Embedding<float>(await generate(value)));
+            }
+
             return new GeneratedEmbeddings<Embedding<float>>(results);
         }
 

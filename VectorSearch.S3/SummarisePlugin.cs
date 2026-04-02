@@ -15,7 +15,9 @@ public sealed class SummarisePlugin(IPostService postService)
     {
         var post = await postService.GetPostByIdAsync(postId);
         if (post == null)
+        {
             return $"Post {postId} not found.";
+        }
 
         return $"PostId: {post.Id}\nTitle: {post.Title}\n\n{post.Body}";
     }

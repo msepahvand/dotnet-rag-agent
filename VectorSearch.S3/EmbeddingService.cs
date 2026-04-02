@@ -39,7 +39,9 @@ public class EmbeddingService : IEmbeddingService
             TaskScheduler.Default);
 
         await foreach (var item in channel.Reader.ReadAllAsync(cancellationToken))
+        {
             yield return item;
+        }
     }
 
     public async Task<float[]> GenerateEmbeddingAsync(string text)

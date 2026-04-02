@@ -18,7 +18,10 @@ public class ConversationStoreEventTests
         await foreach (var e in source)
         {
             results.Add(e);
-            if (results.Count >= count) break;
+            if (results.Count >= count)
+            {
+                break;
+            }
         }
         return results;
     }
