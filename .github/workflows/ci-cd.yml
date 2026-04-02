@@ -32,6 +32,7 @@ jobs:
       - name: Build & test
         run: |
           dotnet build VectorSearch.Api.sln --configuration Release
+          dotnet format VectorSearch.Api.sln --verify-no-changes --severity warn
           dotnet test VectorSearch.IntegrationTests/VectorSearch.IntegrationTests.csproj \
             --configuration Release --no-build --verbosity normal
 
