@@ -1,5 +1,9 @@
 # Claude Code Instructions
 
+## Git Workflow
+- **Never push unless explicitly asked.** Commit locally, then wait for the user to say "push".
+- **Always run `dotnet test VectorSearch.IntegrationTests` before committing.** All tests must pass. Do not commit if any test is failing.
+
 ## Commit Messages
 Use conventional commit prefixes:
 - `feat:` — new features or enhancements
