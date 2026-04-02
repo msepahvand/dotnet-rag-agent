@@ -24,6 +24,7 @@ public class Program
         builder.Services.AddScoped<ISemanticSearchService, SemanticSearchService>();
         builder.Services.AddScoped<IAgentOrchestrationService, AgentOrchestrationService>();
         builder.Services.AddSingleton<IConversationStore, InMemoryConversationStore>();
+        builder.Services.AddHostedService<IndexingStartupService>();
 
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen(options =>

@@ -12,7 +12,6 @@ namespace VectorSearch.S3;
 
 public sealed class GroundedAgentAnswerService(
     Kernel kernel,
-    IndexingPlugin indexingPlugin,
     SemanticSearchPlugin semanticSearchPlugin,
     IChatCompletionService? chatCompletionService,
     ILogger<GroundedAgentAnswerService> logger) : IAgentAnswerService
@@ -27,8 +26,6 @@ public sealed class GroundedAgentAnswerService(
     public async Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ChatMessage> history)
     {
         var normalizedTopK = topK <= 0 ? 5 : Math.Min(topK, 10);
-
-        await indexingPlugin.IndexPostsIfEmptyAsync();
 
         var sourcesJson = await semanticSearchPlugin.SearchPostsAsync(question, normalizedTopK);
         var sources = JsonSerializer.Deserialize<List<AgentSource>>(sourcesJson) ?? [];

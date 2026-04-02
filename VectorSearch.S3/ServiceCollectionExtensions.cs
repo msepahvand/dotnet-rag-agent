@@ -39,7 +39,6 @@ public static class ServiceCollectionExtensions
             return kernel;
         });
         services.AddScoped<IEmbeddingService, EmbeddingService>();
-        services.AddScoped<IndexingPlugin>();
         services.AddScoped<SemanticSearchPlugin>();
 
         RegisterVectorStore(services, options.VectorStoreProvider);
