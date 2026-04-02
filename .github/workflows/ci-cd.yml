@@ -175,6 +175,12 @@ jobs:
             echo "ECR already has $IMAGE_COUNT image(s) — skipping bootstrap."
           fi
 
+      - name: Remove stale App Runner state entries
+        working-directory: infra
+        run: |
+          terraform state rm aws_apprunner_service.api 2>/dev/null || true
+          terraform state rm aws_iam_role_policy.apprunner_instance_runtime 2>/dev/null || true
+
       - name: Terraform apply
         working-directory: infra
         run: |
