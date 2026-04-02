@@ -139,6 +139,51 @@ jobs:
             fi
           fi
 
+      - name: Drain ECS tasks and deregister task definitions
+        env:
+          AWS_REGION: ${{ github.event.inputs.aws_region || 'us-east-1' }}
+          ECS_CLUSTER_NAME: ${{ github.event.inputs.ecs_cluster_name || 'dotnet-vector-search' }}
+          ECS_SERVICE_NAME: ${{ github.event.inputs.ecs_service_name || 'dotnet-vector-search' }}
+        run: |
+          # Scale service to 0 so all running tasks stop before we destroy
+          SERVICE_STATUS=$(aws ecs describe-services \
+            --region "$AWS_REGION" \
+            --cluster "$ECS_CLUSTER_NAME" \
+            --services "$ECS_SERVICE_NAME" \
+            --query "services[0].status" \
+            --output text 2>/dev/null || echo "MISSING")
+
+          if [ "$SERVICE_STATUS" = "ACTIVE" ]; then
+            echo "Scaling ECS service to 0..."
+            aws ecs update-service \
+              --region "$AWS_REGION" \
+              --cluster "$ECS_CLUSTER_NAME" \
+              --service "$ECS_SERVICE_NAME" \
+              --desired-count 0 >/dev/null
+
+            echo "Waiting for tasks to drain..."
+            aws ecs wait services-stable \
+              --region "$AWS_REGION" \
+              --cluster "$ECS_CLUSTER_NAME" \
+              --services "$ECS_SERVICE_NAME"
+          else
+            echo "ECS service not found or not active — skipping drain."
+          fi
+
+          # Deregister all task definition revisions (CI/CD registers these outside Terraform)
+          TASK_DEF_ARNS=$(aws ecs list-task-definitions \
+            --region "$AWS_REGION" \
+            --family-prefix "$ECS_SERVICE_NAME" \
+            --query 'taskDefinitionArns[]' \
+            --output text 2>/dev/null || true)
+
+          for ARN in $TASK_DEF_ARNS; do
+            aws ecs deregister-task-definition \
+              --region "$AWS_REGION" \
+              --task-definition "$ARN" >/dev/null
+            echo "Deregistered $ARN"
+          done
+
       - name: Destroy application infrastructure
         working-directory: infra
         env:

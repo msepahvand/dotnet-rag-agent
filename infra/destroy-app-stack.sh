@@ -78,29 +78,22 @@ if ! aws ecr describe-repositories --region "$AWS_REGION" --repository-names "$E
   fi
 fi
 
-# Scale down the ECS service before destroy so Terraform does not wait for task draining
-ecs_service_status=$(aws ecs describe-services \
-  --region "$AWS_REGION" \
-  --cluster "$ECS_CLUSTER_NAME" \
-  --services "$ECS_SERVICE_NAME" \
-  --query "services[0].status" \
-  --output text 2>/dev/null || echo "MISSING")
-if [ "$ecs_service_status" = "ACTIVE" ]; then
-  echo "Scaling ECS service to 0 before destroy..."
-  aws ecs update-service \
+# Remove ECS resources from state if they no longer exist in AWS
+if ! aws ecs describe-services \
     --region "$AWS_REGION" \
     --cluster "$ECS_CLUSTER_NAME" \
-    --service "$ECS_SERVICE_NAME" \
-    --desired-count 0 >/dev/null || true
-elif terraform state show "$ECS_SERVICE_ADDRESS" >/dev/null 2>&1; then
+    --services "$ECS_SERVICE_NAME" \
+    --query "services[?status=='ACTIVE'].serviceArn | [0]" \
+    --output text 2>/dev/null | grep -q "arn:"; then
   terraform state rm "$ECS_SERVICE_ADDRESS" >/dev/null || true
 fi
 
-if ! aws ecs describe-clusters --region "$AWS_REGION" --clusters "$ECS_CLUSTER_NAME" \
-    --query "clusters[?status=='ACTIVE'].clusterName | [0]" --output text 2>/dev/null | grep -q "$ECS_CLUSTER_NAME"; then
-  if terraform state show "$ECS_CLUSTER_ADDRESS" >/dev/null 2>&1; then
-    terraform state rm "$ECS_CLUSTER_ADDRESS" >/dev/null || true
-  fi
+if ! aws ecs describe-clusters \
+    --region "$AWS_REGION" \
+    --clusters "$ECS_CLUSTER_NAME" \
+    --query "clusters[?status=='ACTIVE'].clusterName | [0]" \
+    --output text 2>/dev/null | grep -q "$ECS_CLUSTER_NAME"; then
+  terraform state rm "$ECS_CLUSTER_ADDRESS" >/dev/null || true
 fi
 
 # Delete all images from ECR so terraform destroy can remove the repository
