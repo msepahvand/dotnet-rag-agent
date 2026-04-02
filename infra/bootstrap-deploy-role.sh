@@ -11,7 +11,6 @@ set -euo pipefail
 
 ROLE_NAME="GitHubActionsDeployRole"
 POLICY_NAME="GitHubActionsDeployPolicy"
-LEGACY_POLICY_NAME="GitHubActionsECRAppRunner"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
@@ -24,11 +23,6 @@ sed \
   -e "s/__AWS_ACCOUNT_ID__/${AWS_ACCOUNT_ID}/g" \
   -e "s/__AWS_REGION__/${AWS_REGION}/g" \
   "$POLICY_TEMPLATE" > "$RENDERED_POLICY"
-
-# Remove legacy policy name if it still exists
-aws iam delete-role-policy \
-  --role-name "$ROLE_NAME" \
-  --policy-name "$LEGACY_POLICY_NAME" 2>/dev/null || true
 
 aws iam put-role-policy \
   --role-name "$ROLE_NAME" \
