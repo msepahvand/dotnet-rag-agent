@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.SemanticKernel.Connectors.Amazon;
 using VectorSearch.Core;
 using VectorSearch.Core.Models;
 
@@ -62,8 +63,9 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
         chatHistory.AddUserMessage(question);
 
         // Pass 1 — force at least one tool call; SK auto-invokes and adds results to history
-        var retrievalSettings = new PromptExecutionSettings
+        var retrievalSettings = new AmazonClaudeExecutionSettings
         {
+            MaxTokensToSample = 4096,
             FunctionChoiceBehavior = FunctionChoiceBehavior.Required(autoInvoke: true)
         };
         var pass1 = await _chatCompletionService.GetChatMessageContentsAsync(
@@ -76,8 +78,9 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
 
         // Pass 2 — synthesise a structured answer without further tool calls
         chatHistory.AddUserMessage(SynthesisPrompt);
-        var synthesisSettings = new PromptExecutionSettings
+        var synthesisSettings = new AmazonClaudeExecutionSettings
         {
+            MaxTokensToSample = 4096,
             FunctionChoiceBehavior = FunctionChoiceBehavior.None()
         };
         var pass2 = await _chatCompletionService.GetChatMessageContentsAsync(
