@@ -14,26 +14,22 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     private const string SynthesisPrompt =
-        "Based solely on the tool results above, respond with a JSON object in this exact shape: " +
+        "Based solely on the search results provided above, respond with a JSON object in this exact shape: " +
         "{\"answer\": \"<your answer>\", \"citations\": [{\"postId\": <N>, \"quote\": \"<excerpt>\"}], \"grounded\": true}. " +
         "Do not use outside knowledge. If the results are insufficient, set grounded to false and explain why in answer.";
 
     private readonly Kernel _kernel;
     private readonly IChatCompletionService _chatCompletionService;
+    private readonly SemanticSearchPlugin _semanticSearchPlugin;
 
     public GroundedAgentAnswerService(
         Kernel kernel,
         SemanticSearchPlugin semanticSearchPlugin,
-        SummarisePlugin summarisePlugin,
-        ComparePostsPlugin comparePostsPlugin,
         IChatCompletionService chatCompletionService)
     {
         _kernel = kernel;
         _chatCompletionService = chatCompletionService;
-
-        kernel.ImportPluginFromObject(semanticSearchPlugin, SemanticSearchPlugin.PluginName);
-        kernel.ImportPluginFromObject(summarisePlugin, SummarisePlugin.PluginName);
-        kernel.ImportPluginFromObject(comparePostsPlugin, ComparePostsPlugin.PluginName);
+        _semanticSearchPlugin = semanticSearchPlugin;
     }
 
     public async Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ChatMessage> history)
@@ -62,85 +58,29 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
 
         chatHistory.AddUserMessage(question);
 
-        // Pass 1 — force at least one tool call; SK auto-invokes and adds results to history
-        var retrievalSettings = new AmazonClaudeExecutionSettings
-        {
-            MaxTokensToSample = 4096,
-            FunctionChoiceBehavior = FunctionChoiceBehavior.Required(autoInvoke: true)
-        };
-        var pass1 = await _chatCompletionService.GetChatMessageContentsAsync(
-            chatHistory, retrievalSettings, _kernel);
+        // Retrieval — call the search plugin directly; the SK Bedrock connector does not support
+        // function calling (https://github.com/microsoft/semantic-kernel/issues/9750), so we
+        // cannot rely on FunctionChoiceBehavior to dispatch tools at runtime.
+        var searchResultJson = await _semanticSearchPlugin.SearchPostsAsync(question, topK);
+        var sources = JsonSerializer.Deserialize<List<AgentSource>>(searchResultJson, JsonOptions) ?? [];
+        chatHistory.AddUserMessage($"Search results:\n{searchResultJson}");
 
-        foreach (var msg in pass1)
-        {
-            chatHistory.Add(msg);
-        }
-
-        // Pass 2 — synthesise a structured answer without further tool calls
+        // Synthesis — ask the LLM to produce a grounded structured answer from the results above
         chatHistory.AddUserMessage(SynthesisPrompt);
         var synthesisSettings = new AmazonClaudeExecutionSettings
         {
             MaxTokensToSample = 4096,
             FunctionChoiceBehavior = FunctionChoiceBehavior.None()
         };
-        var pass2 = await _chatCompletionService.GetChatMessageContentsAsync(
+        var synthesis = await _chatCompletionService.GetChatMessageContentsAsync(
             chatHistory, synthesisSettings, _kernel);
-        var rawOutput = pass2.FirstOrDefault()?.Content?.Trim() ?? "";
+        var rawOutput = synthesis.FirstOrDefault()?.Content?.Trim() ?? "";
 
-        var toolsUsed = ExtractToolsUsed(chatHistory);
-        var sources = ExtractSearchSources(chatHistory);
         var deterministicAnswer = BuildDeterministicAnswer(question, sources);
-
-        return ParseStructuredAnswer(rawOutput, sources, toolsUsed, deterministicAnswer);
+        return ParseStructuredAnswer(rawOutput, sources, ["search_posts"], deterministicAnswer);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
-    private static List<string> ExtractToolsUsed(ChatHistory history)
-    {
-        var tools = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var message in history)
-        {
-            if (message.Role != AuthorRole.Assistant)
-            {
-                continue;
-            }
-
-            foreach (var item in message.Items.OfType<FunctionCallContent>())
-            {
-                tools.Add(item.FunctionName);
-            }
-        }
-
-        return [.. tools];
-    }
-
-    private static List<AgentSource> ExtractSearchSources(ChatHistory history)
-    {
-        foreach (var message in history)
-        {
-            if (message.Role != AuthorRole.Tool)
-            {
-                continue;
-            }
-
-            foreach (var item in message.Items.OfType<FunctionResultContent>())
-            {
-                if (!string.Equals(item.FunctionName, "search_posts", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                var json = item.Result?.ToString();
-                if (!string.IsNullOrEmpty(json))
-                {
-                    return JsonSerializer.Deserialize<List<AgentSource>>(json, JsonOptions) ?? [];
-                }
-            }
-        }
-
-        return [];
-    }
-
     private static AgentAnswerResult ParseStructuredAnswer(
         string rawOutput, List<AgentSource> sources, List<string> toolsUsed, string fallback)
     {
