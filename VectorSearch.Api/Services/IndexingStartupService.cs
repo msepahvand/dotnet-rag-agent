@@ -8,10 +8,16 @@ namespace VectorSearch.Api.Services;
 
 public sealed class IndexingStartupService(
     IServiceScopeFactory scopeFactory,
+    IHostEnvironment environment,
     ILogger<IndexingStartupService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (environment.IsEnvironment("Testing"))
+        {
+            return;
+        }
+
         using var scope = scopeFactory.CreateScope();
         var vectorService = scope.ServiceProvider.GetRequiredService<IVectorService>();
         var indexingService = scope.ServiceProvider.GetRequiredService<IPostIndexingService>();
