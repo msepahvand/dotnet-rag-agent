@@ -14,7 +14,8 @@ on:
 env:
   AWS_REGION_DEFAULT: us-east-1
   ECR_REPO_DEFAULT: dotnet-vector-search
-  APP_RUNNER_DEFAULT: dotnet-vector-search
+  ECS_CLUSTER_DEFAULT: dotnet-vector-search
+  ECS_SERVICE_DEFAULT: dotnet-vector-search
 
 jobs:
   build-and-test:
@@ -79,12 +80,14 @@ jobs:
           VECTOR_BUCKET_NAME=$(safe_output vector_bucket_name posts-semantic-search)
           VECTOR_INDEX_NAME=$(safe_output vector_index_name posts-content-index)
           ECR_REPOSITORY_NAME=$(safe_output ecr_repository_name "${{ env.ECR_REPO_DEFAULT }}")
-          APP_RUNNER_SERVICE_NAME="${{ secrets.APP_RUNNER_SERVICE_NAME || env.APP_RUNNER_DEFAULT }}"
+          ECS_CLUSTER_NAME=$(safe_output ecs_cluster_name "${{ env.ECS_CLUSTER_DEFAULT }}")
+          ECS_SERVICE_NAME=$(safe_output ecs_service_name "${{ env.ECS_SERVICE_DEFAULT }}")
 
           BUCKET_ADDRESS="module.s3_vectors.aws_s3vectors_vector_bucket.vector_bucket"
           INDEX_ADDRESS="module.s3_vectors.aws_s3vectors_index.vector_index"
           ECR_ADDRESS="aws_ecr_repository.api"
-          APP_RUNNER_ADDRESS="aws_apprunner_service.api"
+          ECS_CLUSTER_ADDRESS="aws_ecs_cluster.api"
+          ECS_SERVICE_ADDRESS="aws_ecs_service.api"
 
           VECTOR_BUCKET_EXISTS="false"
           if ! terraform state show "$BUCKET_ADDRESS" >/dev/null 2>&1; then
@@ -119,13 +122,26 @@ jobs:
             fi
           fi
 
-          if ! terraform state show "$APP_RUNNER_ADDRESS" >/dev/null 2>&1; then
-            APP_RUNNER_ARN=$(aws apprunner list-services \
+          if ! terraform state show "$ECS_CLUSTER_ADDRESS" >/dev/null 2>&1; then
+            CLUSTER_ARN=$(aws ecs describe-clusters \
               --region "$REGION" \
-              --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE_NAME'].ServiceArn | [0]" \
+              --clusters "$ECS_CLUSTER_NAME" \
+              --query "clusters[?status=='ACTIVE'].clusterArn | [0]" \
               --output text 2>/dev/null || true)
-            if [ "$APP_RUNNER_ARN" != "None" ] && [ -n "$APP_RUNNER_ARN" ]; then
-              terraform import "$APP_RUNNER_ADDRESS" "$APP_RUNNER_ARN"
+            if [ "$CLUSTER_ARN" != "None" ] && [ -n "$CLUSTER_ARN" ]; then
+              terraform import "$ECS_CLUSTER_ADDRESS" "$CLUSTER_ARN"
+            fi
+          fi
+
+          if ! terraform state show "$ECS_SERVICE_ADDRESS" >/dev/null 2>&1; then
+            SERVICE_ARN=$(aws ecs describe-services \
+              --region "$REGION" \
+              --cluster "$ECS_CLUSTER_NAME" \
+              --services "$ECS_SERVICE_NAME" \
+              --query "services[?status=='ACTIVE'].serviceArn | [0]" \
+              --output text 2>/dev/null || true)
+            if [ "$SERVICE_ARN" != "None" ] && [ -n "$SERVICE_ARN" ]; then
+              terraform import "$ECS_SERVICE_ADDRESS" "$ECS_CLUSTER_NAME/$ECS_SERVICE_NAME"
             fi
           fi
 
@@ -153,48 +169,6 @@ jobs:
             docker push "$ECR_URI:latest"
           else
             echo "ECR already has $IMAGE_COUNT image(s) — skipping bootstrap."
-          fi
-
-      - name: Recover App Runner service if in CREATE_FAILED state
-        working-directory: infra
-        run: |
-          APP_RUNNER_SERVICE_NAME="${{ secrets.APP_RUNNER_SERVICE_NAME || env.APP_RUNNER_DEFAULT }}"
-          APP_RUNNER_ARN=$(aws apprunner list-services \
-            --region "$REGION" \
-            --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE_NAME'].ServiceArn | [0]" \
-            --output text 2>/dev/null || echo "")
-
-          if [ -z "$APP_RUNNER_ARN" ] || [ "$APP_RUNNER_ARN" = "None" ]; then
-            echo "No existing App Runner service — skipping recovery check."
-            exit 0
-          fi
-
-          SERVICE_STATUS=$(aws apprunner describe-service \
-            --service-arn "$APP_RUNNER_ARN" \
-            --region "$REGION" \
-            --query 'Service.Status' \
-            --output text)
-          echo "App Runner service status: $SERVICE_STATUS"
-
-          if [ "$SERVICE_STATUS" = "CREATE_FAILED" ]; then
-            echo "Service is in CREATE_FAILED — deleting so Terraform can recreate it..."
-            aws apprunner delete-service --service-arn "$APP_RUNNER_ARN" --region "$REGION"
-
-            for i in $(seq 1 30); do
-              POLL_STATUS=$(aws apprunner describe-service \
-                --service-arn "$APP_RUNNER_ARN" \
-                --region "$REGION" \
-                --query 'Service.Status' \
-                --output text 2>/dev/null || echo "DELETED")
-              echo "Deletion poll $i/30: $POLL_STATUS"
-              [ "$POLL_STATUS" = "DELETED" ] && break
-              sleep 10
-            done
-
-            terraform state rm aws_apprunner_service.api 2>/dev/null || true
-            echo "Removed from Terraform state — Terraform will recreate the service."
-          else
-            echo "Service status is $SERVICE_STATUS — no recovery needed."
           fi
 
       - name: Terraform apply
@@ -233,7 +207,7 @@ jobs:
           echo "S3 Vectors verification succeeded."
 
   deploy:
-    name: Deploy to App Runner
+    name: Deploy to ECS
     needs: [build-and-test, infrastructure]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && needs.build-and-test.result == 'success' && needs.infrastructure.result == 'success'
@@ -254,58 +228,57 @@ jobs:
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           ECR_REPO="${{ secrets.ECR_REPOSITORY || env.ECR_REPO_DEFAULT }}"
           IMAGE_TAG="${GITHUB_SHA::12}-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
-          APP_RUNNER_SERVICE_NAME="${{ secrets.APP_RUNNER_SERVICE_NAME || env.APP_RUNNER_DEFAULT }}"
+          ECS_CLUSTER_NAME="${{ secrets.ECS_CLUSTER_NAME || env.ECS_CLUSTER_DEFAULT }}"
+          ECS_SERVICE_NAME="${{ secrets.ECS_SERVICE_NAME || env.ECS_SERVICE_DEFAULT }}"
 
           echo "REGION=$REGION" >> $GITHUB_ENV
           echo "ACCOUNT_ID=$ACCOUNT_ID" >> $GITHUB_ENV
           echo "ECR_REPO=$ECR_REPO" >> $GITHUB_ENV
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
           echo "IMAGE_URI=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG" >> $GITHUB_ENV
-          echo "APP_RUNNER_SERVICE_NAME=$APP_RUNNER_SERVICE_NAME" >> $GITHUB_ENV
+          echo "ECS_CLUSTER_NAME=$ECS_CLUSTER_NAME" >> $GITHUB_ENV
+          echo "ECS_SERVICE_NAME=$ECS_SERVICE_NAME" >> $GITHUB_ENV
 
       - name: Build and push Docker image
         run: |
           docker build -f VectorSearch.Api/Dockerfile -t "$IMAGE_URI" .
           docker push "$IMAGE_URI"
 
-      - name: Update App Runner service
+      - name: Register new task definition and deploy
         run: |
-          # Resolve service ARN (Terraform created the service in infra job)
-          SERVICE_ARN="${{ secrets.APP_RUNNER_SERVICE_ARN }}"
-          if [ -z "$SERVICE_ARN" ]; then
-            SERVICE_ARN=$(aws apprunner list-services --region "$REGION" \
-              --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE_NAME']|[0].ServiceArn" \
-              --output text)
-          fi
-          if [ -z "$SERVICE_ARN" ] || [ "$SERVICE_ARN" = "None" ]; then
-            echo "App Runner service '$APP_RUNNER_SERVICE_NAME' not found." >&2
-            exit 1
-          fi
+          # Read the current task definition, update the image tag, register a new revision
+          CURRENT_TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition "$ECS_SERVICE_NAME" \
+            --region "$REGION" \
+            --query 'taskDefinition' \
+            --output json)
 
-          # Retry loop for services still settling after infra job
-          for i in $(seq 1 20); do
-            set +e
-            output=$(aws apprunner update-service \
-              --service-arn "$SERVICE_ARN" \
-              --source-configuration "ImageRepository={ImageIdentifier=$IMAGE_URI,ImageConfiguration={Port=8080},ImageRepositoryType=ECR}" 2>&1)
-            rc=$?
-            set -e
+          NEW_TASK_DEF=$(echo "$CURRENT_TASK_DEF" | jq \
+            --arg IMAGE "$IMAGE_URI" \
+            '.containerDefinitions[0].image = $IMAGE |
+             del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                 .placementConstraints, .compatibilities, .registeredAt, .registeredBy)')
 
-            if [ $rc -eq 0 ]; then
-              echo "$output"
-              echo "App Runner update-service succeeded."
-              exit 0
-            fi
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --region "$REGION" \
+            --cli-input-json "$NEW_TASK_DEF" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
 
-            if echo "$output" | grep -Eq "InvalidStateException|OPERATION_IN_PROGRESS"; then
-              echo "App Runner is busy (attempt $i/20). Retrying in 15s..."
-              sleep 15
-              continue
-            fi
+          echo "New task definition: $NEW_TASK_DEF_ARN"
 
-            echo "$output" >&2
-            exit $rc
-          done
+          # Rolling deployment: ECS starts the new task, waits for it to be healthy,
+          # then stops the old task. No downtime.
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER_NAME" \
+            --service "$ECS_SERVICE_NAME" \
+            --task-definition "$NEW_TASK_DEF_ARN" \
+            --region "$REGION"
 
-          echo "Timed out waiting for App Runner to become updatable." >&2
-          exit 1
+          echo "Waiting for rolling deployment to stabilise..."
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER_NAME" \
+            --services "$ECS_SERVICE_NAME" \
+            --region "$REGION"
+
+          echo "Deployment complete."

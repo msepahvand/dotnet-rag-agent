@@ -46,27 +46,9 @@ variable "iam_role_name" {
 }
 
 variable "iam_policy_name" {
-  description = "Name of the inline IAM policy"
+  description = "Name of the inline IAM policy on the GitHub Actions role"
   type        = string
-  default     = "GitHubActionsECRAppRunner"
-}
-
-variable "apprunner_instance_role_name" {
-  description = "Name of the App Runner instance IAM role used by the running service"
-  type        = string
-  default     = "AppRunnerInstanceRole"
-}
-
-variable "apprunner_ecr_access_role_name" {
-  description = "Name of the App Runner access role used to pull images from ECR"
-  type        = string
-  default     = "AppRunnerEcrAccessRole"
-}
-
-variable "apprunner_instance_policy_name" {
-  description = "Name of the inline IAM policy attached to the App Runner instance role"
-  type        = string
-  default     = "AppRunnerVectorSearchRuntime"
+  default     = "GitHubActionsECSDeployPolicy"
 }
 
 variable "embedding_model_id" {
@@ -111,14 +93,38 @@ variable "ecr_repository_name" {
   default     = "dotnet-vector-search"
 }
 
-variable "apprunner_service_name" {
-  description = "App Runner service name for the API"
+variable "ecs_cluster_name" {
+  description = "ECS cluster name"
   type        = string
   default     = "dotnet-vector-search"
 }
 
-variable "apprunner_bootstrap_image_tag" {
-  description = "Bootstrap tag used by Terraform when creating App Runner service before CI updates image"
+variable "ecs_service_name" {
+  description = "ECS service name for the API"
+  type        = string
+  default     = "dotnet-vector-search"
+}
+
+variable "ecs_container_name" {
+  description = "Name of the container within the ECS task definition"
+  type        = string
+  default     = "api"
+}
+
+variable "ecs_task_cpu" {
+  description = "CPU units for the Fargate task (256 = 0.25 vCPU)"
+  type        = number
+  default     = 512
+}
+
+variable "ecs_task_memory" {
+  description = "Memory (MiB) for the Fargate task"
+  type        = number
+  default     = 1024
+}
+
+variable "ecs_bootstrap_image_tag" {
+  description = "Bootstrap image tag used by Terraform when creating the ECS task definition before CI deploys the real image"
   type        = string
   default     = "latest"
 }

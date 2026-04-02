@@ -14,7 +14,8 @@ cd "$SCRIPT_DIR"
 
 AWS_REGION="${AWS_REGION:-us-east-1}"
 ECR_REPOSITORY_NAME="${ECR_REPOSITORY_NAME:-dotnet-vector-search}"
-APP_RUNNER_SERVICE_NAME="${APP_RUNNER_SERVICE_NAME:-dotnet-vector-search}"
+ECS_CLUSTER_NAME="${ECS_CLUSTER_NAME:-dotnet-vector-search}"
+ECS_SERVICE_NAME="${ECS_SERVICE_NAME:-dotnet-vector-search}"
 VECTOR_BUCKET_NAME="${VECTOR_BUCKET_NAME:-posts-semantic-search}"
 VECTOR_INDEX_NAME="${VECTOR_INDEX_NAME:-posts-content-index}"
 GITHUB_REPO="${GITHUB_REPO:-}"
@@ -27,19 +28,21 @@ fi
 
 export TF_VAR_aws_region="$AWS_REGION"
 export TF_VAR_ecr_repository_name="$ECR_REPOSITORY_NAME"
-export TF_VAR_apprunner_service_name="$APP_RUNNER_SERVICE_NAME"
+export TF_VAR_ecs_cluster_name="$ECS_CLUSTER_NAME"
+export TF_VAR_ecs_service_name="$ECS_SERVICE_NAME"
 export TF_VAR_vector_bucket_name="$VECTOR_BUCKET_NAME"
 export TF_VAR_vector_index_name="$VECTOR_INDEX_NAME"
 export TF_VAR_github_repo="$GITHUB_REPO"
 export TF_VAR_github_branch="$GITHUB_BRANCH"
 
-echo "Initializing Terraform..."
+echo "Initialising Terraform..."
 terraform init -reconfigure
 
 BUCKET_ADDRESS="module.s3_vectors.aws_s3vectors_vector_bucket.vector_bucket"
 INDEX_ADDRESS="module.s3_vectors.aws_s3vectors_index.vector_index"
 ECR_ADDRESS="aws_ecr_repository.api"
-APP_RUNNER_ADDRESS="aws_apprunner_service.api"
+ECS_CLUSTER_ADDRESS="aws_ecs_cluster.api"
+ECS_SERVICE_ADDRESS="aws_ecs_service.api"
 
 echo "Cleaning up stale Terraform state entries (best effort)..."
 
@@ -75,13 +78,28 @@ if ! aws ecr describe-repositories --region "$AWS_REGION" --repository-names "$E
   fi
 fi
 
-app_runner_arn=$(aws apprunner list-services \
+# Scale down the ECS service before destroy so Terraform does not wait for task draining
+ecs_service_status=$(aws ecs describe-services \
   --region "$AWS_REGION" \
-  --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE_NAME'].ServiceArn | [0]" \
-  --output text 2>/dev/null || true)
-if [ "$app_runner_arn" = "None" ] || [ -z "$app_runner_arn" ]; then
-  if terraform state show "$APP_RUNNER_ADDRESS" >/dev/null 2>&1; then
-    terraform state rm "$APP_RUNNER_ADDRESS" >/dev/null || true
+  --cluster "$ECS_CLUSTER_NAME" \
+  --services "$ECS_SERVICE_NAME" \
+  --query "services[0].status" \
+  --output text 2>/dev/null || echo "MISSING")
+if [ "$ecs_service_status" = "ACTIVE" ]; then
+  echo "Scaling ECS service to 0 before destroy..."
+  aws ecs update-service \
+    --region "$AWS_REGION" \
+    --cluster "$ECS_CLUSTER_NAME" \
+    --service "$ECS_SERVICE_NAME" \
+    --desired-count 0 >/dev/null || true
+elif terraform state show "$ECS_SERVICE_ADDRESS" >/dev/null 2>&1; then
+  terraform state rm "$ECS_SERVICE_ADDRESS" >/dev/null || true
+fi
+
+if ! aws ecs describe-clusters --region "$AWS_REGION" --clusters "$ECS_CLUSTER_NAME" \
+    --query "clusters[?status=='ACTIVE'].clusterName | [0]" --output text 2>/dev/null | grep -q "$ECS_CLUSTER_NAME"; then
+  if terraform state show "$ECS_CLUSTER_ADDRESS" >/dev/null 2>&1; then
+    terraform state rm "$ECS_CLUSTER_ADDRESS" >/dev/null || true
   fi
 fi
 
@@ -107,7 +125,8 @@ terraform destroy -auto-approve \
   -var="github_repo=$GITHUB_REPO" \
   -var="github_branch=$GITHUB_BRANCH" \
   -var="ecr_repository_name=$ECR_REPOSITORY_NAME" \
-  -var="apprunner_service_name=$APP_RUNNER_SERVICE_NAME" \
+  -var="ecs_cluster_name=$ECS_CLUSTER_NAME" \
+  -var="ecs_service_name=$ECS_SERVICE_NAME" \
   -var="vector_bucket_name=$VECTOR_BUCKET_NAME" \
   -var="vector_index_name=$VECTOR_INDEX_NAME"
 
