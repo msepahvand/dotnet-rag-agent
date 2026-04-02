@@ -1,7 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using VectorSearch.Core;
@@ -19,22 +18,17 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
         "Do not use outside knowledge. If the results are insufficient, set grounded to false and explain why in answer.";
 
     private readonly Kernel _kernel;
-    private readonly SemanticSearchPlugin _semanticSearchPlugin;
-    private readonly IChatCompletionService? _chatCompletionService;
-    private readonly ILogger<GroundedAgentAnswerService> _logger;
+    private readonly IChatCompletionService _chatCompletionService;
 
     public GroundedAgentAnswerService(
         Kernel kernel,
         SemanticSearchPlugin semanticSearchPlugin,
         SummarisePlugin summarisePlugin,
         ComparePostsPlugin comparePostsPlugin,
-        IChatCompletionService? chatCompletionService,
-        ILogger<GroundedAgentAnswerService> logger)
+        IChatCompletionService chatCompletionService)
     {
         _kernel = kernel;
-        _semanticSearchPlugin = semanticSearchPlugin;
         _chatCompletionService = chatCompletionService;
-        _logger = logger;
 
         kernel.ImportPluginFromObject(semanticSearchPlugin, SemanticSearchPlugin.PluginName);
         kernel.ImportPluginFromObject(summarisePlugin, SummarisePlugin.PluginName);
@@ -44,19 +38,7 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
     public async Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ChatMessage> history)
     {
         var normalizedTopK = topK <= 0 ? 5 : Math.Min(topK, 10);
-
-        if (_chatCompletionService == null)
-            return await DirectSearchFallbackAsync(question, normalizedTopK);
-
-        try
-        {
-            return await TwoPassAnswerAsync(question, normalizedTopK, history);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Two-pass agent failed, falling back to direct search.");
-            return await DirectSearchFallbackAsync(question, normalizedTopK);
-        }
+        return await TwoPassAnswerAsync(question, normalizedTopK, history);
     }
 
     private async Task<AgentAnswerResult> TwoPassAnswerAsync(
@@ -84,7 +66,7 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
         {
             FunctionChoiceBehavior = FunctionChoiceBehavior.Required(autoInvoke: true)
         };
-        var pass1 = await _chatCompletionService!.GetChatMessageContentsAsync(
+        var pass1 = await _chatCompletionService.GetChatMessageContentsAsync(
             chatHistory, retrievalSettings, _kernel);
         foreach (var msg in pass1) chatHistory.Add(msg);
 
@@ -167,33 +149,6 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
         };
     }
 
-    private async Task<AgentAnswerResult> DirectSearchFallbackAsync(string question, int topK)
-    {
-        var sourcesJson = await _semanticSearchPlugin.SearchPostsAsync(question, topK);
-        var sources = JsonSerializer.Deserialize<List<AgentSource>>(sourcesJson, JsonOptions) ?? [];
-
-        if (sources.Count == 0)
-        {
-            return new AgentAnswerResult
-            {
-                Answer = "I couldn't find supporting sources in the indexed content.",
-                Grounded = false,
-                Sources = [],
-                Citations = [],
-                ToolsUsed = ["search_posts"]
-            };
-        }
-
-        return new AgentAnswerResult
-        {
-            Answer = BuildDeterministicAnswer(question, sources),
-            Grounded = true,
-            Sources = sources,
-            Citations = BuildDeterministicCitations(sources),
-            ToolsUsed = ["search_posts"]
-        };
-    }
-
     private static string BuildDeterministicAnswer(string question, List<AgentSource> sources)
     {
         var evidence = string.Join("\n", sources.Take(3).Select((s, i) =>
@@ -201,12 +156,6 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
         return $"Grounded answer for: {question}\n\nSupporting evidence:\n{evidence}";
     }
 
-    private static List<Citation> BuildDeterministicCitations(List<AgentSource> sources) =>
-        sources.Take(3).Select(s => new Citation
-        {
-            PostId = s.PostId,
-            Quote = s.Snippet.Length > 120 ? s.Snippet[..120] : s.Snippet
-        }).ToList();
 
     private static string ExtractJson(string raw)
     {
