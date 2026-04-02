@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.Qdrant;
 using Testcontainers.Redis;
 using VectorSearch.Api;
+using VectorSearch.Api.Services;
 using VectorSearch.Core;
 using VectorSearch.S3;
 
@@ -107,6 +108,10 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
             // Replace grounded answer generation with a test implementation
             // so agent endpoint tests do not depend on Bedrock runtime services.
             services.AddScoped<IAgentAnswerService, TestAgentAnswerService>();
+
+            // Remove startup indexing — tests control index state themselves.
+            var indexingService = services.FirstOrDefault(d => d.ImplementationType == typeof(IndexingStartupService));
+            if (indexingService != null) services.Remove(indexingService);
         });
 
         builder.UseEnvironment("Testing");
