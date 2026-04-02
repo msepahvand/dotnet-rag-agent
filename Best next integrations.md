@@ -80,6 +80,8 @@ Split the current monolithic agent into two collaborating agents.
 - Orchestrate with SK's `AgentGroupChat` or a simple sequential handoff in code
 - **Why**: This is the core multi-agent pattern. You learn agent communication, handoff protocols, and separation of concerns.
 
+> ⚠️ **Bedrock caveat:** The SK Bedrock connector does not support `FunctionChoiceBehavior` for Claude models (microsoft/semantic-kernel#9750 — closed but not fixed in SK directly; maintainers deferred to the AWS SDK's `IChatClient`). Do **not** rely on `FunctionChoiceBehavior.Auto/Required` to dispatch tools at runtime — it silently does nothing and the agent returns a plain-text response with empty sources. Use the same workaround as `GroundedAgentAnswerService`: call plugins directly in code, inject results into chat history, then invoke the LLM for synthesis.
+
 ### 3.2 Agent with a Critic / Self-Reflection
 
 Add a review loop where a second agent scores the first agent's output.
