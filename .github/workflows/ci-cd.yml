@@ -149,9 +149,6 @@ jobs:
             fi
           fi
 
-          # Remove any resources that no longer exist in configuration (idempotent)
-          terraform state rm aws_apprunner_service.api 2>/dev/null || true
-          terraform state rm aws_iam_role_policy.apprunner_instance_runtime 2>/dev/null || true
 
       - name: Ensure ECR repository exists (Terraform-managed)
         working-directory: infra
