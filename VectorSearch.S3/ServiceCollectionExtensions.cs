@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
 using VectorSearch.Core;
+using VectorSearch.S3.Agents;
 
 namespace VectorSearch.S3;
 
@@ -45,7 +46,11 @@ public static class ServiceCollectionExtensions
 
         // Register the main vector service
         services.AddScoped<IVectorService, VectorService>();
-        services.AddScoped<IAgentAnswerService, GroundedAgentAnswerService>();
+
+        // Multi-agent: researcher retrieves, writer synthesises
+        services.AddScoped<ResearcherAgent>();
+        services.AddScoped<WriterAgent>();
+        services.AddScoped<IAgentAnswerService, MultiAgentAnswerService>();
 
         return services;
     }
