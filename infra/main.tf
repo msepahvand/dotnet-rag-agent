@@ -167,6 +167,16 @@ data "aws_iam_policy_document" "ecs_task_runtime" {
     ]
     resources = ["*"]
   }
+
+  statement {
+    sid    = "AllowMarketplaceForBedrock"
+    effect = "Allow"
+    actions = [
+      "aws-marketplace:ViewSubscriptions",
+      "aws-marketplace:Subscribe"
+    ]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role_policy" "ecs_task_runtime" {
