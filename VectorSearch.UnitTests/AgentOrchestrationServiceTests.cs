@@ -83,7 +83,7 @@ public class AgentOrchestrationServiceTests
         var response = await sut.AskAsync(new AgentAskRequest { Question = "Q?", TopK = 5 });
 
         response.Answer.Should().Be("The answer");
-        response.ToolUsed.Should().Be("semantic-search");
+        response.ToolsUsed.Should().Contain("search_posts");
         response.Sources.Should().ContainSingle().Which.PostId.Should().Be(42);
         response.Citations.Should().ContainSingle().Which.PostId.Should().Be(42);
     }
@@ -97,7 +97,7 @@ public class AgentOrchestrationServiceTests
     [InlineData(10, 10)]
     [InlineData(11, 10)]
     [InlineData(100, 10)]
-    public async Task AskAsync_NormalizesTopK(int requested, int expected)
+    public async Task AskAsync_NormalisesTopK(int requested, int expected)
     {
         int capturedTopK = 0;
         var stub = new CapturingStubAgentAnswerService(topK => capturedTopK = topK);

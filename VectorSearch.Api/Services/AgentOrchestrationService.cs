@@ -26,7 +26,7 @@ public sealed class AgentOrchestrationService(
         return new AgentAskResponse
         {
             ConversationId = conversationId,
-            ToolUsed = "semantic-search",
+            ToolsUsed = result.ToolsUsed.Count > 0 ? result.ToolsUsed : ["search_posts"],
             Grounded = result.Grounded,
             Answer = result.Answer,
             Citations = result.Citations,

@@ -3,7 +3,7 @@ namespace VectorSearch.Core.Models;
 public record AgentAskResponse
 {
     public string ConversationId { get; init; } = string.Empty;
-    public string ToolUsed { get; init; } = "semantic-search";
+    public List<string> ToolsUsed { get; init; } = [];
     public bool Grounded { get; init; }
     public string Answer { get; init; } = string.Empty;
     public List<Citation> Citations { get; init; } = [];

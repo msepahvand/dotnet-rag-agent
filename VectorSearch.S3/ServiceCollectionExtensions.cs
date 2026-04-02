@@ -40,6 +40,8 @@ public static class ServiceCollectionExtensions
         });
         services.AddScoped<IEmbeddingService, EmbeddingService>();
         services.AddScoped<SemanticSearchPlugin>();
+        services.AddScoped<SummarisePlugin>();
+        services.AddScoped<ComparePostsPlugin>();
 
         RegisterVectorStore(services, options.VectorStoreProvider);
 

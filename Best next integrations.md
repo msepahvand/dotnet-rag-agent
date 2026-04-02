@@ -48,24 +48,24 @@ This is a strong foundation. Everything below builds directly on it.
 
 ## Phase 2 — Multi-Tool Agent
 
-### 2.1 Give the Agent More Tools
+### ~~2.1 Give the Agent More Tools~~ ✅
 
-Register multiple plugins and let the model pick which to call.
+~~Register multiple plugins and let the model pick which to call.~~
 
-- Add a `SummarizePlugin` — takes a post ID and returns a condensed summary
-- Add a `ComparePostsPlugin` — takes two post IDs and returns a comparison
-- Register all plugins in the kernel; the agent decides the tool chain per question
-- **Why**: The jump from single-tool to multi-tool is where you learn how models reason about tool selection, argument planning, and chaining.
+- ~~Add a `SummarisePlugin` — takes a post ID and returns a condensed summary~~
+- ~~Add a `ComparePostsPlugin` — takes two post IDs and returns a comparison~~
+- ~~Register all plugins in the kernel; the agent decides the tool chain per question~~
+- **Done**: `SummarisePlugin` (`summarise_post`) and `ComparePostsPlugin` (`compare_posts`) added alongside `SemanticSearchPlugin`. All three registered on the kernel in `GroundedAgentAnswerService`.
 
-### 2.2 Required vs. Auto vs. None — Function Choice Strategies
+### ~~2.2 Required vs. Auto vs. None — Function Choice Strategies~~ ✅
 
-Experiment with all three `FunctionChoiceBehavior` modes.
+~~Experiment with all three `FunctionChoiceBehavior` modes.~~
 
-- `Auto()` — model decides (current behavior)
-- `Required()` — model must call at least one function (useful for retrieval-first flows)
-- `None()` — pure chat, no tools (useful for final-answer generation after retrieval)
-- Chain them: first invocation with `Required` for retrieval, second with `None` for synthesis
-- **Why**: Understanding when to constrain tool use vs. let the model choose is a key agentic design skill.
+- ~~`Auto()` — model decides (current behavior)~~
+- ~~`Required()` — model must call at least one function (useful for retrieval-first flows)~~
+- ~~`None()` — pure chat, no tools (useful for final-answer generation after retrieval)~~
+- ~~Chain them: first invocation with `Required` for retrieval, second with `None` for synthesis~~
+- **Done**: `GroundedAgentAnswerService` uses a two-pass approach — Pass 1 with `Required(autoInvoke: true)` forces tool use; Pass 2 with `None()` synthesises the structured JSON answer.
 
 ---
 

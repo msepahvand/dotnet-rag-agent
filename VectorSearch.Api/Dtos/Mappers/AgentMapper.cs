@@ -11,7 +11,7 @@ public static class AgentMapper
         new()
         {
             ConversationId = model.ConversationId,
-            ToolUsed = model.ToolUsed,
+            ToolsUsed = model.ToolsUsed,
             Grounded = model.Grounded,
             Answer = model.Answer,
             Citations = model.Citations.Select(CitationMapper.ToDto).ToList(),

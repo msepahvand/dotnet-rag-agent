@@ -55,7 +55,8 @@ internal sealed class TestAgentAnswerService(
             Answer = $"Grounded test answer for '{question}' using {citationRefs}.",
             Grounded = sources.Count > 0,
             Sources = sources,
-            Citations = citationList
+            Citations = citationList,
+            ToolsUsed = ["search_posts"]
         };
     }
 }

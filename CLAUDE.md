@@ -1,5 +1,8 @@
 # Claude Code Instructions
 
+## Language
+- Use **British English** in all code, comments, log messages, and documentation. e.g. `summarise` not `summarize`, `normalise` not `normalize`, `initialisation` not `initialization`, `colour` not `color`. Exception: .NET framework method names (e.g. `JsonSerializer`, `InitializeAsync`) must keep their original spelling.
+
 ## Git Workflow
 - **Never push unless explicitly asked.** Commit locally, then wait for the user to say "push".
 - **Always run `dotnet test VectorSearch.IntegrationTests` before committing.** All tests must pass. Do not commit if any test is failing.

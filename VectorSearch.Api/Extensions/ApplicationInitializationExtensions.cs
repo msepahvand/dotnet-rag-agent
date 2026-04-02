@@ -27,7 +27,7 @@ public static class ApplicationInitializationExtensions
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Vector store initialization failed at startup. Service will continue running.");
+            logger.LogError(ex, "Vector store initialisation failed at startup. Service will continue running.");
         }
     }
 }

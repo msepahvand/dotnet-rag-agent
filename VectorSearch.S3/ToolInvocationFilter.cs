@@ -13,7 +13,7 @@ public sealed class ToolInvocationFilter(ILogger<ToolInvocationFilter> logger) :
         FunctionInvocationContext context,
         Func<FunctionInvocationContext, Task> next)
     {
-        NormalizeTopK(context.Arguments);
+        NormaliseTopK(context.Arguments);
 
         var pluginName = string.IsNullOrWhiteSpace(context.Function.PluginName)
             ? "unknown"
@@ -49,7 +49,7 @@ public sealed class ToolInvocationFilter(ILogger<ToolInvocationFilter> logger) :
         }
     }
 
-    private static void NormalizeTopK(KernelArguments arguments)
+    private static void NormaliseTopK(KernelArguments arguments)
     {
         if (!arguments.TryGetValue("topK", out var rawValue) || rawValue is null)
         {

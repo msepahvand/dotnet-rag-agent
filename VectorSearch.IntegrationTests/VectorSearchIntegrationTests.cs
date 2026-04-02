@@ -193,7 +193,7 @@ public class VectorSearchIntegrationTests
         var result = await response.Content.ReadFromJsonAsync<AgentAskResponseDto>();
 
         result.Should().NotBeNull();
-        result!.ToolUsed.Should().Be("semantic-search");
+        result!.ToolsUsed.Should().Contain("search_posts");
         result.Grounded.Should().BeTrue();
         result.Sources.Should().NotBeNull();
         result.Sources.Should().NotBeEmpty();
@@ -203,7 +203,7 @@ public class VectorSearchIntegrationTests
 
     private sealed record AgentAskResponseDto
     {
-        public string ToolUsed { get; init; } = string.Empty;
+        public List<string> ToolsUsed { get; init; } = [];
         public bool Grounded { get; init; }
         public string Answer { get; init; } = string.Empty;
         public List<CitationDto> Citations { get; init; } = [];

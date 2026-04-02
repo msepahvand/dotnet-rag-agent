@@ -86,7 +86,7 @@ flowchart LR
 | **Chat Completion** | `GroundedAgentAnswerService` — Bedrock Claude via `IChatCompletionService` |
 | **Plugin Orchestration** | `GroundedAgentAnswerService` directly calls `IndexingPlugin` then `SemanticSearchPlugin` |
 | **Plugins** | `IndexingPlugin` (auto-index on first ask), `SemanticSearchPlugin` (retrieval + snippet enrichment) |
-| **Invocation Filter** | `ToolInvocationFilter` — logs calls, normalizes topK, enforces guardrails |
+| **Invocation Filter** | `ToolInvocationFilter` — logs calls, normalises topK, enforces guardrails |
 
 ---
 

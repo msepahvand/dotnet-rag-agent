@@ -6,4 +6,5 @@ public record AgentAnswerResult
     public bool Grounded { get; init; }
     public List<AgentSource> Sources { get; init; } = [];
     public List<Citation> Citations { get; init; } = [];
+    public List<string> ToolsUsed { get; init; } = [];
 }
