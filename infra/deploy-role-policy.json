@@ -152,13 +152,15 @@
       ]
     },
     {
-      "Sid": "IAMReadGitHubActionsRole",
+      "Sid": "IAMManageGitHubActionsRole",
       "Effect": "Allow",
       "Action": [
+        "iam:DeleteRolePolicy",
         "iam:GetRole",
         "iam:GetRolePolicy",
         "iam:ListAttachedRolePolicies",
-        "iam:ListRolePolicies"
+        "iam:ListRolePolicies",
+        "iam:PutRolePolicy"
       ],
       "Resource": "arn:aws:iam::__AWS_ACCOUNT_ID__:role/GitHubActionsDeployRole"
     },

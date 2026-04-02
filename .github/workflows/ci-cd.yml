@@ -49,6 +49,10 @@ jobs:
           role-to-assume: ${{ secrets.AWS_INFRA_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION || env.AWS_REGION_DEFAULT }}
 
+      - name: Update GitHub Actions deploy role policy
+        working-directory: infra
+        run: bash ./bootstrap-deploy-role.sh
+
       - uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: '1.5.0'
