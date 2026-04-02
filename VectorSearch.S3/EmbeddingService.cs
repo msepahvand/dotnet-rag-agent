@@ -1,5 +1,4 @@
 using Microsoft.Extensions.AI;
-using Microsoft.SemanticKernel;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using VectorSearch.Core;
@@ -10,9 +9,6 @@ namespace VectorSearch.S3;
 public class EmbeddingService : IEmbeddingService
 {
     private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
-
-    public EmbeddingService(Kernel kernel)
-        : this(kernel.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>()) { }
 
     public EmbeddingService(IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator)
     {
