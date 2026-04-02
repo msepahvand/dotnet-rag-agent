@@ -155,7 +155,7 @@ data "aws_iam_policy_document" "ecs_task_runtime" {
       "bedrock:InvokeModel"
     ]
     resources = [
-      "arn:aws:bedrock:${local.effective_aws_region}::foundation-model/${var.embedding_model_id}"
+      "arn:aws:bedrock:${local.effective_aws_region}::foundation-model/*"
     ]
   }
 
