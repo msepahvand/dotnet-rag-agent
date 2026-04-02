@@ -65,27 +65,17 @@ cd VectorSearch.IntegrationTests && dotnet test               # run tests
 
 ```mermaid
 flowchart LR
-  U[Client] -->|HTTP /api/*| AR[AWS App Runner]
+  A[Agent API] --> IP[IndexingPlugin]
+  A --> SP[SemanticSearchPlugin]
+  A --> BRC[Bedrock Claude]
+  IP --> HN[HackerNews]
+  IP --> BRT[Bedrock Titan]
+  BRT --> S3[(S3 Vectors)]
+  SP --> S3
+  SP --> HN
 
-  subgraph API
-    AR --> IDX[IndexController]
-    AR --> SRCH[SearchController]
-    AR --> AGT[AgentController]
-  end
-
-  IDX -->|Fetch posts| DS[HackerNews]
-  IDX -->|Embeddings| BR[Bedrock Titan v2]
-  IDX -->|Store vectors| S3V[(S3 Vectors)]
-
-  SRCH -->|Embed query| BR
-  SRCH -->|TopK search| S3V
-
-  AGT -->|Grounding context| S3V
-  AGT -->|LLM answer| BRC[Bedrock Claude 3 Haiku]
-
-  S3V --> SRCH
-  SRCH --> U
-  AGT --> U
+  SC[Search API] --> BRT
+  SC --> S3
 ```
 
 ### Semantic Kernel Integration
@@ -94,8 +84,8 @@ flowchart LR
 |---|---|
 | **Embeddings** | `EmbeddingService` — Bedrock Titan via `IEmbeddingGenerator` |
 | **Chat Completion** | `GroundedAgentAnswerService` — Bedrock Claude via `IChatCompletionService` |
-| **Auto Function Calling** | `FunctionChoiceBehavior.Auto()` — model picks which plugin to call |
-| **Plugins** | `SemanticSearchPlugin` (retrieval), `IndexingPlugin` (auto-index on first ask) |
+| **Plugin Orchestration** | `GroundedAgentAnswerService` directly calls `IndexingPlugin` then `SemanticSearchPlugin` |
+| **Plugins** | `IndexingPlugin` (auto-index on first ask), `SemanticSearchPlugin` (retrieval + snippet enrichment) |
 | **Invocation Filter** | `ToolInvocationFilter` — logs calls, normalizes topK, enforces guardrails |
 
 ---

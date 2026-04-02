@@ -17,32 +17,32 @@ This is a strong foundation. Everything below builds directly on it.
 
 ## Phase 1 — Strengthen the Single-Agent Loop
 
-### 1.1 Structured Output Contract
+### ~~1.1 Structured Output Contract~~ ✅
 
-Force the LLM to return a validated JSON shape instead of free-form text.
+~~Force the LLM to return a validated JSON shape instead of free-form text.~~
 
-- Define a response contract: `{ answer, citations: [{ postId, quote }], grounded: bool }`
-- Use SK's `JsonSchemaResponseFormat` or Bedrock's `response_format` to constrain the model
-- Validate before returning from the API; fall back to the deterministic answer on parse failure
-- **Why**: Every production agent needs predictable output shapes. This is table-stakes.
+- ~~Define a response contract: `{ answer, citations: [{ postId, quote }], grounded: bool }`~~
+- ~~Use SK's `JsonSchemaResponseFormat` or Bedrock's `response_format` to constrain the model~~
+- ~~Validate before returning from the API; fall back to the deterministic answer on parse failure~~
+- **Done**: `StructuredLlmAnswer` in `GroundedAgentAnswerService` parses `answer`/`citations`/`grounded` with fallback to deterministic answer.
 
-### 1.2 Prompt Templates as Prompt Functions
+### ~~1.2 Prompt Templates as Prompt Functions~~ ✅
 
-Replace the inline prompt string in `GroundedAgentAnswerService` with a reusable YAML/Handlebars prompt function.
+~~Replace the inline prompt string in `GroundedAgentAnswerService` with a reusable YAML/Handlebars prompt function.~~
 
-- Create a `/Prompts` folder with `.yaml` prompt config + `.txt` Handlebars template
-- Load via `kernel.CreateFunctionFromPromptYaml()`
-- Keep citation instructions, persona, and grounding rules in one versioned place
-- **Why**: Prompt engineering iteration speed is a core agentic skill. Inline strings don't scale.
+- ~~Create a `/Prompts` folder with `.yaml` prompt config + `.txt` Handlebars template~~
+- ~~Load via `kernel.CreateFunctionFromPromptYaml()`~~
+- ~~Keep citation instructions, persona, and grounding rules in one versioned place~~
+- **Done**: `VectorSearch.S3/Prompts/GroundedAnswer.yaml` loaded via `KernelFunctionYaml.FromPromptYaml()`.
 
-### 1.3 Chat History and Multi-Turn Conversations
+### ~~1.3 Chat History and Multi-Turn Conversations~~ ✅
 
-Add stateful conversation support to the `/api/agent/ask` endpoint.
+~~Add stateful conversation support to the `/api/agent/ask` endpoint.~~
 
-- Maintain a `ChatHistory` per session (in-memory or Redis-backed)
-- Pass history into the kernel invocation so follow-up questions have context
-- Add a `/api/agent/conversations` endpoint to manage sessions
-- **Why**: Real agents are conversational. Single-shot Q&A is a demo; multi-turn is production.
+- ~~Maintain a `ChatHistory` per session (in-memory or Redis-backed)~~
+- ~~Pass history into the kernel invocation so follow-up questions have context~~
+- ~~Add a `/api/agent/conversations` endpoint to manage sessions~~
+- **Done**: `InMemoryConversationStore`, `ConversationsController` (list/get/delete), history passed into `GroundedAgentAnswerService.AnswerAsync`.
 
 ---
 
