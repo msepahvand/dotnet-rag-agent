@@ -23,6 +23,7 @@ public class ConversationStoreEventTests
                 break;
             }
         }
+
         return results;
     }
 

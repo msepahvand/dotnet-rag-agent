@@ -34,7 +34,8 @@ public class EmbeddingServiceBackpressureTests
         {
             var current = Interlocked.Increment(ref concurrentCount);
             int observed;
-            do { observed = maxObserved; }
+            do
+            { observed = maxObserved; }
             while (observed < current && Interlocked.CompareExchange(ref maxObserved, current, observed) != observed);
 
             await Task.Delay(30);
@@ -45,7 +46,8 @@ public class EmbeddingServiceBackpressureTests
         var service = new EmbeddingService(generator);
         await CollectAsync(service.StreamEmbeddings(CreatePosts(10), maxConcurrency));
 
-        maxObserved.Should().BeLessThanOrEqualTo(maxConcurrency,
+        maxObserved.Should().BeLessThanOrEqualTo(
+            maxConcurrency,
             because: $"Parallel.ForEachAsync caps concurrent Bedrock calls at {maxConcurrency}");
     }
 
@@ -68,7 +70,8 @@ public class EmbeddingServiceBackpressureTests
 
         emitTimestamps.Should().HaveCount(5);
         var spread = emitTimestamps.Max() - emitTimestamps.Min();
-        spread.Should().BeLessThan(80,
+        spread.Should().BeLessThan(
+            80,
             because: "all 5 embeddings run in parallel so results arrive within the same window");
     }
 

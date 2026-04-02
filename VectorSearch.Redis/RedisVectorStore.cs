@@ -59,7 +59,8 @@ public class RedisVectorStore : IVectorStore, IDisposable
         var schema = new Schema()
             .AddTextField("title")
             .AddTextField("body")
-            .AddVectorField("embedding",
+            .AddVectorField(
+                "embedding",
                 Schema.VectorField.VectorAlgo.HNSW,
                 new Dictionary<string, object>
                 {

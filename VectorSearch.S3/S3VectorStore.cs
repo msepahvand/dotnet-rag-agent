@@ -1,4 +1,4 @@
-﻿using Amazon.S3Vectors;
+using Amazon.S3Vectors;
 using Amazon.S3Vectors.Model;
 using Microsoft.Extensions.Configuration;
 using VectorSearch.Core;
@@ -67,8 +67,7 @@ public class S3VectorStore : IVectorStore
             Metadata = new Amazon.Runtime.Documents.Document(
                 d.Metadata.ToDictionary(
                     kvp => kvp.Key,
-                    kvp => new Amazon.Runtime.Documents.Document(kvp.Value)
-                ))
+                    kvp => new Amazon.Runtime.Documents.Document(kvp.Value)))
         }).ToList();
 
         await _s3VectorsClient.PutVectorsAsync(new PutVectorsRequest
@@ -102,8 +101,7 @@ public class S3VectorStore : IVectorStore
             Key = v.Key ?? "",
             Metadata = v.Metadata.AsDictionary().ToDictionary(
                 kvp => kvp.Key,
-                kvp => kvp.Value.ToString() ?? ""
-            )
+                kvp => kvp.Value.ToString() ?? "")
         }).ToList();
     }
 }

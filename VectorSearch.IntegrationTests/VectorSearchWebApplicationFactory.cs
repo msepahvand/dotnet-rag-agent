@@ -21,7 +21,7 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
     public VectorSearchWebApplicationFactory(string provider)
     {
         _provider = provider;
-        
+
         if (provider == "Qdrant")
         {
             _qdrantContainer = new QdrantBuilder()
@@ -77,10 +77,10 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
             services.RemoveAll<Microsoft.SemanticKernel.Embeddings.ITextEmbeddingGenerationService>();
             services.RemoveAll<Microsoft.SemanticKernel.Kernel>();
             services.RemoveAll<IAgentAnswerService>();
-            
+
             // Remove and replace the IVectorStore implementation based on provider
             services.RemoveAll<IVectorStore>();
-            
+
             if (_provider == "Qdrant")
             {
                 services.AddHttpClient<IVectorStore, QdrantVectorStore>();
@@ -94,7 +94,7 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
                     services.AddScoped(typeof(IVectorStore), redisStoreType);
                 }
             }
-            
+
             // Replace the real embedding service with a mock for testing
             // This eliminates the need for AWS Bedrock credentials
             services.RemoveAll<IEmbeddingService>();
@@ -125,7 +125,7 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
         if (_provider == "Qdrant")
         {
             await _qdrantContainer!.StartAsync();
-            
+
             // Create the Qdrant collection manually since we skip app initialization in tests
             var httpClient = new HttpClient();
             var collectionUrl = $"{ConnectionString}/collections/test_posts";
@@ -133,7 +133,7 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
             {
                 vectors = new { size = 1024, distance = "Cosine" }
             };
-            
+
             var json = System.Text.Json.JsonSerializer.Serialize(createCollectionPayload);
             var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
             await httpClient.PutAsync(collectionUrl, content);
@@ -141,7 +141,7 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
         else if (_provider == "Redis")
         {
             await _redisContainer!.StartAsync();
-            
+
             // Create the Redis index manually since we skip app initialization in tests
             var config = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
@@ -150,13 +150,13 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
                     ["VectorStore:Redis:IndexName"] = "test_posts"
                 })
                 .Build();
-            
+
             var redisStoreType = Type.GetType("VectorSearch.Redis.RedisVectorStore, VectorSearch.Redis");
             if (redisStoreType != null)
             {
                 var redisStore = (IVectorStore)Activator.CreateInstance(redisStoreType, config)!;
                 await redisStore.CreateCollectionAsync(1024);
-                
+
                 // Dispose if it implements IDisposable
                 if (redisStore is IDisposable disposable)
                 {
@@ -172,10 +172,12 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
         {
             await _qdrantContainer.DisposeAsync();
         }
+
         if (_redisContainer != null)
         {
             await _redisContainer.DisposeAsync();
         }
+
         await base.DisposeAsync();
     }
 }

@@ -53,8 +53,8 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
             var role = msg.Role switch
             {
                 "assistant" => AuthorRole.Assistant,
-                "system"    => AuthorRole.System,
-                _           => AuthorRole.User
+                "system" => AuthorRole.System,
+                _ => AuthorRole.User
             };
             chatHistory.Add(new ChatMessageContent(role, msg.Content));
         }
@@ -92,7 +92,6 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
-
     private static List<string> ExtractToolsUsed(ChatHistory history)
     {
         var tools = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -108,6 +107,7 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
                 tools.Add(item.FunctionName);
             }
         }
+
         return [.. tools];
     }
 
@@ -134,6 +134,7 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
                 }
             }
         }
+
         return [];
     }
 
@@ -196,7 +197,7 @@ public sealed class GroundedAgentAnswerService : IAgentAnswerService
 
     private sealed record StructuredLlmAnswer
     {
-        [JsonPropertyName("answer")]   public string Answer { get; init; } = string.Empty;
+        [JsonPropertyName("answer")] public string Answer { get; init; } = string.Empty;
         [JsonPropertyName("citations")] public List<Citation> Citations { get; init; } = [];
         [JsonPropertyName("grounded")] public bool Grounded { get; init; }
     }

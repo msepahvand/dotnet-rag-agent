@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using VectorSearch.Api.Dtos;
@@ -28,7 +28,7 @@ public class VectorSearchIntegrationTests
         // Assert
         response.EnsureSuccessStatusCode();
         var posts = await response.Content.ReadFromJsonAsync<List<PostDto>>();
-        
+
         posts.Should().NotBeNull();
         posts.Should().NotBeEmpty();
         posts!.Count.Should().Be(100); // Default HackerNews top stories count
@@ -49,7 +49,7 @@ public class VectorSearchIntegrationTests
         // Assert
         response.EnsureSuccessStatusCode();
         var post = await response.Content.ReadFromJsonAsync<PostDto>();
-        
+
         post.Should().NotBeNull();
         post!.Id.Should().Be(1);
         post.Title.Should().NotBeNull();
@@ -80,7 +80,7 @@ public class VectorSearchIntegrationTests
         await using var factory = new VectorSearchWebApplicationFactory(provider);
         await factory.InitializeAsync();
         var client = factory.CreateClient();
-        
+
         // Index a post
         var indexResponse = await client.PostAsync("/api/index/1", null);
         indexResponse.EnsureSuccessStatusCode();
@@ -94,7 +94,7 @@ public class VectorSearchIntegrationTests
         // Assert
         searchResponse.EnsureSuccessStatusCode();
         var results = await searchResponse.Content.ReadFromJsonAsync<List<SearchResultDto>>();
-        
+
         results.Should().NotBeNull();
         results.Should().NotBeEmpty();
         results.Should().Contain(r => r.PostId == 1);
@@ -108,7 +108,7 @@ public class VectorSearchIntegrationTests
         await using var factory = new VectorSearchWebApplicationFactory(provider);
         await factory.InitializeAsync();
         var client = factory.CreateClient();
-        
+
         // Index first 5 posts
         for (int i = 1; i <= 5; i++)
         {
@@ -125,7 +125,7 @@ public class VectorSearchIntegrationTests
         // Assert
         searchResponse.EnsureSuccessStatusCode();
         var results = await searchResponse.Content.ReadFromJsonAsync<List<SearchResultDto>>();
-        
+
         results.Should().NotBeNull();
         results.Should().NotBeEmpty();
         results.Should().OnlyContain(r => r.PostId >= 1 && r.PostId <= 5);
@@ -146,7 +146,7 @@ public class VectorSearchIntegrationTests
         // Assert
         response.EnsureSuccessStatusCode();
         var results = await response.Content.ReadFromJsonAsync<List<SearchResultDto>>();
-        
+
         results.Should().NotBeNull();
         // Might be empty if nothing is indexed
     }

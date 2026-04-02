@@ -9,7 +9,6 @@ namespace VectorSearch.UnitTests;
 public class AgentOrchestrationServiceTests
 {
     // ── Grounded passthrough ────────────────────────────────────────────────
-
     [Fact]
     public async Task AskAsync_WhenResultIsGrounded_ResponseGroundedIsTrue()
     {
@@ -65,7 +64,6 @@ public class AgentOrchestrationServiceTests
     }
 
     // ── Response field mapping ──────────────────────────────────────────────
-
     [Fact]
     public async Task AskAsync_MapsAllResultFieldsToResponse()
     {
@@ -89,7 +87,6 @@ public class AgentOrchestrationServiceTests
     }
 
     // ── TopK normalisation ──────────────────────────────────────────────────
-
     [Theory]
     [InlineData(0, 5)]
     [InlineData(-1, 5)]
@@ -109,7 +106,6 @@ public class AgentOrchestrationServiceTests
     }
 
     // ── ConversationId ──────────────────────────────────────────────────────
-
     [Fact]
     public async Task AskAsync_WithNoConversationId_GeneratesNewConversationId()
     {
@@ -183,12 +179,10 @@ public class AgentOrchestrationServiceTests
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
-
     private static InMemoryConversationStore CreateStore() =>
         new(new MemoryCache(new MemoryCacheOptions()));
 
     // ── Stubs ───────────────────────────────────────────────────────────────
-
     private sealed class StubAgentAnswerService(AgentAnswerResult result) : IAgentAnswerService
     {
         public Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ChatMessage> history) =>

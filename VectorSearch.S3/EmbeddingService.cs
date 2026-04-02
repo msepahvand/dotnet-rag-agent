@@ -22,17 +22,19 @@ public class EmbeddingService : IEmbeddingService
     {
         var channel = Channel.CreateUnbounded<(int PostId, float[] Embedding)>();
 
-        var producer = Parallel.ForEachAsync(posts, new ParallelOptions
-        {
-            MaxDegreeOfParallelism = maxConcurrency,
-            CancellationToken = cancellationToken
-        },
-        async (post, ct) =>
-        {
-            var content = $"{post.Title}\n\n{post.Body}";
-            var embedding = await GenerateEmbeddingAsync(content);
-            await channel.Writer.WriteAsync((post.Id, embedding), ct);
-        });
+        var producer = Parallel.ForEachAsync(
+            posts,
+            new ParallelOptions
+            {
+                MaxDegreeOfParallelism = maxConcurrency,
+                CancellationToken = cancellationToken
+            },
+            async (post, ct) =>
+            {
+                var content = $"{post.Title}\n\n{post.Body}";
+                var embedding = await GenerateEmbeddingAsync(content);
+                await channel.Writer.WriteAsync((post.Id, embedding), ct);
+            });
 
         _ = producer.ContinueWith(
             t => channel.Writer.Complete(t.IsFaulted ? t.Exception!.InnerException : null),

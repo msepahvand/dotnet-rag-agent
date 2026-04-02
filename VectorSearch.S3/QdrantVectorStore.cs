@@ -20,10 +20,10 @@ public class QdrantVectorStore : IVectorStore
     {
         _httpClient = httpClient;
         _logger = logger;
-        
+
         var qdrantUrl = configuration["VectorStore:Qdrant:Url"] ?? "http://localhost:6333";
         _httpClient.BaseAddress = new Uri(qdrantUrl);
-        
+
         _collectionName = configuration["VectorStore:Qdrant:CollectionName"] ?? "posts";
         _vectorSize = int.Parse(configuration["VectorStore:Qdrant:VectorSize"] ?? "1024");
     }
@@ -87,7 +87,7 @@ public class QdrantVectorStore : IVectorStore
 
         var response = await _httpClient.PutAsync($"/collections/{_collectionName}", content);
         response.EnsureSuccessStatusCode();
-        
+
         _logger.LogInformation("Created Qdrant collection: {CollectionName}", _collectionName);
     }
 
@@ -120,7 +120,7 @@ public class QdrantVectorStore : IVectorStore
 
         var response = await _httpClient.PutAsync($"/collections/{_collectionName}/points", content);
         response.EnsureSuccessStatusCode();
-        
+
         _logger.LogInformation("Indexed {Count} documents to Qdrant", documents.Count);
     }
 
