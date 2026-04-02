@@ -149,6 +149,10 @@ jobs:
             fi
           fi
 
+          # Remove any resources that no longer exist in configuration (idempotent)
+          terraform state rm aws_apprunner_service.api 2>/dev/null || true
+          terraform state rm aws_iam_role_policy.apprunner_instance_runtime 2>/dev/null || true
+
       - name: Ensure ECR repository exists (Terraform-managed)
         working-directory: infra
         run: |
@@ -174,12 +178,6 @@ jobs:
           else
             echo "ECR already has $IMAGE_COUNT image(s) — skipping bootstrap."
           fi
-
-      - name: Remove stale App Runner state entries
-        working-directory: infra
-        run: |
-          terraform state rm aws_apprunner_service.api 2>/dev/null || true
-          terraform state rm aws_iam_role_policy.apprunner_instance_runtime 2>/dev/null || true
 
       - name: Terraform apply
         working-directory: infra
