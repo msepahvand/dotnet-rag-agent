@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Runs before every `git push`. Aborts the push if dotnet format would make changes.
+set -euo pipefail
+
+echo "Running dotnet format check..."
+
+if ! dotnet format VectorSearch.Api.sln --verify-no-changes --severity warn; then
+  echo ""
+  echo "dotnet format found violations. Run:"
+  echo "  dotnet format VectorSearch.Api.sln --severity warn"
+  echo "then stage the changes and try again."
+  exit 1
+fi
+
+echo "dotnet format: clean."
