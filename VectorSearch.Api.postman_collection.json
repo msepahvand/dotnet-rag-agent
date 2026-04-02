@@ -25,6 +25,11 @@
       "key": "topK",
       "value": "5",
       "type": "string"
+    },
+    {
+      "key": "conversationId",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -38,13 +43,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/posts",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "posts"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "posts"]
             }
           },
           "response": []
@@ -56,14 +56,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/posts/{{postId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "posts",
-                "{{postId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "posts", "{{postId}}"]
             }
           },
           "response": []
@@ -80,14 +74,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/index/all",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "index",
-                "all"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "index", "all"]
             }
           },
           "response": []
@@ -99,14 +87,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/index/{{postId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "index",
-                "{{postId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "index", "{{postId}}"]
             }
           },
           "response": []
@@ -123,22 +105,11 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/search?query={{query}}&topK={{topK}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "search"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "search"],
               "query": [
-                {
-                  "key": "query",
-                  "value": "{{query}}"
-                },
-                {
-                  "key": "topK",
-                  "value": "{{topK}}"
-                }
+                { "key": "query", "value": "{{query}}" },
+                { "key": "topK", "value": "{{topK}}" }
               ]
             }
           },
@@ -153,31 +124,34 @@
           "name": "Ask Agent",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"question\": \"What are the latest posts about AI?\",\n  \"topK\": 5\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/api/agent/ask",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "agent",
-                "ask"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent", "ask"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Ask Agent - With Conversation History",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"Can you elaborate on that?\",\n  \"topK\": 5,\n  \"conversationId\": \"{{conversationId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agent/ask",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent", "ask"]
             }
           },
           "response": []
@@ -186,31 +160,60 @@
           "name": "Ask Agent - Empty Question (400)",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"question\": \"\",\n  \"topK\": 5\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/api/agent/ask",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "agent",
-                "ask"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent", "ask"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Conversations",
+      "item": [
+        {
+          "name": "List Conversations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent", "conversations"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Conversation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent/conversations/{{conversationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent", "conversations", "{{conversationId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Conversation",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent/conversations/{{conversationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent", "conversations", "{{conversationId}}"]
             }
           },
           "response": []
@@ -227,14 +230,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/swagger/v1/swagger.json",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "swagger",
-                "v1",
-                "swagger.json"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["swagger", "v1", "swagger.json"]
             }
           },
           "response": []
