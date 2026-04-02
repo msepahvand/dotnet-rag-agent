@@ -155,6 +155,48 @@ jobs:
             echo "ECR already has $IMAGE_COUNT image(s) — skipping bootstrap."
           fi
 
+      - name: Recover App Runner service if in CREATE_FAILED state
+        working-directory: infra
+        run: |
+          APP_RUNNER_SERVICE_NAME="${{ secrets.APP_RUNNER_SERVICE_NAME || env.APP_RUNNER_DEFAULT }}"
+          APP_RUNNER_ARN=$(aws apprunner list-services \
+            --region "$REGION" \
+            --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE_NAME'].ServiceArn | [0]" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -z "$APP_RUNNER_ARN" ] || [ "$APP_RUNNER_ARN" = "None" ]; then
+            echo "No existing App Runner service — skipping recovery check."
+            exit 0
+          fi
+
+          SERVICE_STATUS=$(aws apprunner describe-service \
+            --service-arn "$APP_RUNNER_ARN" \
+            --region "$REGION" \
+            --query 'Service.Status' \
+            --output text)
+          echo "App Runner service status: $SERVICE_STATUS"
+
+          if [ "$SERVICE_STATUS" = "CREATE_FAILED" ]; then
+            echo "Service is in CREATE_FAILED — deleting so Terraform can recreate it..."
+            aws apprunner delete-service --service-arn "$APP_RUNNER_ARN" --region "$REGION"
+
+            for i in $(seq 1 30); do
+              POLL_STATUS=$(aws apprunner describe-service \
+                --service-arn "$APP_RUNNER_ARN" \
+                --region "$REGION" \
+                --query 'Service.Status' \
+                --output text 2>/dev/null || echo "DELETED")
+              echo "Deletion poll $i/30: $POLL_STATUS"
+              [ "$POLL_STATUS" = "DELETED" ] && break
+              sleep 10
+            done
+
+            terraform state rm aws_apprunner_service.api 2>/dev/null || true
+            echo "Removed from Terraform state — Terraform will recreate the service."
+          else
+            echo "Service status is $SERVICE_STATUS — no recovery needed."
+          fi
+
       - name: Terraform apply
         working-directory: infra
         run: |
