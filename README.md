@@ -122,7 +122,7 @@ Switch providers via `appsettings.json` or environment variables:
 { "VectorStore": { "Provider": "S3Vectors" },
   "AWS": { "Region": "us-east-1", "VectorBucketName": "posts-semantic-search",
            "VectorIndexName": "posts-content-index", "EmbeddingModelId": "cohere.embed-english-v3",
-           "ChatModelId": "anthropic.claude-sonnet-4-6" } }
+           "ChatModelId": "us.anthropic.claude-sonnet-4-6" } }
 
 // appsettings.Development.json — Qdrant
 { "VectorStore": { "Provider": "Qdrant", "Qdrant": { "Url": "http://localhost:6333",
@@ -216,7 +216,7 @@ Auth: **OIDC role assumption** (no static keys). Images tagged `<sha>-<run>-<att
 
 1. **Create S3 Vector Bucket** (not regular S3) — name: `posts-semantic-search`
 2. **Create vector index** — name: `posts-content-index`, dimensions: **1024**, distance: **cosine**
-3. **Enable Bedrock models** — `cohere.embed-english-v3` and `anthropic.claude-sonnet-4-6` in Bedrock console
+3. **Enable Bedrock models** — `cohere.embed-english-v3` and `us.anthropic.claude-sonnet-4-6` in Bedrock console
 4. **Configure credentials** — `aws configure` or IAM role
 5. **Test**:
    ```powershell
