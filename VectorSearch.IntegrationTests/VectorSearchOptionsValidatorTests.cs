@@ -12,14 +12,14 @@ public class VectorSearchOptionsValidatorTests
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["AWS:EmbeddingModelId"] = "amazon.titan-embed-text-v2:0",
-            ["AWS:ChatModelId"] = "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+            ["AWS:ChatModelId"] = "anthropic.claude-sonnet-4-6",
             ["VectorStore:Provider"] = "qdrant"
         });
 
         var result = VectorSearchOptionsValidator.Parse(configuration);
 
         result.EmbeddingModelId.Should().Be("amazon.titan-embed-text-v2:0");
-        result.ChatModelId.Should().Be("us.anthropic.claude-3-7-sonnet-20250219-v1:0");
+        result.ChatModelId.Should().Be("anthropic.claude-sonnet-4-6");
         result.VectorStoreProvider.Should().Be(VectorStoreProvider.Qdrant);
     }
 
@@ -28,7 +28,7 @@ public class VectorSearchOptionsValidatorTests
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["AWS:ChatModelId"] = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+            ["AWS:ChatModelId"] = "anthropic.claude-sonnet-4-6"
         });
 
         Action action = () => VectorSearchOptionsValidator.Parse(configuration);
@@ -61,7 +61,7 @@ public class VectorSearchOptionsValidatorTests
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["AWS:EmbeddingModelId"] = "amazon.titan-embed-text-v2:0",
-            ["AWS:ChatModelId"] = "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+            ["AWS:ChatModelId"] = "anthropic.claude-sonnet-4-6",
             ["VectorStore:Provider"] = "pinecone"
         });
 
@@ -81,7 +81,7 @@ public class VectorSearchOptionsValidatorTests
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["AWS:EmbeddingModelId"] = "amazon.titan-embed-text-v2:0",
-            ["AWS:ChatModelId"] = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+            ["AWS:ChatModelId"] = "anthropic.claude-sonnet-4-6"
         });
 
         var result = VectorSearchOptionsValidator.Parse(configuration);
