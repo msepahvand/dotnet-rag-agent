@@ -11,7 +11,7 @@ namespace VectorSearch.S3.Agents;
 /// (microsoft/semantic-kernel#9750), so plugins are called directly rather than dispatched
 /// via FunctionChoiceBehavior.Required/Auto.
 /// </summary>
-public sealed class ResearcherAgent
+public sealed class ResearcherAgent : IResearcherAgent
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 

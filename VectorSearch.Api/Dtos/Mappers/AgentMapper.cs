@@ -15,7 +15,8 @@ public static class AgentMapper
             Grounded = model.Grounded,
             Answer = model.Answer,
             Citations = model.Citations.Select(CitationMapper.ToDto).ToList(),
-            Sources = model.Sources.Select(SourceMapper.ToDto).ToList()
+            Sources = model.Sources.Select(SourceMapper.ToDto).ToList(),
+            Iterations = model.Iterations
         };
 }
 

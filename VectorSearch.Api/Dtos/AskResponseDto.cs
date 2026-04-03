@@ -8,4 +8,5 @@ public sealed record AskResponseDto
     public string Answer { get; init; } = string.Empty;
     public List<CitationDto> Citations { get; init; } = [];
     public List<SourceDto> Sources { get; init; } = [];
+    public int Iterations { get; init; } = 1;
 }

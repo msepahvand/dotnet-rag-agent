@@ -51,9 +51,10 @@ public static class ServiceCollectionExtensions
         // Register the main vector service
         services.AddScoped<IVectorService, VectorService>();
 
-        // Multi-agent: researcher retrieves, writer synthesises
-        services.AddScoped<ResearcherAgent>();
-        services.AddScoped<WriterAgent>();
+        // Multi-agent: researcher retrieves, writer synthesises, critic reflects
+        services.AddScoped<IResearcherAgent, ResearcherAgent>();
+        services.AddScoped<IWriterAgent, WriterAgent>();
+        services.AddScoped<ICriticAgent, CriticAgent>();
         services.AddScoped<IAgentAnswerService, MultiAgentAnswerService>();
 
         return services;

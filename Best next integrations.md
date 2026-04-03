@@ -71,25 +71,25 @@ This is a strong foundation. Everything below builds directly on it.
 
 ## Phase 3 — Multi-Agent Orchestration
 
-### 3.1 Researcher + Writer Pattern
+### ~~3.1 Researcher + Writer Pattern~~ ✅
 
-Split the current monolithic agent into two collaborating agents.
+~~Split the current monolithic agent into two collaborating agents.~~
 
-- **Researcher agent**: has access to `SemanticSearchPlugin`. Retrieves and ranks sources.
-- **Writer agent**: receives sources from researcher. Produces the final grounded answer.
-- Orchestrate with SK's `AgentGroupChat` or a simple sequential handoff in code
-- **Why**: This is the core multi-agent pattern. You learn agent communication, handoff protocols, and separation of concerns.
+- ~~**Researcher agent**: has access to `SemanticSearchPlugin`. Retrieves and ranks sources.~~
+- ~~**Writer agent**: receives sources from researcher. Produces the final grounded answer.~~
+- ~~Orchestrate with SK's `AgentGroupChat` or a simple sequential handoff in code~~
+- **Done**: `ResearcherAgent` → `WriterAgent` sequential handoff in `MultiAgentAnswerService`. Plugins called directly due to Bedrock caveat below.
 
-> ⚠️ **Bedrock caveat:** The SK Bedrock connector does not support `FunctionChoiceBehavior` for Claude models (microsoft/semantic-kernel#9750 — closed but not fixed in SK directly; maintainers deferred to the AWS SDK's `IChatClient`). Do **not** rely on `FunctionChoiceBehavior.Auto/Required` to dispatch tools at runtime — it silently does nothing and the agent returns a plain-text response with empty sources. Use the same workaround as `GroundedAgentAnswerService`: call plugins directly in code, inject results into chat history, then invoke the LLM for synthesis.
+> ⚠️ **Bedrock caveat:** The SK Bedrock connector does not support `FunctionChoiceBehavior` for Claude models (microsoft/semantic-kernel#9750 — closed but not fixed in SK directly; maintainers deferred to the AWS SDK's `IChatClient`). Do **not** rely on `FunctionChoiceBehavior.Auto/Required` to dispatch tools at runtime — it silently does nothing and the agent returns a plain-text response with empty sources. Call plugins directly in code, inject results into chat history, then invoke the LLM for synthesis.
 
-### 3.2 Agent with a Critic / Self-Reflection
+### ~~3.2 Agent with a Critic / Self-Reflection~~ ✅
 
-Add a review loop where a second agent scores the first agent's output.
+~~Add a review loop where a second agent scores the first agent's output.~~
 
-- Critic agent checks: Are citations real? Is the answer grounded? Is it relevant?
-- If the critic rejects, loop back to the researcher with feedback
-- Cap at 2-3 iterations to avoid runaway loops
-- **Why**: Self-reflection / verification loops are what separate toy agents from reliable ones.
+- ~~Critic agent checks: Are citations real? Is the answer grounded? Is it relevant?~~
+- ~~If the critic rejects, loop back to the researcher with feedback~~
+- ~~Cap at 2-3 iterations to avoid runaway loops~~
+- **Done**: `CriticAgent` evaluates citation validity deterministically (postId existence check) then uses the LLM for relevance and groundedness. `MultiAgentAnswerService` runs up to 3 writer passes, passing critic feedback into each retry. `AgentAnswerResult.Iterations` (and `AskResponseDto.Iterations`) exposes how many passes were needed.
 
 ### 3.3 SK Process Framework (Nested Steps)
 

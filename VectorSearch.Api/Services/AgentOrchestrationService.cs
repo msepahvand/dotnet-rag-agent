@@ -30,7 +30,8 @@ public sealed class AgentOrchestrationService(
             Grounded = result.Grounded,
             Answer = result.Answer,
             Citations = result.Citations,
-            Sources = result.Sources
+            Sources = result.Sources,
+            Iterations = result.Iterations
         };
     }
 }

@@ -12,7 +12,7 @@ namespace VectorSearch.S3.Agents;
 /// Responsible solely for synthesis. Receives pre-retrieved sources from the researcher agent
 /// and produces a grounded, structured answer with citations.
 /// </summary>
-public sealed class WriterAgent
+public sealed class WriterAgent : IWriterAgent
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
@@ -37,7 +37,8 @@ public sealed class WriterAgent
     public async Task<AgentAnswerResult> WriteAsync(
         string question,
         ResearchResult research,
-        IReadOnlyList<ChatMessage> history)
+        IReadOnlyList<ChatMessage> history,
+        string? criticFeedback = null)
     {
         var chatHistory = new ChatHistory(SystemPrompt);
 
@@ -54,6 +55,14 @@ public sealed class WriterAgent
 
         chatHistory.AddUserMessage(question);
         chatHistory.AddUserMessage($"Search results:\n{research.SourcesJson}");
+
+        if (!string.IsNullOrWhiteSpace(criticFeedback))
+        {
+            chatHistory.AddUserMessage(
+                $"A critic reviewed a previous draft of this answer and identified the following issues: " +
+                $"{criticFeedback} Please address these issues in your revised answer.");
+        }
+
         chatHistory.AddUserMessage(SynthesisInstruction);
 
         var settings = new AmazonClaudeExecutionSettings
