@@ -160,6 +160,28 @@
         "iam:GetOpenIDConnectProvider"
       ],
       "Resource": "arn:aws:iam::__AWS_ACCOUNT_ID__:oidc-provider/token.actions.githubusercontent.com"
+    },
+    {
+      "Sid": "S3TfState",
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket",
+        "s3:DeleteBucket",
+        "s3:GetBucketVersioning",
+        "s3:GetEncryptionConfiguration",
+        "s3:GetObject",
+        "s3:HeadBucket",
+        "s3:ListBucket",
+        "s3:PutBucketEncryption",
+        "s3:PutBucketPublicAccessBlock",
+        "s3:PutBucketVersioning",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::dotnet-rag-agent-tf-state",
+        "arn:aws:s3:::dotnet-rag-agent-tf-state/*"
+      ]
     }
   ]
 }
