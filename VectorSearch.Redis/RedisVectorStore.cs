@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NRedisStack;
 using NRedisStack.RedisStackCommands;
 using NRedisStack.Search;
@@ -14,9 +16,15 @@ public class RedisVectorStore : IVectorStore, IDisposable
     private readonly IDatabase _db;
     private readonly SearchCommands _ft;
     private readonly string _indexName;
+    private readonly ILogger<RedisVectorStore> _logger;
 
+    // Parameterless-logger overload used by Activator.CreateInstance in tests/tooling.
     public RedisVectorStore(IConfiguration configuration)
+        : this(configuration, NullLogger<RedisVectorStore>.Instance) { }
+
+    public RedisVectorStore(IConfiguration configuration, ILogger<RedisVectorStore> logger)
     {
+        _logger = logger;
         var connectionString = configuration["VectorStore:Redis:ConnectionString"] ?? "localhost:6379";
         _indexName = configuration["VectorStore:Redis:IndexName"] ?? "posts_idx";
 
@@ -32,8 +40,9 @@ public class RedisVectorStore : IVectorStore, IDisposable
             await _ft.InfoAsync(_indexName);
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogDebug(ex, "Failed to check if Redis index {IndexName} exists", _indexName);
             return false;
         }
     }

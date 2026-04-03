@@ -8,15 +8,13 @@ namespace VectorSearch.S3;
 
 public sealed class SemanticSearchPlugin(IVectorService vectorService, IPostService postService)
 {
-    public const string PluginName = "SemanticSearch";
-
     [KernelFunction("search_posts")]
     [Description("Runs semantic search over indexed posts and returns grounded sources with PostId, title, snippet, and distance.")]
     public async Task<string> SearchPostsAsync(
         [Description("Natural language question to search for.")] string question,
         [Description("Maximum number of results to return, between 1 and 10.")] int topK = 5)
     {
-        var normalizedTopK = topK <= 0 ? 5 : Math.Min(topK, 10);
+        var normalizedTopK = TopKNormaliser.Normalise(topK);
         var searchResults = await vectorService.SemanticSearchAsync(question, normalizedTopK);
 
         var sourceCandidates = await Task.WhenAll(
@@ -50,11 +48,8 @@ public sealed class SemanticSearchPlugin(IVectorService vectorService, IPostServ
             return string.Empty;
         }
 
-        if (content.Length <= maxLength)
-        {
-            return content;
-        }
-
-        return $"{content[..maxLength].TrimEnd()}...";
+        return content.Length <= maxLength
+            ? content
+            : $"{content[..maxLength].TrimEnd()}...";
     }
 }

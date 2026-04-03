@@ -13,7 +13,7 @@ public sealed class AgentOrchestrationService(
             ? Guid.NewGuid().ToString()
             : request.ConversationId;
 
-        var topK = request.TopK <= 0 ? 5 : Math.Min(request.TopK, 10);
+        var topK = TopKNormaliser.Normalise(request.TopK);
 
         var history = await conversationStore.GetHistoryAsync(conversationId);
 

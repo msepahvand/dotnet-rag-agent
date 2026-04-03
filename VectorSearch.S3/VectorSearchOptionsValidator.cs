@@ -20,10 +20,13 @@ public static class VectorSearchOptionsValidator
     {
         var embeddingModelId = ParseRequiredModelId(configuration, "AWS:EmbeddingModelId");
         var chatModelId = ParseRequiredModelId(configuration, "AWS:ChatModelId");
-        var vectorStoreProvider = ParseVectorStoreProvider(configuration);
+        var vectorStoreProvider = ParseProvider(configuration);
 
         return new VectorSearchOptions(embeddingModelId, chatModelId, vectorStoreProvider);
     }
+
+    public static VectorStoreProvider ParseProvider(IConfiguration configuration)
+        => ParseVectorStoreProvider(configuration);
 
     private static VectorStoreProvider ParseVectorStoreProvider(IConfiguration configuration)
     {

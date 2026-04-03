@@ -17,7 +17,6 @@ VectorSearch.Core/                  # Shared abstractions & models
 
 VectorSearch.S3/                    # AWS & Qdrant implementations
 ├── EmbeddingService.cs             # Bedrock Titan embeddings
-├── MockEmbeddingService.cs         # Deterministic embeddings for local dev
 ├── S3VectorStore.cs, S3VectorService.cs, QdrantVectorStore.cs
 ├── HackerNewsService.cs            # Data source
 ├── GroundedAgentAnswerService.cs   # SK-based grounded answer agent
@@ -29,7 +28,7 @@ VectorSearch.S3/                    # AWS & Qdrant implementations
 
 VectorSearch.Redis/                 # RedisVectorStore.cs
 VectorSearch.Api/                   # Controllers (Agent, Index, Posts, Search) + thin Services
-VectorSearch.IntegrationTests/      # 22 tests: 7 Theory×2 providers + 5 validator + 3 plugin
+VectorSearch.IntegrationTests/      # 22 tests: 7 Theory×2 providers + 5 validator + 3 plugin; MockEmbeddingService
 ```
 
 ---

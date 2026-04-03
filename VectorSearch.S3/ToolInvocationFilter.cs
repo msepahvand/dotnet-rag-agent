@@ -1,14 +1,12 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
+using VectorSearch.Core;
 
 namespace VectorSearch.S3;
 
 public sealed class ToolInvocationFilter(ILogger<ToolInvocationFilter> logger) : IFunctionInvocationFilter
 {
-    private const int DefaultTopK = 5;
-    private const int MaxTopK = 10;
-
     public async Task OnFunctionInvocationAsync(
         FunctionInvocationContext context,
         Func<FunctionInvocationContext, Task> next)
@@ -58,12 +56,11 @@ public sealed class ToolInvocationFilter(ILogger<ToolInvocationFilter> logger) :
 
         if (!TryParseInt(rawValue, out var parsedTopK))
         {
-            arguments["topK"] = DefaultTopK;
+            arguments["topK"] = TopKNormaliser.Default;
             return;
         }
 
-        var normalized = parsedTopK <= 0 ? DefaultTopK : Math.Min(parsedTopK, MaxTopK);
-        arguments["topK"] = normalized;
+        arguments["topK"] = TopKNormaliser.Normalise(parsedTopK);
     }
 
     private static bool TryParseInt(object value, out int parsed)

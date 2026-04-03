@@ -42,8 +42,6 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEmbeddingService, EmbeddingService>();
         services.AddScoped<SemanticSearchPlugin>();
 
-        RegisterVectorStore(services, options.VectorStoreProvider);
-
         // Register the main vector service
         services.AddScoped<IVectorService, VectorService>();
 
@@ -55,36 +53,16 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    private static void RegisterVectorStore(
-        IServiceCollection services,
-        VectorStoreProvider vectorProvider)
+    public static IServiceCollection AddQdrantVectorStore(this IServiceCollection services)
     {
-        switch (vectorProvider)
-        {
-            case VectorStoreProvider.Qdrant:
-                services.AddHttpClient<IVectorStore, QdrantVectorStore>();
-                break;
+        services.AddHttpClient<IVectorStore, QdrantVectorStore>();
+        return services;
+    }
 
-            case VectorStoreProvider.Redis:
-                // Late-bind Redis implementation so this project can compile/run without a hard project reference.
-                services.AddScoped<IVectorStore>(sp =>
-                {
-                    var config = sp.GetRequiredService<IConfiguration>();
-                    var redisStoreType = Type.GetType("VectorSearch.Redis.RedisVectorStore, VectorSearch.Redis");
-                    if (redisStoreType == null)
-                    {
-                        throw new InvalidOperationException("Redis provider requires VectorSearch.Redis project reference");
-                    }
-
-                    return (IVectorStore)Activator.CreateInstance(redisStoreType, config)!;
-                });
-                break;
-
-            case VectorStoreProvider.S3Vectors:
-            default:
-                services.AddAWSService<IAmazonS3Vectors>();
-                services.AddScoped<IVectorStore, S3VectorStore>();
-                break;
-        }
+    public static IServiceCollection AddS3VectorsVectorStore(this IServiceCollection services)
+    {
+        services.AddAWSService<IAmazonS3Vectors>();
+        services.AddScoped<IVectorStore, S3VectorStore>();
+        return services;
     }
 }

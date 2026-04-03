@@ -19,6 +19,7 @@ public class Program
         builder.Services.AddFluentValidationAutoValidation();
         builder.Services.AddValidatorsFromAssemblyContaining<Program>();
         builder.Services.AddVectorSearch(builder.Configuration);
+        builder.Services.AddVectorStoreProvider(builder.Configuration);
         builder.Services.AddScoped<IPostsQueryService, PostsQueryService>();
         builder.Services.AddScoped<IPostIndexingService, PostIndexingService>();
         builder.Services.AddScoped<ISemanticSearchService, SemanticSearchService>();

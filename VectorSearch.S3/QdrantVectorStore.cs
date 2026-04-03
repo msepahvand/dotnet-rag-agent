@@ -35,8 +35,9 @@ public class QdrantVectorStore : IVectorStore
             var response = await _httpClient.GetAsync($"/collections/{_collectionName}");
             return response.IsSuccessStatusCode;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogDebug(ex, "Failed to check if Qdrant collection {CollectionName} exists", _collectionName);
             return false;
         }
     }

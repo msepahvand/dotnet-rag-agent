@@ -5,7 +5,7 @@ using System.Threading.Channels;
 using VectorSearch.Core;
 using VectorSearch.Core.Models;
 
-namespace VectorSearch.S3;
+namespace VectorSearch.IntegrationTests;
 
 public class MockEmbeddingService : IEmbeddingService
 {

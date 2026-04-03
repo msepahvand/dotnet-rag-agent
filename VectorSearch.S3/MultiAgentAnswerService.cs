@@ -22,7 +22,7 @@ public sealed class MultiAgentAnswerService : IAgentAnswerService
     public async Task<AgentAnswerResult> AnswerAsync(
         string question, int topK, IReadOnlyList<ChatMessage> history)
     {
-        var normalisedTopK = topK <= 0 ? 5 : Math.Min(topK, 10);
+        var normalisedTopK = TopKNormaliser.Normalise(topK);
 
         var research = await _researcher.ResearchAsync(question, normalisedTopK);
         return await _writer.WriteAsync(question, research, history);
