@@ -16,7 +16,7 @@ public class SemanticSearchPluginIntegrationTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["AWS:EmbeddingModelId"] = "amazon.titan-embed-text-v2:0",
-                ["AWS:ChatModelId"] = "anthropic.claude-3-haiku-20240307-v1:0",
+                ["AWS:ChatModelId"] = "anthropic.claude-3-5-sonnet-20241022-v2:0",
                 ["VectorStore:Provider"] = "Qdrant"
             })
             .Build();
