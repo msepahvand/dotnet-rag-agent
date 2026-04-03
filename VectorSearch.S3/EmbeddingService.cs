@@ -1,6 +1,6 @@
-using Microsoft.Extensions.AI;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
+using Microsoft.Extensions.AI;
 using VectorSearch.Core;
 using VectorSearch.Core.Models;
 
@@ -32,7 +32,7 @@ public class EmbeddingService : IEmbeddingService
             async (post, ct) =>
             {
                 var content = $"{post.Title}\n\n{post.Body}";
-                var embedding = await GenerateEmbeddingAsync(content);
+                var embedding = await GenerateAsync(content, "search_document", ct);
                 await channel.Writer.WriteAsync((post.Id, embedding), ct);
             });
 
@@ -46,9 +46,22 @@ public class EmbeddingService : IEmbeddingService
         }
     }
 
-    public async Task<float[]> GenerateEmbeddingAsync(string text)
+    public Task<float[]> GenerateEmbeddingAsync(string text)
+        => GenerateAsync(text, "search_query");
+
+    private async Task<float[]> GenerateAsync(
+        string text,
+        string inputType,
+        CancellationToken cancellationToken = default)
     {
-        var result = await _embeddingGenerator.GenerateAsync([text]);
+        var options = new EmbeddingGenerationOptions
+        {
+            AdditionalProperties = new AdditionalPropertiesDictionary
+            {
+                ["input_type"] = inputType
+            }
+        };
+        var result = await _embeddingGenerator.GenerateAsync([text], options, cancellationToken);
         return result[0].Vector.ToArray();
     }
 }

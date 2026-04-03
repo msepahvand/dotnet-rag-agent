@@ -32,10 +32,14 @@ internal sealed class CohereEmbeddingGenerator : IEmbeddingGenerator<string, Emb
     {
         var texts = values.ToList();
 
+        var inputType = options?.AdditionalProperties?.TryGetValue("input_type", out var it) == true
+            ? it?.ToString() ?? "search_document"
+            : "search_document";
+
         var body = JsonSerializer.Serialize(new CohereEmbedRequest
         {
             Texts = texts,
-            InputType = "search_document",
+            InputType = inputType,
             Truncate = "NONE"
         });
 
