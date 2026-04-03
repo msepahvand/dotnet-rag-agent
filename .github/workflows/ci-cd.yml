@@ -13,9 +13,9 @@ on:
 
 env:
   AWS_REGION_DEFAULT: us-east-1
-  ECR_REPO_DEFAULT: dotnet-vector-search
-  ECS_CLUSTER_DEFAULT: dotnet-vector-search
-  ECS_SERVICE_DEFAULT: dotnet-vector-search
+  ECR_REPO_DEFAULT: dotnet-rag-agent
+  ECS_CLUSTER_DEFAULT: dotnet-rag-agent
+  ECS_SERVICE_DEFAULT: dotnet-rag-agent
 
 jobs:
   build-and-test:

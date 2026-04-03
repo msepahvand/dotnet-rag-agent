@@ -38,8 +38,8 @@ VectorSearch.IntegrationTests/      # 22 tests: 7 Theory×2 providers + 5 valida
 **Prerequisites**: .NET 8.0 SDK, Docker Desktop, AWS account (S3 Vectors only)
 
 ```powershell
-git clone https://github.com/msepahvand/dotnet-vector-search.git
-cd dotnet-vector-search
+git clone https://github.com/msepahvand/dotnet-rag-agent.git
+cd dotnet-rag-agent
 docker-compose up          # starts Redis, Qdrant, and API
 ```
 
@@ -162,7 +162,7 @@ dotnet test --filter "provider=Redis"                          # single provider
 ### Docker
 
 ```powershell
-docker build -t vectorsearch-api -f VectorSearch.Api/Dockerfile .
+docker build -t rag-agent-api -f VectorSearch.Api/Dockerfile .
 docker run -p 8080:8080 vectorsearch-api
 ```
 
@@ -183,8 +183,8 @@ Auth: **OIDC role assumption** (no static keys). Images tagged `<sha>-<run>-<att
 | `AWS_INFRA_ROLE_ARN` | Yes | OIDC role for Terraform + deploy |
 | `AWS_ACCOUNT_ID` | Yes | For ECR URI |
 | `AWS_REGION` | No | Defaults to `us-east-1` |
-| `ECR_REPOSITORY` | No | Defaults to `dotnet-vector-search` |
-| `APP_RUNNER_SERVICE_NAME` | No | Defaults to `dotnet-vector-search` |
+| `ECR_REPOSITORY` | No | Defaults to `dotnet-rag-agent` |
+| `APP_RUNNER_SERVICE_NAME` | No | Defaults to `dotnet-rag-agent` |
 | `APP_RUNNER_SERVICE_ARN` | No | Auto-resolved from name |
 | `APP_RUNNER_ECR_ACCESS_ROLE_ARN` | New service only | ECR pull role |
 | `APP_RUNNER_INSTANCE_ROLE_ARN` | New service only | Bedrock/S3 Vectors access |

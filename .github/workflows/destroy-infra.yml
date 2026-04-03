@@ -29,17 +29,17 @@ on:
       ecr_repository_name:
         description: "ECR repository name"
         required: false
-        default: "dotnet-vector-search"
+        default: "dotnet-rag-agent"
         type: string
       ecs_cluster_name:
         description: "ECS cluster name"
         required: false
-        default: "dotnet-vector-search"
+        default: "dotnet-rag-agent"
         type: string
       ecs_service_name:
         description: "ECS service name"
         required: false
-        default: "dotnet-vector-search"
+        default: "dotnet-rag-agent"
         type: string
 
 jobs:
@@ -70,9 +70,9 @@ jobs:
           AWS_REGION: ${{ github.event.inputs.aws_region || 'us-east-1' }}
           VECTOR_BUCKET_NAME: ${{ github.event.inputs.vector_bucket_name || 'posts-semantic-search' }}
           VECTOR_INDEX_NAME: ${{ github.event.inputs.vector_index_name || 'posts-content-index' }}
-          ECR_REPOSITORY_NAME: ${{ github.event.inputs.ecr_repository_name || 'dotnet-vector-search' }}
-          ECS_CLUSTER_NAME: ${{ github.event.inputs.ecs_cluster_name || 'dotnet-vector-search' }}
-          ECS_SERVICE_NAME: ${{ github.event.inputs.ecs_service_name || 'dotnet-vector-search' }}
+          ECR_REPOSITORY_NAME: ${{ github.event.inputs.ecr_repository_name || 'dotnet-rag-agent' }}
+          ECS_CLUSTER_NAME: ${{ github.event.inputs.ecs_cluster_name || 'dotnet-rag-agent' }}
+          ECS_SERVICE_NAME: ${{ github.event.inputs.ecs_service_name || 'dotnet-rag-agent' }}
         run: |
           terraform init -reconfigure
 
@@ -142,8 +142,8 @@ jobs:
       - name: Drain ECS tasks and deregister task definitions
         env:
           AWS_REGION: ${{ github.event.inputs.aws_region || 'us-east-1' }}
-          ECS_CLUSTER_NAME: ${{ github.event.inputs.ecs_cluster_name || 'dotnet-vector-search' }}
-          ECS_SERVICE_NAME: ${{ github.event.inputs.ecs_service_name || 'dotnet-vector-search' }}
+          ECS_CLUSTER_NAME: ${{ github.event.inputs.ecs_cluster_name || 'dotnet-rag-agent' }}
+          ECS_SERVICE_NAME: ${{ github.event.inputs.ecs_service_name || 'dotnet-rag-agent' }}
         run: |
           # Scale service to 0 so all running tasks stop before we destroy
           SERVICE_STATUS=$(aws ecs describe-services \
@@ -193,8 +193,8 @@ jobs:
           AWS_REGION: ${{ github.event.inputs.aws_region || 'us-east-1' }}
           VECTOR_BUCKET_NAME: ${{ github.event.inputs.vector_bucket_name || 'posts-semantic-search' }}
           VECTOR_INDEX_NAME: ${{ github.event.inputs.vector_index_name || 'posts-content-index' }}
-          ECR_REPOSITORY_NAME: ${{ github.event.inputs.ecr_repository_name || 'dotnet-vector-search' }}
-          ECS_CLUSTER_NAME: ${{ github.event.inputs.ecs_cluster_name || 'dotnet-vector-search' }}
-          ECS_SERVICE_NAME: ${{ github.event.inputs.ecs_service_name || 'dotnet-vector-search' }}
+          ECR_REPOSITORY_NAME: ${{ github.event.inputs.ecr_repository_name || 'dotnet-rag-agent' }}
+          ECS_CLUSTER_NAME: ${{ github.event.inputs.ecs_cluster_name || 'dotnet-rag-agent' }}
+          ECS_SERVICE_NAME: ${{ github.event.inputs.ecs_service_name || 'dotnet-rag-agent' }}
         run: |
           bash ./destroy-app-stack.sh

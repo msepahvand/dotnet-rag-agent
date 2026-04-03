@@ -90,19 +90,19 @@ variable "vector_data_type" {
 variable "ecr_repository_name" {
   description = "ECR repository name used for the API container image"
   type        = string
-  default     = "dotnet-vector-search"
+  default     = "dotnet-rag-agent"
 }
 
 variable "ecs_cluster_name" {
   description = "ECS cluster name"
   type        = string
-  default     = "dotnet-vector-search"
+  default     = "dotnet-rag-agent"
 }
 
 variable "ecs_service_name" {
   description = "ECS service name for the API"
   type        = string
-  default     = "dotnet-vector-search"
+  default     = "dotnet-rag-agent"
 }
 
 variable "ecs_container_name" {
