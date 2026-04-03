@@ -132,7 +132,7 @@ jobs:
               --query "clusters[?status=='ACTIVE'].clusterArn | [0]" \
               --output text 2>/dev/null || true)
             if [ "$CLUSTER_ARN" != "None" ] && [ -n "$CLUSTER_ARN" ]; then
-              tf_import "$ECS_CLUSTER_ADDRESS" "$CLUSTER_ARN"
+              tf_import "$ECS_CLUSTER_ADDRESS" "$ECS_CLUSTER_NAME"
             fi
           fi
 
