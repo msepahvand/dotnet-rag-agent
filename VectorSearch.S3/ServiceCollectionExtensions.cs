@@ -1,5 +1,6 @@
 using Amazon.BedrockRuntime;
 using Amazon.S3Vectors;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
@@ -25,7 +26,12 @@ public static class ServiceCollectionExtensions
         });
 
         // Configure Semantic Kernel + embedding pipeline once for all providers.
-        services.AddBedrockEmbeddingGenerator(options.EmbeddingModelId);
+        // Cohere Embed v3 uses a different request schema from Titan, so we use
+        // a custom generator rather than the SK connector's BedrockEmbeddingGenerator.
+        services.AddScoped<IEmbeddingGenerator<string, Embedding<float>>>(sp =>
+            new CohereEmbeddingGenerator(
+                sp.GetRequiredService<IAmazonBedrockRuntime>(),
+                options.EmbeddingModelId));
         services.AddBedrockChatCompletionService(options.ChatModelId);
         services.AddScoped<IFunctionInvocationFilter, ToolInvocationFilter>();
         services.AddTransient(sp =>
