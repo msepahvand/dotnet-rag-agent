@@ -92,6 +92,7 @@ jobs:
           ECS_SERVICE_ADDRESS="aws_ecs_service.api"
           SG_ALB_ADDRESS="aws_security_group.alb"
           SG_TASKS_ADDRESS="aws_security_group.ecs_tasks"
+          ALB_ADDRESS="aws_lb.api"
           TG_ADDRESS="aws_lb_target_group.api"
           IAM_EXEC_ADDRESS="aws_iam_role.ecs_task_execution"
           IAM_TASK_ADDRESS="aws_iam_role.ecs_task"
@@ -182,6 +183,15 @@ jobs:
               --query "TargetGroups[0].TargetGroupArn" --output text 2>/dev/null || true)
             if [ "$TG_ARN" != "None" ] && [ -n "$TG_ARN" ]; then
               tf_import "$TG_ADDRESS" "$TG_ARN"
+            fi
+          fi
+
+          if ! tf_has "$ALB_ADDRESS"; then
+            ALB_ARN=$(aws elbv2 describe-load-balancers --region "$REGION" \
+              --names "$ECS_SERVICE_NAME" \
+              --query "LoadBalancers[0].LoadBalancerArn" --output text 2>/dev/null || true)
+            if [ "$ALB_ARN" != "None" ] && [ -n "$ALB_ARN" ]; then
+              tf_import "$ALB_ADDRESS" "$ALB_ARN"
             fi
           fi
 
