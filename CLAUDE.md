@@ -35,8 +35,8 @@ Use conventional commit prefixes:
 - Always run `terraform fmt -recursive` and `terraform validate` before committing any Terraform change.
 - Run both via Docker (local Terraform may not work). Use `MSYS_NO_PATHCONV=1` to prevent Git Bash from mangling paths:
   ```
-  MSYS_NO_PATHCONV=1 docker run --rm -v "c:/src/dotnet-vector-search/infra:/workspace" -w /workspace hashicorp/terraform:1.5.0 fmt -recursive
-  MSYS_NO_PATHCONV=1 docker run --rm -v "c:/src/dotnet-vector-search/infra:/workspace" -w /workspace hashicorp/terraform:1.5.0 validate
+  MSYS_NO_PATHCONV=1 docker run --rm -v "c:/src/dotnet-rag-agent/infra:/workspace" -w /workspace hashicorp/terraform:1.5.0 fmt -recursive
+  MSYS_NO_PATHCONV=1 docker run --rm -v "c:/src/dotnet-rag-agent/infra:/workspace" -w /workspace hashicorp/terraform:1.5.0 validate
   ```
 
 ## Roadmap (Next Integrations)

@@ -1,7 +1,7 @@
 variable "tf_state_bucket_name" {
   description = "Name of the S3 bucket for Terraform state"
   type        = string
-  default     = "dotnet-vector-search-tf-state"
+  default     = "dotnet-rag-agent-tf-state"
 }
 
 variable "github_repo" {

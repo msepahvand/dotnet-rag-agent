@@ -12,7 +12,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket  = "dotnet-vector-search-tf-state"
+    bucket  = "dotnet-rag-agent-tf-state"
     key     = "global/terraform.tfstate"
     region  = "us-east-1"
     encrypt = true
