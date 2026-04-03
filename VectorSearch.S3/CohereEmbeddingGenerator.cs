@@ -41,12 +41,13 @@ internal sealed class CohereEmbeddingGenerator : IEmbeddingGenerator<string, Emb
 
         var response = await _bedrockRuntime.InvokeModelAsync(
             new InvokeModelRequest
-        {
-            ModelId = _modelId,
-            ContentType = "application/json",
-            Accept = "application/json",
-            Body = new MemoryStream(Encoding.UTF8.GetBytes(body))
-        }, cancellationToken);
+            {
+                ModelId = _modelId,
+                ContentType = "application/json",
+                Accept = "application/json",
+                Body = new MemoryStream(Encoding.UTF8.GetBytes(body))
+            },
+            cancellationToken);
 
         using var doc = await JsonDocument.ParseAsync(response.Body, cancellationToken: cancellationToken);
 
