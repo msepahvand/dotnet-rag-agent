@@ -73,6 +73,8 @@ jobs:
           ECR_REPOSITORY_NAME: ${{ github.event.inputs.ecr_repository_name || 'dotnet-rag-agent' }}
           ECS_CLUSTER_NAME: ${{ github.event.inputs.ecs_cluster_name || 'dotnet-rag-agent' }}
           ECS_SERVICE_NAME: ${{ github.event.inputs.ecs_service_name || 'dotnet-rag-agent' }}
+          TF_VAR_github_repo: ${{ github.repository }}
+          TF_VAR_github_branch: ${{ github.ref }}
         run: |
           terraform init -reconfigure
 
@@ -82,6 +84,12 @@ jobs:
           ECR_ADDRESS="aws_ecr_repository.api"
           ECS_CLUSTER_ADDRESS="aws_ecs_cluster.api"
           ECS_SERVICE_ADDRESS="aws_ecs_service.api"
+          SG_ALB_ADDRESS="aws_security_group.alb"
+          SG_TASKS_ADDRESS="aws_security_group.ecs_tasks"
+          TG_ADDRESS="aws_lb_target_group.api"
+          IAM_EXEC_ADDRESS="aws_iam_role.ecs_task_execution"
+          IAM_TASK_ADDRESS="aws_iam_role.ecs_task"
+          CW_LOG_ADDRESS="aws_cloudwatch_log_group.api"
           VECTOR_BUCKET_EXISTS="false"
 
           if ! terraform state show "$BUCKET_ADDRESS" >/dev/null 2>&1; then
@@ -123,7 +131,7 @@ jobs:
               --query "clusters[?status=='ACTIVE'].clusterArn | [0]" \
               --output text 2>/dev/null || true)
             if [ "$CLUSTER_ARN" != "None" ] && [ -n "$CLUSTER_ARN" ]; then
-              terraform import "$ECS_CLUSTER_ADDRESS" "$CLUSTER_ARN"
+              terraform import "$ECS_CLUSTER_ADDRESS" "$ECS_CLUSTER_NAME"
             fi
           fi
 
@@ -136,6 +144,59 @@ jobs:
               --output text 2>/dev/null || true)
             if [ "$SERVICE_ARN" != "None" ] && [ -n "$SERVICE_ARN" ]; then
               terraform import "$ECS_SERVICE_ADDRESS" "$ECS_CLUSTER_NAME/$ECS_SERVICE_NAME"
+            fi
+          fi
+
+          VPC_ID=$(aws ec2 describe-vpcs --region "$AWS_REGION" \
+            --filters "Name=isDefault,Values=true" \
+            --query "Vpcs[0].VpcId" --output text 2>/dev/null || true)
+
+          if ! terraform state show "$SG_ALB_ADDRESS" >/dev/null 2>&1; then
+            SG_ALB_ID=$(aws ec2 describe-security-groups --region "$AWS_REGION" \
+              --filters "Name=group-name,Values=${ECS_SERVICE_NAME}-alb" "Name=vpc-id,Values=$VPC_ID" \
+              --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || true)
+            if [ "$SG_ALB_ID" != "None" ] && [ -n "$SG_ALB_ID" ]; then
+              terraform import "$SG_ALB_ADDRESS" "$SG_ALB_ID"
+            fi
+          fi
+
+          if ! terraform state show "$SG_TASKS_ADDRESS" >/dev/null 2>&1; then
+            SG_TASKS_ID=$(aws ec2 describe-security-groups --region "$AWS_REGION" \
+              --filters "Name=group-name,Values=${ECS_SERVICE_NAME}-tasks" "Name=vpc-id,Values=$VPC_ID" \
+              --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || true)
+            if [ "$SG_TASKS_ID" != "None" ] && [ -n "$SG_TASKS_ID" ]; then
+              terraform import "$SG_TASKS_ADDRESS" "$SG_TASKS_ID"
+            fi
+          fi
+
+          if ! terraform state show "$TG_ADDRESS" >/dev/null 2>&1; then
+            TG_ARN=$(aws elbv2 describe-target-groups --region "$AWS_REGION" \
+              --names "$ECS_SERVICE_NAME" \
+              --query "TargetGroups[0].TargetGroupArn" --output text 2>/dev/null || true)
+            if [ "$TG_ARN" != "None" ] && [ -n "$TG_ARN" ]; then
+              terraform import "$TG_ADDRESS" "$TG_ARN"
+            fi
+          fi
+
+          if ! terraform state show "$IAM_EXEC_ADDRESS" >/dev/null 2>&1; then
+            if aws iam get-role --role-name EcsTaskExecutionRole >/dev/null 2>&1; then
+              terraform import "$IAM_EXEC_ADDRESS" "EcsTaskExecutionRole"
+            fi
+          fi
+
+          if ! terraform state show "$IAM_TASK_ADDRESS" >/dev/null 2>&1; then
+            if aws iam get-role --role-name EcsTaskRole >/dev/null 2>&1; then
+              terraform import "$IAM_TASK_ADDRESS" "EcsTaskRole"
+            fi
+          fi
+
+          if ! terraform state show "$CW_LOG_ADDRESS" >/dev/null 2>&1; then
+            LOG_GROUP=$(aws logs describe-log-groups --region "$AWS_REGION" \
+              --log-group-name-prefix "/ecs/$ECS_SERVICE_NAME" \
+              --query "logGroups[?logGroupName=='/ecs/$ECS_SERVICE_NAME'].logGroupName | [0]" \
+              --output text 2>/dev/null || true)
+            if [ "$LOG_GROUP" != "None" ] && [ -n "$LOG_GROUP" ]; then
+              terraform import "$CW_LOG_ADDRESS" "/ecs/$ECS_SERVICE_NAME"
             fi
           fi
 
