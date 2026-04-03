@@ -73,51 +73,19 @@ jobs:
           terraform -chdir=infra init -reconfigure
 
           # Ensure ECR repository exists before pushing any image
-          terraform -chdir=infra apply -auto-approve \
-            -target=aws_ecr_repository.api \
-            -var="github_repo=${{ github.repository }}" \
-            -var="github_branch=${{ github.ref }}" \
-            -var="aws_region=$REGION"
+          terraform -chdir=infra apply -auto-approve -target=aws_ecr_repository.api
 
           # Push a bootstrap image if the repository is empty (ECS requires an image to start)
           ECR_REPO="${{ secrets.ECR_REPOSITORY || env.ECR_REPO_DEFAULT }}"
-          ECR_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$ECR_REPO"
-          IMAGE_COUNT=$(aws ecr list-images --repository-name "$ECR_REPO" --region "$REGION" \
-            --query 'length(imageIds)' --output text 2>/dev/null || echo "0")
-          if [ "$IMAGE_COUNT" = "0" ] || [ "$IMAGE_COUNT" = "None" ]; then
-            echo "ECR is empty — building and pushing bootstrap image..."
-            aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
-            docker build -f VectorSearch.Api/Dockerfile -t "$ECR_URI:latest" .
-            docker push "$ECR_URI:latest"
-          else
-            echo "ECR already has $IMAGE_COUNT image(s) — skipping bootstrap."
-          fi
+          bash scripts/bootstrap-ecr-image.sh "$REGION" "$ACCOUNT_ID" "$ECR_REPO"
 
           # Full infrastructure apply now that a valid image exists in ECR
-          terraform -chdir=infra apply -auto-approve \
-            -var="github_repo=${{ github.repository }}" \
-            -var="github_branch=${{ github.ref }}" \
-            -var="aws_region=$REGION"
+          terraform -chdir=infra apply -auto-approve
 
           # Verify S3 Vectors resources
           VECTOR_BUCKET_NAME=$(terraform -chdir=infra output -raw vector_bucket_name)
           VECTOR_INDEX_NAME=$(terraform -chdir=infra output -raw vector_index_name)
-          BUCKET_FOUND=$(aws s3vectors list-vector-buckets \
-            --region "$REGION" \
-            --query "vectorBuckets[?vectorBucketName=='$VECTOR_BUCKET_NAME'].vectorBucketName | [0]" \
-            --output text)
-          if [ "$BUCKET_FOUND" = "None" ] || [ -z "$BUCKET_FOUND" ]; then
-            echo "S3 Vectors bucket '$VECTOR_BUCKET_NAME' not found in '$REGION'." >&2; exit 1
-          fi
-          INDEX_FOUND=$(aws s3vectors list-indexes \
-            --region "$REGION" \
-            --vector-bucket-name "$VECTOR_BUCKET_NAME" \
-            --query "indexes[?indexName=='$VECTOR_INDEX_NAME'].indexName | [0]" \
-            --output text)
-          if [ "$INDEX_FOUND" = "None" ] || [ -z "$INDEX_FOUND" ]; then
-            echo "S3 Vectors index '$VECTOR_INDEX_NAME' not found in '$VECTOR_BUCKET_NAME'." >&2; exit 1
-          fi
-          echo "S3 Vectors verification succeeded."
+          bash scripts/verify-s3-vectors.sh "$REGION" "$VECTOR_BUCKET_NAME" "$VECTOR_INDEX_NAME"
 
   deploy:
     name: Deploy to ECS
@@ -150,39 +118,4 @@ jobs:
           docker push "$IMAGE_URI"
 
       - name: Deploy to ECS
-        run: |
-          CURRENT_TASK_DEF=$(aws ecs describe-task-definition \
-            --task-definition "$ECS_SERVICE_NAME" \
-            --region "$REGION" \
-            --query 'taskDefinition' \
-            --output json)
-
-          NEW_TASK_DEF=$(echo "$CURRENT_TASK_DEF" | jq \
-            --arg IMAGE "$IMAGE_URI" \
-            '.containerDefinitions[0].image = $IMAGE |
-             del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
-                 .placementConstraints, .compatibilities, .registeredAt, .registeredBy)')
-
-          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
-            --region "$REGION" \
-            --cli-input-json "$NEW_TASK_DEF" \
-            --query 'taskDefinition.taskDefinitionArn' \
-            --output text)
-
-          echo "New task definition: $NEW_TASK_DEF_ARN"
-
-          # Rolling deployment: ECS starts the new task, waits for it to be healthy,
-          # then stops the old task. No downtime.
-          aws ecs update-service \
-            --cluster "$ECS_CLUSTER_NAME" \
-            --service "$ECS_SERVICE_NAME" \
-            --task-definition "$NEW_TASK_DEF_ARN" \
-            --region "$REGION"
-
-          echo "Waiting for rolling deployment to stabilise..."
-          aws ecs wait services-stable \
-            --cluster "$ECS_CLUSTER_NAME" \
-            --services "$ECS_SERVICE_NAME" \
-            --region "$REGION"
-
-          echo "Deployment complete."
+        run: bash scripts/deploy-ecs.sh "$REGION" "$ECS_CLUSTER_NAME" "$ECS_SERVICE_NAME" "$IMAGE_URI"
