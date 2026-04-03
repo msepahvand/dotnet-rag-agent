@@ -12,14 +12,14 @@ public class VectorSearchOptionsValidatorTests
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["AWS:EmbeddingModelId"] = "amazon.titan-embed-text-v2:0",
-            ["AWS:ChatModelId"] = "anthropic.claude-3-5-sonnet-20241022-v2:0",
+            ["AWS:ChatModelId"] = "anthropic.claude-3-5-sonnet-20250219-v1:0",
             ["VectorStore:Provider"] = "qdrant"
         });
 
         var result = VectorSearchOptionsValidator.Parse(configuration);
 
         result.EmbeddingModelId.Should().Be("amazon.titan-embed-text-v2:0");
-        result.ChatModelId.Should().Be("anthropic.claude-3-5-sonnet-20241022-v2:0");
+        result.ChatModelId.Should().Be("anthropic.claude-3-5-sonnet-20250219-v1:0");
         result.VectorStoreProvider.Should().Be(VectorStoreProvider.Qdrant);
     }
 
@@ -28,7 +28,7 @@ public class VectorSearchOptionsValidatorTests
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["AWS:ChatModelId"] = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+            ["AWS:ChatModelId"] = "anthropic.claude-3-5-sonnet-20250219-v1:0"
         });
 
         Action action = () => VectorSearchOptionsValidator.Parse(configuration);
@@ -61,7 +61,7 @@ public class VectorSearchOptionsValidatorTests
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["AWS:EmbeddingModelId"] = "amazon.titan-embed-text-v2:0",
-            ["AWS:ChatModelId"] = "anthropic.claude-3-5-sonnet-20241022-v2:0",
+            ["AWS:ChatModelId"] = "anthropic.claude-3-5-sonnet-20250219-v1:0",
             ["VectorStore:Provider"] = "pinecone"
         });
 
@@ -81,7 +81,7 @@ public class VectorSearchOptionsValidatorTests
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["AWS:EmbeddingModelId"] = "amazon.titan-embed-text-v2:0",
-            ["AWS:ChatModelId"] = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+            ["AWS:ChatModelId"] = "anthropic.claude-3-5-sonnet-20250219-v1:0"
         });
 
         var result = VectorSearchOptionsValidator.Parse(configuration);
