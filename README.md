@@ -1,34 +1,46 @@
-# .NET Vector Search with Multiple Providers
+# .NET RAG Agent with Multiple Vector Store Providers
 
-Semantic search API using vector embeddings with **Redis Stack**, **Qdrant**, and **AWS S3 Vectors**. Built on ASP.NET Core 8.0 and Semantic Kernel.
+Retrieval-augmented generation (RAG) API using a Researcher + Writer multi-agent pattern, vector embeddings, and pluggable vector store backends. Built on ASP.NET Core 8.0 and Semantic Kernel.
 
 ```
-HTTP request → Controller → Semantic Kernel prompt → Bedrock model picks tools
-→ SK calls C# plugin → tool result feeds back into completion → final answer
+POST /api/agent/ask
+  → AgentOrchestrationService
+    → ResearcherAgent (SemanticSearchPlugin → vector store)
+    → WriterAgent (Bedrock Claude → grounded answer + citations)
+  → persisted to InMemoryConversationStore
 ```
 
 ## Project Structure
 
 ```
-VectorSearch.Core/                  # Shared abstractions & models
-├── IVectorStore.cs, IVectorService.cs, IEmbeddingService.cs, IPostService.cs
-├── IAgentAnswerService.cs
-└── Models/                         # AgentAnswerResult, AgentAskRequest/Response, AgentSource
+VectorSearch.Core/                  # Provider-agnostic contracts
+├── IVectorStore.cs, IVectorService.cs, IEmbeddingService.cs
+├── IPostService.cs, IAgentAnswerService.cs, IConversationStore.cs
+└── Models/                         # Post, ChatMessage, AgentAnswerResult, ConversationEvent, AgentSource
 
-VectorSearch.S3/                    # AWS & Qdrant implementations
-├── EmbeddingService.cs             # Bedrock Titan embeddings
+VectorSearch.S3/                    # AWS + Qdrant implementations
+├── Agents/
+│   ├── ResearcherAgent.cs          # Runs SemanticSearchPlugin, returns sources
+│   └── WriterAgent.cs              # Synthesises sources → grounded answer via Bedrock Claude
+├── MultiAgentAnswerService.cs      # Orchestrates Researcher → Writer
+├── EmbeddingService.cs             # Bedrock Titan via IEmbeddingGenerator (Channel-based streaming)
+├── SemanticSearchPlugin.cs         # SK plugin: embed query → vector search → enrich snippets
+├── IndexingPlugin.cs               # SK plugin: auto-index if vector store is empty
+├── ToolInvocationFilter.cs         # SK invocation filter: logging + topK normalisation
 ├── S3VectorStore.cs, S3VectorService.cs, QdrantVectorStore.cs
-├── HackerNewsService.cs            # Data source
-├── GroundedAgentAnswerService.cs   # SK-based grounded answer agent
-├── SemanticSearchPlugin.cs         # SK plugin for retrieval
-├── IndexingPlugin.cs               # SK plugin for auto-indexing
-├── ToolInvocationFilter.cs         # SK function invocation filter
-├── VectorSearchOptionsValidator.cs
-└── ServiceCollectionExtensions.cs
+├── HackerNewsService.cs
+└── VectorSearchOptionsValidator.cs
 
 VectorSearch.Redis/                 # RedisVectorStore.cs
-VectorSearch.Api/                   # Controllers (Agent, Index, Posts, Search) + thin Services
-VectorSearch.IntegrationTests/      # 22 tests: 7 Theory×2 providers + 5 validator + 3 plugin; MockEmbeddingService
+VectorSearch.Api/                   # Controllers + thin services
+├── Controllers/                    # Agent, Conversations, Index, Posts, Search
+├── Services/
+│   ├── AgentOrchestrationService.cs    # Loads history, calls IAgentAnswerService, persists messages
+│   ├── InMemoryConversationStore.cs    # Singleton; exposes Subscribe() → IAsyncEnumerable<ConversationEvent>
+│   ├── PostIndexingService.cs          # Streams embeddings with backpressure (max 3 concurrent)
+│   ├── PostsQueryService.cs
+│   └── SemanticSearchService.cs
+VectorSearch.IntegrationTests/      # 24 tests
 ```
 
 ---
@@ -46,14 +58,14 @@ docker-compose up          # starts Redis, Qdrant, and API
 ```powershell
 curl http://localhost:5000/api/posts                          # fetch posts
 curl -X POST http://localhost:5000/api/index/all              # index all posts
-curl "http://localhost:5000/api/search?query=test&topK=5"     # search
+curl "http://localhost:5000/api/search?query=test&topK=5"     # semantic search
 curl -X POST http://localhost:5000/api/agent/ask \
   -H "Content-Type: application/json" \
-  -d '{"question":"What are the top posts about?","topK":5}'  # agentic ask
+  -d '{"question":"What are the top posts about?","topK":5}'  # RAG agent ask
 ```
 
 ```powershell
-cd VectorSearch.IntegrationTests && dotnet test               # run tests
+dotnet test VectorSearch.IntegrationTests                     # run tests
 ```
 
 **UIs**: RedisInsight http://localhost:8001 · Qdrant Dashboard http://localhost:6333/dashboard
@@ -64,27 +76,28 @@ cd VectorSearch.IntegrationTests && dotnet test               # run tests
 
 ```mermaid
 flowchart LR
-  A[Agent API] --> IP[IndexingPlugin]
-  A --> SP[SemanticSearchPlugin]
-  A --> BRC[Bedrock Claude]
-  IP --> HN[HackerNews]
-  IP --> BRT[Bedrock Titan]
-  BRT --> S3[(S3 Vectors)]
-  SP --> S3
-  SP --> HN
+  A[POST /agent/ask] --> ORC[AgentOrchestrationService]
+  ORC --> RA[ResearcherAgent]
+  ORC --> WA[WriterAgent]
+  RA --> SP[SemanticSearchPlugin]
+  SP --> BRT[Bedrock Titan]
+  BRT --> VS[(Vector Store)]
+  WA --> BRC[Bedrock Claude]
+  ORC --> CS[InMemoryConversationStore]
 
-  SC[Search API] --> BRT
-  SC --> S3
+  SC[GET /search] --> BRT
+  SC --> VS
 ```
 
 ### Semantic Kernel Integration
 
 | Capability | Implementation |
 |---|---|
-| **Embeddings** | `EmbeddingService` — Bedrock Titan via `IEmbeddingGenerator` |
-| **Chat Completion** | `GroundedAgentAnswerService` — Bedrock Claude via `IChatCompletionService` |
-| **Plugin Orchestration** | `GroundedAgentAnswerService` directly calls `IndexingPlugin` then `SemanticSearchPlugin` |
-| **Plugins** | `IndexingPlugin` (auto-index on first ask), `SemanticSearchPlugin` (retrieval + snippet enrichment) |
+| **Embeddings** | `EmbeddingService` — Bedrock Titan via `IEmbeddingGenerator`, Channel-based streaming with backpressure |
+| **Research** | `ResearcherAgent` — invokes `SemanticSearchPlugin` to retrieve and enrich sources |
+| **Answer synthesis** | `WriterAgent` — Bedrock Claude via `IChatCompletionService`, structured JSON output (answer + citations + grounded flag) |
+| **Orchestration** | `MultiAgentAnswerService` → `AgentOrchestrationService` (history load/persist) |
+| **Plugins** | `SemanticSearchPlugin` (retrieval), `IndexingPlugin` (auto-index on first ask) |
 | **Invocation Filter** | `ToolInvocationFilter` — logs calls, normalises topK, enforces guardrails |
 
 ---
@@ -108,7 +121,8 @@ Switch providers via `appsettings.json` or environment variables:
 // appsettings.json — S3 Vectors (production default)
 { "VectorStore": { "Provider": "S3Vectors" },
   "AWS": { "Region": "us-east-1", "VectorBucketName": "posts-semantic-search",
-           "VectorIndexName": "posts-content-index", "EmbeddingModelId": "amazon.titan-embed-text-v2:0" } }
+           "VectorIndexName": "posts-content-index", "EmbeddingModelId": "amazon.titan-embed-text-v2:0",
+           "ChatModelId": "anthropic.claude-3-7-sonnet-20250219-v1:0" } }
 
 // appsettings.Development.json — Qdrant
 { "VectorStore": { "Provider": "Qdrant", "Qdrant": { "Url": "http://localhost:6333",
@@ -132,15 +146,18 @@ Or via env vars: `$env:VectorStore__Provider="Qdrant"`, etc.
 | POST | `/api/index/all` | Index all posts with embeddings |
 | POST | `/api/index/{id}` | Index a single post |
 | GET | `/api/search?query=<text>&topK=<n>` | Semantic search (default topK=10) |
-| POST | `/api/agent/ask` | Agentic grounded answer (`{ "question": "...", "topK": 5 }`) |
+| POST | `/api/agent/ask` | RAG agent ask (`{ "question": "...", "topK": 5, "conversationId": "..." }`) |
+| GET | `/api/agent/conversations` | List all conversation IDs |
+| GET | `/api/agent/conversations/{id}` | Get full message history for a conversation |
+| DELETE | `/api/agent/conversations/{id}` | Delete a conversation |
 
-The agent endpoint auto-indexes if the vector store is empty, runs semantic search via SK plugin, and returns a grounded answer with `[PostId: N]` citations.
+The agent endpoint auto-indexes if the vector store is empty, runs semantic retrieval via `ResearcherAgent`, and returns a grounded answer with `[PostId: N]` citations. Conversation history is maintained per `conversationId` for multi-turn context.
 
 ---
 
 ## Testing
 
-**22 tests** — xUnit + Testcontainers + WebApplicationFactory:
+**24 tests** — xUnit + Testcontainers + WebApplicationFactory:
 
 | Tests | Scope |
 |-------|-------|
@@ -163,7 +180,7 @@ dotnet test --filter "provider=Redis"                          # single provider
 
 ```powershell
 docker build -t rag-agent-api -f VectorSearch.Api/Dockerfile .
-docker run -p 8080:8080 vectorsearch-api
+docker run -p 8080:8080 rag-agent-api
 ```
 
 ### CI/CD (GitHub Actions)
@@ -199,13 +216,15 @@ Auth: **OIDC role assumption** (no static keys). Images tagged `<sha>-<run>-<att
 
 1. **Create S3 Vector Bucket** (not regular S3) — name: `posts-semantic-search`
 2. **Create vector index** — name: `posts-content-index`, dimensions: **1024**, distance: **cosine**
-3. **Enable Bedrock model** — `amazon.titan-embed-text-v2:0` in Bedrock console
+3. **Enable Bedrock models** — `amazon.titan-embed-text-v2:0` and `anthropic.claude-3-7-sonnet-20250219-v1:0` in Bedrock console
 4. **Configure credentials** — `aws configure` or IAM role
 5. **Test**:
    ```powershell
    dotnet run --project VectorSearch.Api
    curl -X POST http://localhost:5000/api/index/all
    curl "http://localhost:5000/api/search?query=technology&topK=10"
+   curl -X POST http://localhost:5000/api/agent/ask -H "Content-Type: application/json" \
+     -d '{"question":"What are people saying about AI?","topK":5}'
    ```
 
 **Cost**: ~$0.01 to index 100 posts (Bedrock embeddings + S3 Vectors storage).
@@ -223,6 +242,7 @@ Auth: **OIDC role assumption** (no static keys). Images tagged `<sha>-<run>-<att
 | AWS "Access Denied" | `aws sts get-caller-identity`, verify IAM + Bedrock model access |
 | AWS "Bucket not found" | Confirm it's an S3 **Vector Bucket**, check region |
 | Empty search results | Index posts first (`POST /api/index/all`), verify dimensions = 1024 |
+| Invalid Bedrock model | Ensure model is enabled in your region's Bedrock console |
 
 ---
 
