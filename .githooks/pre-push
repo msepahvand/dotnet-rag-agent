@@ -4,10 +4,10 @@ set -euo pipefail
 
 echo "Running dotnet format check..."
 
-if ! dotnet format VectorSearch.Api.sln --verify-no-changes --severity warn; then
+if ! dotnet format RagAgent.sln --verify-no-changes --severity warn; then
   echo ""
   echo "dotnet format found violations. Run:"
-  echo "  dotnet format VectorSearch.Api.sln --severity warn"
+  echo "  dotnet format RagAgent.sln --severity warn"
   echo "then stage the changes and try again."
   exit 1
 fi

@@ -13,12 +13,12 @@ POST /api/agent/ask
 ## Project Structure
 
 ```
-VectorSearch.Core/                  # Provider-agnostic contracts
+RagAgent.Core/                      # Provider-agnostic contracts
 ├── IVectorStore.cs, IVectorService.cs, IEmbeddingService.cs
 ├── IPostService.cs, IAgentAnswerService.cs, IConversationStore.cs
 └── Models/                         # Post, ChatMessage, AgentAnswerResult, ConversationEvent, AgentSource
 
-VectorSearch.S3/                    # AWS + Qdrant implementations
+RagAgent.Agents/                    # AWS + Qdrant implementations
 ├── Agents/
 │   ├── ResearcherAgent.cs          # Runs SemanticSearchPlugin, returns sources
 │   └── WriterAgent.cs              # Synthesises sources → grounded answer via Bedrock Claude
@@ -31,8 +31,8 @@ VectorSearch.S3/                    # AWS + Qdrant implementations
 ├── HackerNewsService.cs
 └── VectorSearchOptionsValidator.cs
 
-VectorSearch.Redis/                 # RedisVectorStore.cs
-VectorSearch.Api/                   # Controllers + thin services
+RagAgent.Redis/                     # RedisVectorStore.cs
+RagAgent.Api/                       # Controllers + thin services
 ├── Controllers/                    # Agent, Conversations, Index, Posts, Search
 ├── Services/
 │   ├── AgentOrchestrationService.cs    # Loads history, calls IAgentAnswerService, persists messages
@@ -40,7 +40,7 @@ VectorSearch.Api/                   # Controllers + thin services
 │   ├── PostIndexingService.cs          # Streams embeddings with backpressure (max 3 concurrent)
 │   ├── PostsQueryService.cs
 │   └── SemanticSearchService.cs
-VectorSearch.IntegrationTests/      # 24 tests
+RagAgent.IntegrationTests/          # 24 tests
 ```
 
 ---
@@ -65,7 +65,7 @@ curl -X POST http://localhost:5000/api/agent/ask \
 ```
 
 ```powershell
-dotnet test VectorSearch.IntegrationTests                     # run tests
+dotnet test RagAgent.IntegrationTests                         # run tests
 ```
 
 **UIs**: RedisInsight http://localhost:8001 · Qdrant Dashboard http://localhost:6333/dashboard
@@ -179,7 +179,7 @@ dotnet test --filter "provider=Redis"                          # single provider
 ### Docker
 
 ```powershell
-docker build -t rag-agent-api -f VectorSearch.Api/Dockerfile .
+docker build -t rag-agent-api -f RagAgent.Api/Dockerfile .
 docker run -p 8080:8080 rag-agent-api
 ```
 
@@ -220,7 +220,7 @@ Auth: **OIDC role assumption** (no static keys). Images tagged `<sha>-<run>-<att
 4. **Configure credentials** — `aws configure` or IAM role
 5. **Test**:
    ```powershell
-   dotnet run --project VectorSearch.Api
+   dotnet run --project RagAgent.Api
    curl -X POST http://localhost:5000/api/index/all
    curl "http://localhost:5000/api/search?query=technology&topK=10"
    curl -X POST http://localhost:5000/api/agent/ask -H "Content-Type: application/json" \

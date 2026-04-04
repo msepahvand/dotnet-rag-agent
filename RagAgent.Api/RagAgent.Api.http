@@ -1,0 +1,16 @@
+@RagAgent.Api_HostAddress = http://localhost:5210
+
+GET {{RagAgent.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+POST {{RagAgent.Api_HostAddress}}/api/agent/ask
+Content-Type: application/json
+
+{
+	"question": "What is semantic search in this project?",
+	"topK": 5
+}
+
+###

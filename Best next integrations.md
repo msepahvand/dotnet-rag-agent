@@ -33,7 +33,7 @@ This is a strong foundation. Everything below builds directly on it.
 - ~~Create a `/Prompts` folder with `.yaml` prompt config + `.txt` Handlebars template~~
 - ~~Load via `kernel.CreateFunctionFromPromptYaml()`~~
 - ~~Keep citation instructions, persona, and grounding rules in one versioned place~~
-- **Done**: `VectorSearch.S3/Prompts/GroundedAnswer.yaml` loaded via `KernelFunctionYaml.FromPromptYaml()`.
+- **Done**: `RagAgent.Agents/Prompts/GroundedAnswer.yaml` loaded via `KernelFunctionYaml.FromPromptYaml()`.
 
 ### ~~1.3 Chat History and Multi-Turn Conversations~~ ✅
 

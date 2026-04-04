@@ -17,7 +17,7 @@ if [ "$IMAGE_COUNT" = "0" ] || [ "$IMAGE_COUNT" = "None" ]; then
   echo "ECR is empty — building and pushing bootstrap image..."
   aws ecr get-login-password --region "$REGION" \
     | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
-  docker build -f VectorSearch.Api/Dockerfile -t "$ECR_URI:latest" .
+  docker build -f RagAgent.Api/Dockerfile -t "$ECR_URI:latest" .
   docker push "$ECR_URI:latest"
 else
   echo "ECR already has $IMAGE_COUNT image(s) — skipping bootstrap."

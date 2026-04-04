@@ -10,7 +10,7 @@
 
 - Keep controllers thin: HTTP concerns stay in controllers; orchestration and business logic belong in services.
 
-- Favor provider-agnostic design in VectorSearch.Core. Shared contracts and logic in Core should not depend on Redis, S3 Vectors, or Qdrant specifics.
+- Favor provider-agnostic design in RagAgent.Core. Shared contracts and logic in Core should not depend on Redis, S3 Vectors, or Qdrant specifics.
 
 - Test strategy: aim for roughly 70% unit tests and 30% integration tests.
 

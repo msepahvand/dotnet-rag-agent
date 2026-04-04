@@ -5,8 +5,8 @@
 
 ## Git Workflow
 - **Never push unless explicitly asked.** Commit locally, then wait for the user to say "push".
-- **For .cs changes:** always run `dotnet test VectorSearch.IntegrationTests` before committing. All tests must pass. Do not commit if any test is failing.
-- **For .cs changes:** always run `dotnet format VectorSearch.Api.sln --severity warn` before committing. The pre-push hook enforces this, but fixing it before the commit avoids a blocked push.
+- **For .cs changes:** always run `dotnet test RagAgent.IntegrationTests` before committing. All tests must pass. Do not commit if any test is failing.
+- **For .cs changes:** always run `dotnet format RagAgent.sln --severity warn` before committing. The pre-push hook enforces this, but fixing it before the commit avoids a blocked push.
 - **For Terraform-only changes:** do not run dotnet tests. Instead run `terraform fmt -recursive` and `terraform validate` via Docker (see Terraform section below).
 
 ## Commit Messages
@@ -18,7 +18,7 @@ Use conventional commit prefixes:
 
 ## Architecture
 - **Keep controllers thin.** HTTP concerns (routing, validation, status codes, response shaping) stay in controllers. Orchestration and business logic belong in services.
-- **VectorSearch.Core must stay provider-agnostic.** Shared contracts, interfaces, and logic in Core must not depend on Redis, S3 Vectors, or Qdrant specifics. Provider-specific details go in VectorSearch.Redis and VectorSearch.S3.
+- **RagAgent.Core must stay provider-agnostic.** Shared contracts, interfaces, and logic in Core must not depend on Redis, S3 Vectors, or Qdrant specifics. Provider-specific details go in RagAgent.Redis and RagAgent.Agents.
 - **Placement guide:**
   - Controller → route handling, request parsing, status codes, response DTOs
   - Service → use-case orchestration, sequencing calls to abstractions
