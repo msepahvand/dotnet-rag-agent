@@ -147,12 +147,15 @@ public class AgentStreamingServiceTests
         private readonly List<string> _tokens = tokens.ToList();
 
         public Task<AgentAnswerResult> WriteAsync(
-            string question, ResearchResult research,
-            IReadOnlyList<ChatMessage> history, string? criticFeedback = null) =>
+            string question,
+            ResearchResult research,
+            IReadOnlyList<ChatMessage> history,
+            string? criticFeedback = null) =>
             Task.FromResult(new AgentAnswerResult { Answer = "stub", Grounded = true });
 
         public async IAsyncEnumerable<string> StreamAsync(
-            string question, ResearchResult research,
+            string question,
+            ResearchResult research,
             IReadOnlyList<ChatMessage> history,
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
