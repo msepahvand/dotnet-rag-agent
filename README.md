@@ -63,8 +63,6 @@ RagAgent.IntegrationTests/          # Integration tests (end-to-end API via Test
 **Prerequisites**: .NET 8.0 SDK, Docker Desktop, AWS account (S3 Vectors only)
 
 ```powershell
-git clone https://github.com/msepahvand/dotnet-rag-agent.git
-cd dotnet-rag-agent
 docker-compose up          # starts Redis, Qdrant, and API
 ```
 
