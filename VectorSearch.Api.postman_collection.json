@@ -221,6 +221,49 @@
       ]
     },
     {
+      "name": "Evaluation",
+      "item": [
+        {
+          "name": "Evaluate - Default Questions",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agent/evaluate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent", "evaluate"]
+            },
+            "description": "Runs the built-in question set through the full RAG pipeline and returns groundedness, citation validity, and latency metrics."
+          },
+          "response": []
+        },
+        {
+          "name": "Evaluate - Custom Questions",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"topK\": 5,\n  \"questions\": [\n    {\n      \"question\": \"What are the tradeoffs between microservices and monoliths?\",\n      \"expectedPostIds\": []\n    },\n    {\n      \"question\": \"How do teams handle technical debt?\",\n      \"expectedPostIds\": []\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agent/evaluate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent", "evaluate"]
+            },
+            "description": "Runs a caller-supplied question set. Populate expectedPostIds to get Hit@k metrics."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Swagger",
       "item": [
         {
