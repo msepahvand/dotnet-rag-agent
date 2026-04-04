@@ -4,7 +4,8 @@
 - Use **British English** in all code, comments, log messages, and documentation. e.g. `summarise` not `summarize`, `normalise` not `normalize`, `initialisation` not `initialization`, `colour` not `color`. Exception: .NET framework method names (e.g. `JsonSerializer`, `InitializeAsync`) must keep their original spelling.
 
 ## Git Workflow
-- **Never push unless explicitly asked.** Commit locally, then wait for the user to say "push".
+- **Commit freely** after completing a task (once tests and formatting pass). Do not wait for permission to commit.
+- **Never push unless explicitly asked.** Always wait for the user to say "push" before running `git push`.
 - **For .cs changes:** always run `dotnet test RagAgent.IntegrationTests` before committing. All tests must pass. Do not commit if any test is failing.
 - **For .cs changes:** always run `dotnet format RagAgent.sln --severity warn` before committing. The pre-push hook enforces this, but fixing it before the commit avoids a blocked push.
 - **For Terraform-only changes:** do not run dotnet tests. Instead run `terraform fmt -recursive` and `terraform validate` via Docker (see Terraform section below).
