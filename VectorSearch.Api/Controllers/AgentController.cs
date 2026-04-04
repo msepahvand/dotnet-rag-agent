@@ -10,7 +10,7 @@ namespace VectorSearch.Api.Controllers;
 public sealed class AgentController(IAgentOrchestrationService agentOrchestrationService) : ControllerBase
 {
     [HttpPost("ask")]
-    public async Task<IActionResult> Ask([FromBody] AskRequestDto request)
+    public async Task<IActionResult> AskAsync([FromBody] AskRequestDto request)
     {
         var result = await agentOrchestrationService.AskAsync(AgentMapper.ToModel(request));
         return Ok(AgentMapper.ToDto(result));

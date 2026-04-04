@@ -9,14 +9,14 @@ namespace VectorSearch.Api.Controllers;
 public sealed class ConversationsController(IConversationStore conversationStore) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> ListConversations()
+    public async Task<IActionResult> ListConversationsAsync()
     {
         var ids = await conversationStore.ListConversationIdsAsync();
         return Ok(ids.Select(id => new ConversationSummaryDto(id)));
     }
 
     [HttpGet("{conversationId}")]
-    public async Task<IActionResult> GetConversation(string conversationId)
+    public async Task<IActionResult> GetConversationAsync(string conversationId)
     {
         var history = await conversationStore.GetHistoryAsync(conversationId);
 
@@ -33,7 +33,7 @@ public sealed class ConversationsController(IConversationStore conversationStore
     }
 
     [HttpDelete("{conversationId}")]
-    public async Task<IActionResult> DeleteConversation(string conversationId)
+    public async Task<IActionResult> DeleteConversationAsync(string conversationId)
     {
         await conversationStore.DeleteAsync(conversationId);
         return NoContent();

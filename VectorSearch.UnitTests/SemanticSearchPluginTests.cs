@@ -9,7 +9,7 @@ public class SemanticSearchPluginTests
 {
     // ── TrimForSnippet (tested via SearchPostsAsync) ─────────────────────────
     [Fact]
-    public async Task SearchPostsAsync_WhenBodyIsWithinLimit_ReturnsBodyAsSnippet()
+    public async Task SearchPostsAsync_WhenBodyIsWithinLimit_ReturnsBodyAsSnippetAsync()
     {
         const string shortBody = "Short body text.";
         var plugin = BuildPlugin(
@@ -23,7 +23,7 @@ public class SemanticSearchPluginTests
     }
 
     [Fact]
-    public async Task SearchPostsAsync_WhenBodyExceedsLimit_TruncatesWithEllipsis()
+    public async Task SearchPostsAsync_WhenBodyExceedsLimit_TruncatesWithEllipsisAsync()
     {
         var longBody = new string('a', 300);
         var plugin = BuildPlugin(
@@ -37,7 +37,7 @@ public class SemanticSearchPluginTests
     }
 
     [Fact]
-    public async Task SearchPostsAsync_WhenBodyIsEmpty_ReturnsEmptySnippet()
+    public async Task SearchPostsAsync_WhenBodyIsEmpty_ReturnsEmptySnippetAsync()
     {
         var plugin = BuildPlugin(
             searchResults: [new SearchResult { PostId = 1, Title = "T", Distance = 0.1f }],
@@ -50,7 +50,7 @@ public class SemanticSearchPluginTests
     }
 
     [Fact]
-    public async Task SearchPostsAsync_WhenPostNotFoundForResult_ReturnsEmptySnippet()
+    public async Task SearchPostsAsync_WhenPostNotFoundForResult_ReturnsEmptySnippetAsync()
     {
         var plugin = BuildPlugin(
             searchResults: [new SearchResult { PostId = 99, Title = "T", Distance = 0.1f }],
@@ -63,7 +63,7 @@ public class SemanticSearchPluginTests
     }
 
     [Fact]
-    public async Task SearchPostsAsync_FiltersOutSourcesWithEmptyTitle()
+    public async Task SearchPostsAsync_FiltersOutSourcesWithEmptyTitleAsync()
     {
         var plugin = BuildPlugin(
             searchResults:
@@ -80,7 +80,7 @@ public class SemanticSearchPluginTests
     }
 
     [Fact]
-    public async Task SearchPostsAsync_NormalisesTopK()
+    public async Task SearchPostsAsync_NormalisesTopKAsync()
     {
         int capturedTopK = 0;
         var vectorService = new CapturingVectorService(topK => capturedTopK = topK);

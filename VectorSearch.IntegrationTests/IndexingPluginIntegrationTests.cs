@@ -9,7 +9,7 @@ namespace VectorSearch.IntegrationTests;
 public class IndexingPluginIntegrationTests
 {
     [Fact]
-    public async Task IndexPostsIfEmptyAsync_IndexesPosts_WhenVectorStoreIsEmpty()
+    public async Task IndexPostsIfEmptyAsync_IndexesPosts_WhenVectorStoreIsEmptyAsync()
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -30,7 +30,7 @@ public class IndexingPluginIntegrationTests
     }
 
     [Fact]
-    public async Task IndexPostsIfEmptyAsync_SkipsIndexing_WhenVectorStoreAlreadyHasPosts()
+    public async Task IndexPostsIfEmptyAsync_SkipsIndexing_WhenVectorStoreAlreadyHasPostsAsync()
     {
         var services = new ServiceCollection();
         services.AddLogging();

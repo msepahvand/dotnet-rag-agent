@@ -10,7 +10,7 @@ namespace VectorSearch.IntegrationTests;
 public class SemanticSearchPluginIntegrationTests
 {
     [Fact]
-    public async Task SearchPostsAsync_UsesWiredDependenciesAndReturnsGroundedSource()
+    public async Task SearchPostsAsync_UsesWiredDependenciesAndReturnsGroundedSourceAsync()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>

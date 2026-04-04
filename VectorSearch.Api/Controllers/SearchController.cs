@@ -10,7 +10,7 @@ namespace VectorSearch.Api.Controllers;
 public sealed class SearchController(ISemanticSearchService semanticSearchService) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> Search([FromQuery] string query, [FromQuery] int topK = 10)
+    public async Task<IActionResult> SearchAsync([FromQuery] string query, [FromQuery] int topK = 10)
     {
         if (string.IsNullOrWhiteSpace(query))
         {

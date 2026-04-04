@@ -9,7 +9,7 @@ public class MultiAgentAnswerServiceTests
 {
     // ── Iterations ──────────────────────────────────────────────────────────
     [Fact]
-    public async Task AnswerAsync_WhenCriticApprovesFirstAnswer_ReturnsIterations1()
+    public async Task AnswerAsync_WhenCriticApprovesFirstAnswer_ReturnsIterations1Async()
     {
         var sut = BuildSut(criticApprovals: [true]);
 
@@ -19,7 +19,7 @@ public class MultiAgentAnswerServiceTests
     }
 
     [Fact]
-    public async Task AnswerAsync_WhenCriticRejectsOnceThenApproves_ReturnsIterations2()
+    public async Task AnswerAsync_WhenCriticRejectsOnceThenApproves_ReturnsIterations2Async()
     {
         var sut = BuildSut(criticApprovals: [false, true]);
 
@@ -29,7 +29,7 @@ public class MultiAgentAnswerServiceTests
     }
 
     [Fact]
-    public async Task AnswerAsync_WhenCriticAlwaysRejects_CapsAtMaxIterations()
+    public async Task AnswerAsync_WhenCriticAlwaysRejects_CapsAtMaxIterationsAsync()
     {
         var sut = BuildSut(criticApprovals: [false, false, false]);
 
@@ -40,7 +40,7 @@ public class MultiAgentAnswerServiceTests
 
     // ── Feedback passing ────────────────────────────────────────────────────
     [Fact]
-    public async Task AnswerAsync_WhenCriticRejects_PassesFeedbackToNextWriterCall()
+    public async Task AnswerAsync_WhenCriticRejects_PassesFeedbackToNextWriterCallAsync()
     {
         const string criticFeedback = "Citations are missing quotes.";
         string? capturedFeedback = null;
@@ -57,7 +57,7 @@ public class MultiAgentAnswerServiceTests
     }
 
     [Fact]
-    public async Task AnswerAsync_OnFirstCall_WriterReceivesNullFeedback()
+    public async Task AnswerAsync_OnFirstCall_WriterReceivesNullFeedbackAsync()
     {
         string? capturedFeedback = "sentinel";
 
@@ -74,7 +74,7 @@ public class MultiAgentAnswerServiceTests
 
     // ── Critic not called on final pass ─────────────────────────────────────
     [Fact]
-    public async Task AnswerAsync_DoesNotCallCriticAfterFinalIteration()
+    public async Task AnswerAsync_DoesNotCallCriticAfterFinalIterationAsync()
     {
         var critic = new CountingCriticStub(approves: false);
         var sut = new MultiAgentAnswerService(
@@ -94,7 +94,7 @@ public class MultiAgentAnswerServiceTests
     [InlineData(-1, 5)]
     [InlineData(11, 10)]
     [InlineData(5, 5)]
-    public async Task AnswerAsync_NormalisesTopKBeforeResearch(int requested, int expected)
+    public async Task AnswerAsync_NormalisesTopKBeforeResearchAsync(int requested, int expected)
     {
         var researcher = new CapturingResearcherStub();
         var sut = new MultiAgentAnswerService(

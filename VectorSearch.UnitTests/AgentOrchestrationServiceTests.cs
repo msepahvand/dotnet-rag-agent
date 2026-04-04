@@ -10,7 +10,7 @@ public class AgentOrchestrationServiceTests
 {
     // ── Grounded passthrough ────────────────────────────────────────────────
     [Fact]
-    public async Task AskAsync_WhenResultIsGrounded_ResponseGroundedIsTrue()
+    public async Task AskAsync_WhenResultIsGrounded_ResponseGroundedIsTrueAsync()
     {
         var stub = new StubAgentAnswerService(new AgentAnswerResult
         {
@@ -27,7 +27,7 @@ public class AgentOrchestrationServiceTests
     }
 
     [Fact]
-    public async Task AskAsync_WhenResultIsNotGrounded_ResponseGroundedIsFalse_EvenWithCitationsAndSources()
+    public async Task AskAsync_WhenResultIsNotGrounded_ResponseGroundedIsFalse_EvenWithCitationsAndSourcesAsync()
     {
         // Regression: old code used Citations.Count > 0 || Sources.Count > 0.
         // If the LLM returns grounded:false but still includes citations, the old logic
@@ -47,7 +47,7 @@ public class AgentOrchestrationServiceTests
     }
 
     [Fact]
-    public async Task AskAsync_WhenResultIsNotGroundedAndEmpty_ResponseGroundedIsFalse()
+    public async Task AskAsync_WhenResultIsNotGroundedAndEmpty_ResponseGroundedIsFalseAsync()
     {
         var stub = new StubAgentAnswerService(new AgentAnswerResult
         {
@@ -65,7 +65,7 @@ public class AgentOrchestrationServiceTests
 
     // ── Response field mapping ──────────────────────────────────────────────
     [Fact]
-    public async Task AskAsync_MapsAllResultFieldsToResponse()
+    public async Task AskAsync_MapsAllResultFieldsToResponseAsync()
     {
         var source = new AgentSource { PostId = 42, Title = "Title", Snippet = "Snip", Distance = 0.25f };
         var citation = new Citation { PostId = 42, Quote = "Quote text" };
@@ -94,7 +94,7 @@ public class AgentOrchestrationServiceTests
     [InlineData(10, 10)]
     [InlineData(11, 10)]
     [InlineData(100, 10)]
-    public async Task AskAsync_NormalisesTopK(int requested, int expected)
+    public async Task AskAsync_NormalisesTopKAsync(int requested, int expected)
     {
         int capturedTopK = 0;
         var stub = new CapturingStubAgentAnswerService(topK => capturedTopK = topK);
@@ -107,7 +107,7 @@ public class AgentOrchestrationServiceTests
 
     // ── ConversationId ──────────────────────────────────────────────────────
     [Fact]
-    public async Task AskAsync_WithNoConversationId_GeneratesNewConversationId()
+    public async Task AskAsync_WithNoConversationId_GeneratesNewConversationIdAsync()
     {
         var stub = new StubAgentAnswerService(new AgentAnswerResult { Answer = "ok", Grounded = true });
         var sut = new AgentOrchestrationService(stub, CreateStore());
@@ -118,7 +118,7 @@ public class AgentOrchestrationServiceTests
     }
 
     [Fact]
-    public async Task AskAsync_WithExistingConversationId_ReturnsTheSameConversationId()
+    public async Task AskAsync_WithExistingConversationId_ReturnsTheSameConversationIdAsync()
     {
         var stub = new StubAgentAnswerService(new AgentAnswerResult { Answer = "ok", Grounded = true });
         var sut = new AgentOrchestrationService(stub, CreateStore());
@@ -130,7 +130,7 @@ public class AgentOrchestrationServiceTests
     }
 
     [Fact]
-    public async Task AskAsync_TwoTurns_SecondTurnReceivesHistory()
+    public async Task AskAsync_TwoTurns_SecondTurnReceivesHistoryAsync()
     {
         IReadOnlyList<ChatMessage>? capturedHistory = null;
         var stub = new CapturingHistoryStubAgentAnswerService(history => capturedHistory = history);
@@ -149,7 +149,7 @@ public class AgentOrchestrationServiceTests
     }
 
     [Fact]
-    public async Task AskAsync_StoresUserAndAssistantMessagesAfterEachTurn()
+    public async Task AskAsync_StoresUserAndAssistantMessagesAfterEachTurnAsync()
     {
         var stub = new StubAgentAnswerService(new AgentAnswerResult { Answer = "my answer", Grounded = true });
         var store = CreateStore();
@@ -164,7 +164,7 @@ public class AgentOrchestrationServiceTests
     }
 
     [Fact]
-    public async Task AskAsync_TwoSeparateConversations_DoNotShareHistory()
+    public async Task AskAsync_TwoSeparateConversations_DoNotShareHistoryAsync()
     {
         var stub = new StubAgentAnswerService(new AgentAnswerResult { Answer = "ok", Grounded = true });
         var store = CreateStore();

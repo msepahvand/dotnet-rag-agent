@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
 using VectorSearch.Core;
 using VectorSearch.S3.Agents;
+using VectorSearch.S3.Process;
 
 namespace VectorSearch.S3;
 
@@ -55,7 +56,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IResearcherAgent, ResearcherAgent>();
         services.AddScoped<IWriterAgent, WriterAgent>();
         services.AddScoped<ICriticAgent, CriticAgent>();
-        services.AddScoped<IAgentAnswerService, MultiAgentAnswerService>();
+
+        // SK Process orchestration: bridges the process result back to request/response
+        services.AddScoped<ProcessResultHolder>();
+        services.AddScoped<IAgentAnswerService, ProcessAnswerService>();
 
         return services;
     }

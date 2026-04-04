@@ -28,7 +28,7 @@ public class ConversationStoreEventTests
     }
 
     [Fact]
-    public async Task AppendAsync_EmitsMessageAppendedEvent()
+    public async Task AppendAsync_EmitsMessageAppendedEventAsync()
     {
         var store = CreateStore();
         var eventStream = store.Subscribe(); // registers before append — channel buffers the event
@@ -44,7 +44,7 @@ public class ConversationStoreEventTests
     }
 
     [Fact]
-    public async Task DeleteAsync_EmitsConversationDeletedEvent()
+    public async Task DeleteAsync_EmitsConversationDeletedEventAsync()
     {
         var store = CreateStore();
         await store.AppendAsync("conv-1", new ChatMessage("user", "hello"));
@@ -60,7 +60,7 @@ public class ConversationStoreEventTests
     }
 
     [Fact]
-    public async Task CacheEviction_EmitsConversationExpiredEvent()
+    public async Task CacheEviction_EmitsConversationExpiredEventAsync()
     {
         var cache = new MemoryCache(new MemoryCacheOptions());
         var store = new InMemoryConversationStore(cache);
@@ -78,7 +78,7 @@ public class ConversationStoreEventTests
     }
 
     [Fact]
-    public async Task Events_EmitInOrder_ForMultipleOperations()
+    public async Task Events_EmitInOrder_ForMultipleOperationsAsync()
     {
         var store = CreateStore();
         var eventStream = store.Subscribe();
@@ -99,7 +99,7 @@ public class ConversationStoreEventTests
     }
 
     [Fact]
-    public async Task Events_AreIsolatedBetweenConversations()
+    public async Task Events_AreIsolatedBetweenConversationsAsync()
     {
         var store = CreateStore();
         var eventStream = store.Subscribe();
@@ -121,7 +121,7 @@ public class ConversationStoreEventTests
 
     // ── Message cap ─────────────────────────────────────────────────────────
     [Fact]
-    public async Task AppendAsync_WhenMessagesExceedCap_RemovesOldestMessages()
+    public async Task AppendAsync_WhenMessagesExceedCap_RemovesOldestMessagesAsync()
     {
         var store = CreateStore();
         const string convId = "conv-trim";

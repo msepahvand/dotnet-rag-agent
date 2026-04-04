@@ -91,14 +91,15 @@ This is a strong foundation. Everything below builds directly on it.
 - ~~Cap at 2-3 iterations to avoid runaway loops~~
 - **Done**: `CriticAgent` evaluates citation validity deterministically (postId existence check) then uses the LLM for relevance and groundedness. `MultiAgentAnswerService` runs up to 3 writer passes, passing critic feedback into each retry. `AgentAnswerResult.Iterations` (and `AskResponseDto.Iterations`) exposes how many passes were needed.
 
-### 3.3 SK Process Framework (Nested Steps)
+### ~~3.3 SK Process Framework (Nested Steps)~~ ✅
 
-Rewrite the orchestration as an SK `Process` with discrete steps.
+~~Rewrite the orchestration as an SK `Process` with discrete steps.~~
 
-- Step 1: Retrieve sources → Step 2: Generate answer → Step 3: Validate → Step 4: Respond
-- Each step is independently testable and observable
-- Add branching: if validation fails, loop back to Step 2 with adjusted prompt
-- **Why**: The Process framework is SK's answer to complex agent workflows. Learning it early gives you a structured way to build production agent pipelines.
+- ~~Step 1: Retrieve sources → Step 2: Generate answer → Step 3: Validate → Step 4: Respond~~
+- ~~Each step is independently testable and observable~~
+- ~~Add branching: if validation fails, loop back to Step 2 with adjusted prompt~~
+- ~~**Why**: The Process framework is SK's answer to complex agent workflows. Learning it early gives you a structured way to build production agent pipelines.~~
+- **Done**: `ProcessAnswerService` implements `IAgentAnswerService` as a `KernelProcess` with four discrete steps: `ResearchStep` → `WriteStep` → `CriticStep` → `OutputStep`. The process branches: critic approval routes to output; revision routes back to `WriteStep.ReviseAsync`. A `WriteStepState.Iteration` counter caps loops at 3. `ProcessResultHolder` (scoped) bridges the fire-and-forget process back to the request/response pattern.
 
 ---
 

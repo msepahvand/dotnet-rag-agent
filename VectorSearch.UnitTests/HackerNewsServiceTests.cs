@@ -22,7 +22,7 @@ public class HackerNewsServiceTests : IDisposable
 
     // ── GetAllPostsAsync ─────────────────────────────────────────────────────
     [Fact]
-    public async Task GetAllPostsAsync_ReturnsPostForEachValidId()
+    public async Task GetAllPostsAsync_ReturnsPostForEachValidIdAsync()
     {
         StubTopStories([1, 2]);
         StubItem(1, title: "Post One", text: "Body one.");
@@ -35,7 +35,7 @@ public class HackerNewsServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAllPostsAsync_FiltersOutItemsWithNoTitle()
+    public async Task GetAllPostsAsync_FiltersOutItemsWithNoTitleAsync()
     {
         StubTopStories([1, 2]);
         StubItem(1, title: "Valid Post", text: "Body.");
@@ -47,7 +47,7 @@ public class HackerNewsServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAllPostsAsync_FiltersOutItemsThatReturnNull()
+    public async Task GetAllPostsAsync_FiltersOutItemsThatReturnNullAsync()
     {
         StubTopStories([1, 2]);
         StubItem(1, title: "Valid Post", text: "Body.");
@@ -59,7 +59,7 @@ public class HackerNewsServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAllPostsAsync_WhenTopStoriesIsEmpty_ReturnsEmptyList()
+    public async Task GetAllPostsAsync_WhenTopStoriesIsEmpty_ReturnsEmptyListAsync()
     {
         StubTopStories([]);
 
@@ -69,7 +69,7 @@ public class HackerNewsServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAllPostsAsync_RespectsTopStoriesCountConfig()
+    public async Task GetAllPostsAsync_RespectsTopStoriesCountConfigAsync()
     {
         StubTopStories([1, 2, 3, 4, 5]);
         foreach (var id in new[] { 1, 2, 3 })
@@ -85,7 +85,7 @@ public class HackerNewsServiceTests : IDisposable
 
     // ── GetPostByIdAsync ─────────────────────────────────────────────────────
     [Fact]
-    public async Task GetPostByIdAsync_WhenItemExists_ReturnsPost()
+    public async Task GetPostByIdAsync_WhenItemExists_ReturnsPostAsync()
     {
         StubItem(42, title: "My Post", text: "My body text.");
 
@@ -98,7 +98,7 @@ public class HackerNewsServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetPostByIdAsync_WhenItemHasNoTitle_ReturnsNull()
+    public async Task GetPostByIdAsync_WhenItemHasNoTitle_ReturnsNullAsync()
     {
         StubItem(1, title: null, text: "Body.");
 
@@ -108,7 +108,7 @@ public class HackerNewsServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetPostByIdAsync_WhenItemDoesNotExist_ReturnsNull()
+    public async Task GetPostByIdAsync_WhenItemDoesNotExist_ReturnsNullAsync()
     {
         StubNullItem(99);
 
@@ -119,7 +119,7 @@ public class HackerNewsServiceTests : IDisposable
 
     // ── HTML stripping and body fallbacks ────────────────────────────────────
     [Fact]
-    public async Task GetPostByIdAsync_WhenTextContainsHtmlTags_StripsTagsFromBody()
+    public async Task GetPostByIdAsync_WhenTextContainsHtmlTags_StripsTagsFromBodyAsync()
     {
         StubItem(1, title: "T", text: "<p>Hello <b>world</b>.</p>");
 
@@ -129,7 +129,7 @@ public class HackerNewsServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetPostByIdAsync_WhenTextContainsHtmlEntities_DecodesEntities()
+    public async Task GetPostByIdAsync_WhenTextContainsHtmlEntities_DecodesEntitiesAsync()
     {
         StubItem(1, title: "T", text: "Rocks &amp; minerals");
 
@@ -139,7 +139,7 @@ public class HackerNewsServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetPostByIdAsync_WhenTextIsNullAndUrlExists_UsesUrlAsFallbackBody()
+    public async Task GetPostByIdAsync_WhenTextIsNullAndUrlExists_UsesUrlAsFallbackBodyAsync()
     {
         StubItem(1, title: "T", text: null, url: "https://example.com/article");
 
@@ -149,7 +149,7 @@ public class HackerNewsServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetPostByIdAsync_WhenTextAndUrlAreBothMissing_UsesGenericFallbackBody()
+    public async Task GetPostByIdAsync_WhenTextAndUrlAreBothMissing_UsesGenericFallbackBodyAsync()
     {
         StubItem(1, title: "T", text: null, url: null);
 
@@ -159,7 +159,7 @@ public class HackerNewsServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetPostByIdAsync_WhenTextIsWhitespaceOnly_UsesUrlFallback()
+    public async Task GetPostByIdAsync_WhenTextIsWhitespaceOnly_UsesUrlFallbackAsync()
     {
         StubItem(1, title: "T", text: "   ", url: "https://example.com");
 

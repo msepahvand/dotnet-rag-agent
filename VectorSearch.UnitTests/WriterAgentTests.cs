@@ -10,7 +10,7 @@ public class WriterAgentTests
 {
     // ── JSON parsing ─────────────────────────────────────────────────────────
     [Fact]
-    public async Task WriteAsync_WithValidJsonResponse_ParsesAnswerCitationsAndGrounded()
+    public async Task WriteAsync_WithValidJsonResponse_ParsesAnswerCitationsAndGroundedAsync()
     {
         const string json = """{"answer":"Test answer","citations":[{"postId":1,"quote":"exact quote"}],"grounded":true}""";
         var sut = BuildWriter(json);
@@ -23,7 +23,7 @@ public class WriterAgentTests
     }
 
     [Fact]
-    public async Task WriteAsync_WithCodeFencedJsonResponse_ExtractsAndParses()
+    public async Task WriteAsync_WithCodeFencedJsonResponse_ExtractsAndParsesAsync()
     {
         const string fenced = "```json\n{\"answer\":\"Fenced\",\"citations\":[],\"grounded\":false}\n```";
         var sut = BuildWriter(fenced);
@@ -35,7 +35,7 @@ public class WriterAgentTests
     }
 
     [Fact]
-    public async Task WriteAsync_WithJsonEmbeddedInProse_ExtractsAndParses()
+    public async Task WriteAsync_WithJsonEmbeddedInProse_ExtractsAndParsesAsync()
     {
         const string prose = """Here is the answer: {"answer":"Embedded","citations":[],"grounded":true} done.""";
         var sut = BuildWriter(prose);
@@ -47,7 +47,7 @@ public class WriterAgentTests
     }
 
     [Fact]
-    public async Task WriteAsync_WithUnparseableResponse_FallsBackToRawLlmOutput()
+    public async Task WriteAsync_WithUnparseableResponse_FallsBackToRawLlmOutputAsync()
     {
         const string raw = "This is not JSON at all.";
         var sut = BuildWriter(raw);
@@ -60,7 +60,7 @@ public class WriterAgentTests
     }
 
     [Fact]
-    public async Task WriteAsync_WithEmptyResponse_FallsBackToDeterministicAnswer()
+    public async Task WriteAsync_WithEmptyResponse_FallsBackToDeterministicAnswerAsync()
     {
         var research = ResearchWithSources([new AgentSource { PostId = 7, Title = "Some Post", Snippet = "A snippet", Distance = 0.1f }]);
         var sut = BuildWriter(string.Empty);
@@ -72,7 +72,7 @@ public class WriterAgentTests
     }
 
     [Fact]
-    public async Task WriteAsync_WhenLlmReturnsGroundedFalse_PreservesGroundedFalse()
+    public async Task WriteAsync_WhenLlmReturnsGroundedFalse_PreservesGroundedFalseAsync()
     {
         const string json = """{"answer":"Insufficient sources","citations":[],"grounded":false}""";
         var sut = BuildWriter(json);
@@ -84,7 +84,7 @@ public class WriterAgentTests
 
     // ── Critic feedback injection ─────────────────────────────────────────────
     [Fact]
-    public async Task WriteAsync_WithCriticFeedback_InjectsFeedbackMessageBeforeSynthesisInstruction()
+    public async Task WriteAsync_WithCriticFeedback_InjectsFeedbackMessageBeforeSynthesisInstructionAsync()
     {
         const string json = """{"answer":"Revised","citations":[],"grounded":true}""";
         var capturing = new CapturingChatService(json);
@@ -98,7 +98,7 @@ public class WriterAgentTests
     }
 
     [Fact]
-    public async Task WriteAsync_WithoutCriticFeedback_DoesNotInjectFeedbackMessage()
+    public async Task WriteAsync_WithoutCriticFeedback_DoesNotInjectFeedbackMessageAsync()
     {
         const string json = """{"answer":"A","citations":[],"grounded":true}""";
         var capturing = new CapturingChatService(json);
@@ -112,7 +112,7 @@ public class WriterAgentTests
 
     // ── Conversation history role mapping ────────────────────────────────────
     [Fact]
-    public async Task WriteAsync_MapsConversationHistoryRolesToCorrectAuthorRoles()
+    public async Task WriteAsync_MapsConversationHistoryRolesToCorrectAuthorRolesAsync()
     {
         const string json = """{"answer":"A","citations":[],"grounded":true}""";
         var capturing = new CapturingChatService(json);
@@ -134,7 +134,7 @@ public class WriterAgentTests
 
     // ── ToolsUsed passthrough ────────────────────────────────────────────────
     [Fact]
-    public async Task WriteAsync_PreservesToolsUsedFromResearch()
+    public async Task WriteAsync_PreservesToolsUsedFromResearchAsync()
     {
         const string json = """{"answer":"A","citations":[],"grounded":true}""";
         var sut = BuildWriter(json);

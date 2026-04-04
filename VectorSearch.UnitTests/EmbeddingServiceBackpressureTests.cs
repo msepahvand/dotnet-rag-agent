@@ -24,7 +24,7 @@ public class EmbeddingServiceBackpressureTests
     }
 
     [Fact]
-    public async Task StreamEmbeddings_NeverExceedsMaxConcurrency()
+    public async Task StreamEmbeddings_NeverExceedsMaxConcurrencyAsync()
     {
         const int maxConcurrency = 2;
         var concurrentCount = 0;
@@ -52,7 +52,7 @@ public class EmbeddingServiceBackpressureTests
     }
 
     [Fact]
-    public async Task StreamEmbeddings_EmitsResultsProgressively_NotAllAtEnd()
+    public async Task StreamEmbeddings_EmitsResultsProgressively_NotAllAtEndAsync()
     {
         var emitTimestamps = new List<long>();
         var generator = new FakeEmbeddingGenerator(async _ =>
@@ -76,7 +76,7 @@ public class EmbeddingServiceBackpressureTests
     }
 
     [Fact]
-    public async Task StreamEmbeddings_ReturnsAllResults()
+    public async Task StreamEmbeddings_ReturnsAllResultsAsync()
     {
         var generator = new FakeEmbeddingGenerator(_ => Task.FromResult<float[]>([1.0f, 2.0f]));
         var service = new EmbeddingService(generator);
@@ -88,7 +88,7 @@ public class EmbeddingServiceBackpressureTests
     }
 
     [Fact]
-    public async Task StreamEmbeddings_WithMaxConcurrencyOne_ProcessesAllPosts()
+    public async Task StreamEmbeddings_WithMaxConcurrencyOne_ProcessesAllPostsAsync()
     {
         var generator = new FakeEmbeddingGenerator(async _ =>
         {

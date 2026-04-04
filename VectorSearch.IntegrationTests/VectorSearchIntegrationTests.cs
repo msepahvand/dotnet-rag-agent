@@ -15,7 +15,7 @@ public class VectorSearchIntegrationTests
 
     [Theory]
     [MemberData(nameof(VectorProviders))]
-    public async Task GetPosts_ReturnsSuccessAndPosts(string provider)
+    public async Task GetPosts_ReturnsSuccessAndPostsAsync(string provider)
     {
         // Arrange
         await using var factory = new VectorSearchWebApplicationFactory(provider);
@@ -36,7 +36,7 @@ public class VectorSearchIntegrationTests
 
     [Theory]
     [MemberData(nameof(VectorProviders))]
-    public async Task GetPost_WithValidId_ReturnsPost(string provider)
+    public async Task GetPost_WithValidId_ReturnsPostAsync(string provider)
     {
         // Arrange
         await using var factory = new VectorSearchWebApplicationFactory(provider);
@@ -58,7 +58,7 @@ public class VectorSearchIntegrationTests
 
     [Theory]
     [MemberData(nameof(VectorProviders))]
-    public async Task GetPost_WithInvalidId_ReturnsNotFound(string provider)
+    public async Task GetPost_WithInvalidId_ReturnsNotFoundAsync(string provider)
     {
         // Arrange
         await using var factory = new VectorSearchWebApplicationFactory(provider);
@@ -74,7 +74,7 @@ public class VectorSearchIntegrationTests
 
     [Theory]
     [MemberData(nameof(VectorProviders))]
-    public async Task IndexSinglePost_ThenSearch_ReturnsPost(string provider)
+    public async Task IndexSinglePost_ThenSearch_ReturnsPostAsync(string provider)
     {
         // Arrange
         await using var factory = new VectorSearchWebApplicationFactory(provider);
@@ -102,7 +102,7 @@ public class VectorSearchIntegrationTests
 
     [Theory]
     [MemberData(nameof(VectorProviders))]
-    public async Task IndexMultiplePosts_ThenSearch_ReturnsRelevantResults(string provider)
+    public async Task IndexMultiplePosts_ThenSearch_ReturnsRelevantResultsAsync(string provider)
     {
         // Arrange
         await using var factory = new VectorSearchWebApplicationFactory(provider);
@@ -133,7 +133,7 @@ public class VectorSearchIntegrationTests
 
     [Theory]
     [MemberData(nameof(VectorProviders))]
-    public async Task Search_WithNoIndexedData_ReturnsEmptyResults(string provider)
+    public async Task Search_WithNoIndexedData_ReturnsEmptyResultsAsync(string provider)
     {
         // Arrange
         await using var factory = new VectorSearchWebApplicationFactory(provider);
@@ -153,7 +153,7 @@ public class VectorSearchIntegrationTests
 
     [Theory]
     [MemberData(nameof(VectorProviders))]
-    public async Task Search_WithEmptyQuery_ReturnsBadRequest(string provider)
+    public async Task Search_WithEmptyQuery_ReturnsBadRequestAsync(string provider)
     {
         // Arrange
         await using var factory = new VectorSearchWebApplicationFactory(provider);
@@ -169,7 +169,7 @@ public class VectorSearchIntegrationTests
 
     [Theory]
     [MemberData(nameof(VectorProviders))]
-    public async Task AgentAsk_UsesSemanticSearchAndReturnsGroundedSources(string provider)
+    public async Task AgentAsk_UsesSemanticSearchAndReturnsGroundedSourcesAsync(string provider)
     {
         // Arrange
         await using var factory = new VectorSearchWebApplicationFactory(provider);

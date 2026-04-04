@@ -10,7 +10,7 @@ public class CriticAgentTests
 {
     // ── Deterministic citation check ─────────────────────────────────────────
     [Fact]
-    public async Task EvaluateAsync_WhenCitationPostIdNotInSources_ReturnsFailWithoutCallingLlm()
+    public async Task EvaluateAsync_WhenCitationPostIdNotInSources_ReturnsFailWithoutCallingLlmAsync()
     {
         var throwingService = new ThrowingChatService();
         var sut = new CriticAgent(throwingService, new Kernel());
@@ -24,7 +24,7 @@ public class CriticAgentTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_WhenMultipleInvalidPostIds_ListsAllInFeedback()
+    public async Task EvaluateAsync_WhenMultipleInvalidPostIds_ListsAllInFeedbackAsync()
     {
         var sut = new CriticAgent(new ThrowingChatService(), new Kernel());
         var answer = AnswerWith(citations:
@@ -40,7 +40,7 @@ public class CriticAgentTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_WhenNoCitations_ProceedsToLlmEvaluation()
+    public async Task EvaluateAsync_WhenNoCitations_ProceedsToLlmEvaluationAsync()
     {
         const string llmResponse = """{"approved":true,"feedback":"","checks":["relevance: PASS"]}""";
         var sut = new CriticAgent(new StubChatService(llmResponse), new Kernel());
@@ -54,7 +54,7 @@ public class CriticAgentTests
 
     // ── LLM evaluation ───────────────────────────────────────────────────────
     [Fact]
-    public async Task EvaluateAsync_WhenLlmReturnsApproved_ReturnsApproved()
+    public async Task EvaluateAsync_WhenLlmReturnsApproved_ReturnsApprovedAsync()
     {
         const string llmResponse = """{"approved":true,"feedback":"","checks":["relevance: PASS","groundedness: PASS"]}""";
         var sut = new CriticAgent(new StubChatService(llmResponse), new Kernel());
@@ -68,7 +68,7 @@ public class CriticAgentTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_WhenLlmReturnsRejected_ReturnsRejectedWithFeedback()
+    public async Task EvaluateAsync_WhenLlmReturnsRejected_ReturnsRejectedWithFeedbackAsync()
     {
         const string llmResponse = """{"approved":false,"feedback":"Answer is not relevant.","checks":["relevance: FAIL","groundedness: PASS"]}""";
         var sut = new CriticAgent(new StubChatService(llmResponse), new Kernel());
@@ -83,7 +83,7 @@ public class CriticAgentTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_WhenLlmReturnsCodeFencedJson_ParsesCorrectly()
+    public async Task EvaluateAsync_WhenLlmReturnsCodeFencedJson_ParsesCorrectlyAsync()
     {
         const string fenced = "```json\n{\"approved\":false,\"feedback\":\"Missing citations.\",\"checks\":[]}\n```";
         var sut = new CriticAgent(new StubChatService(fenced), new Kernel());
@@ -98,7 +98,7 @@ public class CriticAgentTests
 
     // ── Parse-failure fallback ────────────────────────────────────────────────
     [Fact]
-    public async Task EvaluateAsync_WhenLlmResponseIsUnparseable_FallsBackToApproved()
+    public async Task EvaluateAsync_WhenLlmResponseIsUnparseable_FallsBackToApprovedAsync()
     {
         var sut = new CriticAgent(new StubChatService("I cannot evaluate this."), new Kernel());
         var answer = AnswerWith(citations: []);
@@ -112,7 +112,7 @@ public class CriticAgentTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_WhenLlmResponseIsEmpty_FallsBackToApproved()
+    public async Task EvaluateAsync_WhenLlmResponseIsEmpty_FallsBackToApprovedAsync()
     {
         var sut = new CriticAgent(new StubChatService(string.Empty), new Kernel());
         var answer = AnswerWith(citations: []);
