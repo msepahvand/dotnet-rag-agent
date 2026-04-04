@@ -21,7 +21,7 @@ public class VectorService : IVectorService
     {
         if (!await _vectorStore.CollectionExistsAsync())
         {
-            await _vectorStore.CreateCollectionAsync(1024); // Titan embedding dimensions
+            await _vectorStore.CreateCollectionAsync(1024); // Cohere embed-english-v3 embedding dimensions
         }
     }
 

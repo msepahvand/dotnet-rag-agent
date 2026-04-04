@@ -11,14 +11,14 @@ public class VectorSearchOptionsValidatorTests
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["AWS:EmbeddingModelId"] = "amazon.titan-embed-text-v2:0",
+            ["AWS:EmbeddingModelId"] = "cohere.embed-english-v3",
             ["AWS:ChatModelId"] = "us.anthropic.claude-sonnet-4-6",
             ["VectorStore:Provider"] = "qdrant"
         });
 
         var result = VectorSearchOptionsValidator.Parse(configuration);
 
-        result.EmbeddingModelId.Should().Be("amazon.titan-embed-text-v2:0");
+        result.EmbeddingModelId.Should().Be("cohere.embed-english-v3");
         result.ChatModelId.Should().Be("us.anthropic.claude-sonnet-4-6");
         result.VectorStoreProvider.Should().Be(VectorStoreProvider.Qdrant);
     }
@@ -43,7 +43,7 @@ public class VectorSearchOptionsValidatorTests
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["AWS:EmbeddingModelId"] = "amazon.titan-embed-text-v2:0",
+            ["AWS:EmbeddingModelId"] = "cohere.embed-english-v3",
             ["AWS:ChatModelId"] = "anthropic claude"
         });
 
@@ -60,7 +60,7 @@ public class VectorSearchOptionsValidatorTests
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["AWS:EmbeddingModelId"] = "amazon.titan-embed-text-v2:0",
+            ["AWS:EmbeddingModelId"] = "cohere.embed-english-v3",
             ["AWS:ChatModelId"] = "us.anthropic.claude-sonnet-4-6",
             ["VectorStore:Provider"] = "pinecone"
         });
@@ -80,7 +80,7 @@ public class VectorSearchOptionsValidatorTests
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["AWS:EmbeddingModelId"] = "amazon.titan-embed-text-v2:0",
+            ["AWS:EmbeddingModelId"] = "cohere.embed-english-v3",
             ["AWS:ChatModelId"] = "us.anthropic.claude-sonnet-4-6"
         });
 

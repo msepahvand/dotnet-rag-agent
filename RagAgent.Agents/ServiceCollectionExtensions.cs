@@ -27,8 +27,8 @@ public static class ServiceCollectionExtensions
         });
 
         // Configure Semantic Kernel + embedding pipeline once for all providers.
-        // Cohere Embed v3 uses a different request schema from Titan, so we use
-        // a custom generator rather than the SK connector's BedrockEmbeddingGenerator.
+        // Cohere Embed v3 uses a different request schema to the SK connector's default,
+        // so we use a custom generator rather than the SK connector's BedrockEmbeddingGenerator.
         services.AddScoped<IEmbeddingGenerator<string, Embedding<float>>>(sp =>
             new CohereEmbeddingGenerator(
                 sp.GetRequiredService<IAmazonBedrockRuntime>(),

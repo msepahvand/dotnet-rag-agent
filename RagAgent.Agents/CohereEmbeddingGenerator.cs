@@ -9,7 +9,7 @@ namespace RagAgent.Agents;
 
 /// <summary>
 /// Calls the Cohere Embed v3 API on Bedrock directly.
-/// The SK Amazon connector sends Titan's inputText format regardless of model,
+/// The SK Amazon Bedrock connector always uses the Titan inputText request schema regardless of model,
 /// so we bypass it and build the correct Cohere request ourselves.
 /// </summary>
 internal sealed class CohereEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>

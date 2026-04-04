@@ -54,7 +54,7 @@ variable "iam_policy_name" {
 variable "embedding_model_id" {
   description = "Bedrock embedding model ID used by the application"
   type        = string
-  default     = "amazon.titan-embed-text-v2:0"
+  default     = "cohere.embed-english-v3"
 }
 
 variable "vector_bucket_name" {

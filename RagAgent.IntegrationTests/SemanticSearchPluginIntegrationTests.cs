@@ -15,7 +15,7 @@ public class SemanticSearchPluginIntegrationTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["AWS:EmbeddingModelId"] = "amazon.titan-embed-text-v2:0",
+                ["AWS:EmbeddingModelId"] = "cohere.embed-english-v3",
                 ["AWS:ChatModelId"] = "us.anthropic.claude-sonnet-4-6",
                 ["VectorStore:Provider"] = "Qdrant"
             })
