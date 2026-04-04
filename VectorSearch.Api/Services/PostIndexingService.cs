@@ -1,5 +1,6 @@
 using VectorSearch.Api.Services.Contracts;
 using VectorSearch.Core;
+using VectorSearch.Core.Models;
 
 namespace VectorSearch.Api.Services;
 
@@ -11,10 +12,16 @@ public sealed class PostIndexingService(
     public async Task<IndexAllPostsResult> IndexAllAsync()
     {
         var posts = await postService.GetAllPostsAsync();
+        return await IndexPostsAsync(posts);
+    }
 
-        var postLookup = posts.ToDictionary(p => p.Id);
-        var postsWithEmbeddings = new List<(Core.Models.Post Post, float[] Embedding)>();
-        await foreach (var (postId, embedding) in embeddingService.StreamEmbeddings(posts))
+    public async Task<IndexAllPostsResult> IndexPostsAsync(IReadOnlyList<Post> posts)
+    {
+        var postList = posts.ToList();
+        var postLookup = postList.ToDictionary(p => p.Id);
+        var postsWithEmbeddings = new List<(Post Post, float[] Embedding)>();
+
+        await foreach (var (postId, embedding) in embeddingService.StreamEmbeddings(postList))
         {
             if (postLookup.TryGetValue(postId, out var post))
             {
@@ -23,8 +30,7 @@ public sealed class PostIndexingService(
         }
 
         await vectorService.IndexPostsBatchAsync(postsWithEmbeddings);
-
-        return new IndexAllPostsResult(posts.Count);
+        return new IndexAllPostsResult(postsWithEmbeddings.Count);
     }
 
     public async Task<IndexSinglePostResult?> IndexSingleAsync(int id)
