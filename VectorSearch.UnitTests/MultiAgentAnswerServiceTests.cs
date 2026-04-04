@@ -154,8 +154,10 @@ public class MultiAgentAnswerServiceTests
     private sealed class AlwaysPassingWriterStub : IWriterAgent
     {
         public Task<AgentAnswerResult> WriteAsync(
-            string question, ResearchResult research,
-            IReadOnlyList<ChatMessage> history, string? criticFeedback = null) =>
+            string question,
+            ResearchResult research,
+            IReadOnlyList<ChatMessage> history,
+            string? criticFeedback = null) =>
             Task.FromResult(PassingAnswer());
     }
 
@@ -164,8 +166,10 @@ public class MultiAgentAnswerServiceTests
         private int _callCount;
 
         public Task<AgentAnswerResult> WriteAsync(
-            string question, ResearchResult research,
-            IReadOnlyList<ChatMessage> history, string? criticFeedback = null)
+            string question,
+            ResearchResult research,
+            IReadOnlyList<ChatMessage> history,
+            string? criticFeedback = null)
         {
             if (_callCount++ == onCallIndex)
             {
