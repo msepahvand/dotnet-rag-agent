@@ -281,6 +281,46 @@ Auth: **OIDC role assumption** (no static keys). Images tagged `<sha>-<run>-<att
 
 ---
 
+## Observability
+
+The API is instrumented with OpenTelemetry. Traces are exported via OTLP and can be viewed in Jaeger locally or AWS X-Ray in production.
+
+### Local (Jaeger)
+
+Jaeger runs as part of `docker-compose up` and is available at **http://localhost:16686**.
+
+Select service **`rag-agent`** in the Jaeger UI to see traces. Each agent request produces a span covering the full pipeline:
+
+| Span | Emitted by |
+|------|------------|
+| `agent.ask` | `POST /api/agent/ask` — batch pipeline |
+| `agent.stream` | `POST /api/agent/ask/stream` — streaming pipeline |
+
+Span tags available on both spans:
+
+| Tag | Description |
+|-----|-------------|
+| `conversation.id` | Conversation the request belongs to |
+| `rag.top_k` | Number of sources requested from the vector store |
+| `rag.grounded` | Whether the answer was grounded in retrieved sources |
+
+Additional tags on `agent.ask`: `rag.iterations`, `rag.citations_count`, `rag.tools_used`.  
+Additional tag on `agent.stream`: `rag.sources_count`.
+
+### Production (AWS X-Ray)
+
+In production, an **ADOT (AWS Distro for OpenTelemetry) Collector** sidecar runs alongside the ECS Fargate task. It receives traces from the API container over OTLP (port 4317) and forwards them to AWS X-Ray.
+
+To view traces:
+
+1. Open the [AWS X-Ray console](https://console.aws.amazon.com/xray/home) and select your region
+2. Go to **Traces** → search by service name **`rag-agent`**
+3. Use **Service Map** to see the full call graph including downstream Bedrock calls
+
+The ADOT collector config lives in [infra/otel-collector-config.yaml](infra/otel-collector-config.yaml) and is injected into the ECS task definition as the `AOT_CONFIG_CONTENT` environment variable by [scripts/deploy-ecs.sh](scripts/deploy-ecs.sh).
+
+---
+
 ## Resources
 
 - [Semantic Kernel](https://learn.microsoft.com/en-us/semantic-kernel/) · [AWS S3 Vectors](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-vectors.html) · [Amazon Bedrock](https://docs.aws.amazon.com/bedrock/) · [Redis Vector Search](https://redis.io/docs/interact/search-and-query/advanced-concepts/vectors/) · [Qdrant](https://qdrant.tech/documentation/) · [Testcontainers .NET](https://dotnet.testcontainers.org/)
