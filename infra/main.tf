@@ -178,6 +178,18 @@ data "aws_iam_policy_document" "ecs_task_runtime" {
     ]
     resources = ["*"]
   }
+
+  statement {
+    sid    = "AllowXRayTracing"
+    effect = "Allow"
+    actions = [
+      "xray:PutTraceSegments",
+      "xray:PutTelemetryRecords",
+      "xray:GetSamplingRules",
+      "xray:GetSamplingTargets",
+    ]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role_policy" "ecs_task_runtime" {
@@ -190,6 +202,13 @@ resource "aws_iam_role_policy" "ecs_task_runtime" {
 
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/ecs/${var.ecs_service_name}"
+  retention_in_days = 7
+}
+
+# Separate log group for the ADOT Collector sidecar so collector logs don't
+# mix with application logs.
+resource "aws_cloudwatch_log_group" "otel_collector" {
+  name              = "/ecs/${var.ecs_service_name}/otel-collector"
   retention_in_days = 7
 }
 
