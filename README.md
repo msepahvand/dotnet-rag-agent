@@ -5,13 +5,19 @@
 Retrieval-augmented generation (RAG) API using a Researcher → Critic → Writer SK Process pipeline, vector embeddings, and pluggable vector store backends. Built on ASP.NET Core 8.0 and Semantic Kernel.
 
 ```
-POST /api/agent/ask
+POST /api/agent/ask          (batch — higher quality, ~10 s)
   → AgentOrchestrationService
     → ProcessAnswerService (KernelProcess)
       → ResearchStep  (SemanticSearchPlugin → vector store)
       → WriteStep     (Bedrock Claude → draft answer + citations)
       → CriticStep    (Bedrock Claude → approve or request revision)
       → OutputStep    (final grounded answer)
+  → persisted to InMemoryConversationStore
+
+POST /api/agent/ask/stream   (SSE streaming — lower latency, ~1 s to first token)
+  → AgentStreamingService
+      → ResearcherAgent  (SemanticSearchPlugin → vector store)
+      → WriterAgent      (Bedrock Claude → token-by-token prose, no critic loop)
   → persisted to InMemoryConversationStore
 ```
 
@@ -181,13 +187,23 @@ Or via env vars: `$env:VectorStore__Provider="Qdrant"`, etc.
 | POST | `/api/index/all` | Index all posts with embeddings |
 | POST | `/api/index/{id}` | Index a single post |
 | GET | `/api/search?query=<text>&topK=<n>` | Semantic search (default topK=10) |
-| POST | `/api/agent/ask` | RAG agent ask (`{ "question": "...", "topK": 5, "conversationId": "..." }`) |
+| POST | `/api/agent/ask` | RAG agent ask — full Researcher → Critic → Writer pipeline, structured JSON response with citations |
+| POST | `/api/agent/ask/stream` | Streaming RAG ask — Server-Sent Events (SSE); skips critic loop for lower latency. Event types: `status`, `sources`, `token`, `done`, `error` |
 | POST | `/api/agent/evaluate` | Run evaluation question set, returns hit@k / groundedness / citation metrics |
 | GET | `/api/agent/conversations` | List all conversation IDs |
 | GET | `/api/agent/conversations/{id}` | Get full message history for a conversation |
 | DELETE | `/api/agent/conversations/{id}` | Delete a conversation |
 
-The agent endpoint auto-indexes if the vector store is empty, runs semantic retrieval via `ResearcherAgent`, and returns a grounded answer with `[PostId: N]` citations. Conversation history is maintained per `conversationId` for multi-turn context.
+The agent endpoints auto-index if the vector store is empty and maintain conversation history per `conversationId` for multi-turn context.
+
+**Choosing between batch and streaming:**
+
+| | `POST /ask` | `POST /ask/stream` |
+|---|---|---|
+| **Latency** | ~10 s total | ~1 s to first token |
+| **LLM calls** | 2–3 (writer + critic + optional rewrite) | 1 (writer only) |
+| **Output format** | JSON with citations and grounded flag | SSE token stream, sources in `done` event |
+| **Use when** | Citation quality matters | Chat UI, real-time feedback |
 
 ![Agent ask demo](docs/img/ask-agent-demo.png)
 
