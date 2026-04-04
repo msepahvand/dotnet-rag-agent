@@ -1,6 +1,6 @@
 ---
 name: design-skills
-description: 'Use for ASP.NET Core API architecture and testing conventions in this repo: keep controllers thin, preserve provider-agnostic logic in VectorSearch.Core, prefer unit tests for business logic, and use integration tests to verify minimum end-to-end API behavior like 200 OK happy paths.'
+description: 'Use for ASP.NET Core API architecture and testing conventions in this repo: keep controllers thin, preserve provider-agnostic logic in RagAgent.Core, prefer unit tests for business logic, and use integration tests to verify minimum end-to-end API behavior like 200 OK happy paths.'
 ---
 
 # Design Skills
@@ -14,8 +14,8 @@ description: 'Use for ASP.NET Core API architecture and testing conventions in t
 ## Architecture Rules
 - Keep controllers thin. Controllers should handle routing, request validation, status codes, and response shaping.
 - Move orchestration and business logic into services.
-- Keep VectorSearch.Core provider-agnostic. Core should contain shared contracts, models, and logic that work across Redis, S3 Vectors, and Qdrant.
-- Put provider-specific implementation details in provider projects such as VectorSearch.Redis and VectorSearch.S3.
+- Keep RagAgent.Core provider-agnostic. Core should contain shared contracts, models, and logic that work across Redis, S3 Vectors, and Qdrant.
+- Put provider-specific implementation details in provider projects such as RagAgent.Redis and RagAgent.Agents.
 - Avoid leaking provider-specific types or assumptions into Core or controllers.
 
 ## Testing Rules
@@ -33,7 +33,7 @@ description: 'Use for ASP.NET Core API architecture and testing conventions in t
 
 ## Change Checklist
 1. Check whether controller code can be moved into a service.
-2. Check whether shared logic belongs in VectorSearch.Core instead of a provider project.
+2. Check whether shared logic belongs in RagAgent.Core instead of a provider project.
 3. Add or update unit tests for the changed logic.
 4. Add or update integration tests only for key end-to-end API behavior.
 5. Verify the change does not couple controllers or Core to a specific provider.

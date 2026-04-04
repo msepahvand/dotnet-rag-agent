@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- SK Process Framework is experimental in v1.72.0-alpha -->
+    <NoWarn>$(NoWarn);SKEXP0080</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SemanticKernel" Version="1.72.0" />
+    <PackageReference Include="Microsoft.SemanticKernel.Connectors.Amazon" Version="1.72.0-alpha" />
+    <PackageReference Include="Microsoft.SemanticKernel.Process.Core" Version="1.72.0-alpha" />
+    <PackageReference Include="Microsoft.SemanticKernel.Process.LocalRuntime" Version="1.72.0-alpha" />
+    <PackageReference Include="Microsoft.SemanticKernel.PromptTemplates.Handlebars" Version="1.72.0" />
+    <PackageReference Include="Microsoft.SemanticKernel.Yaml" Version="1.72.0" />
+    <PackageReference Include="AWSSDK.BedrockRuntime" Version="4.0.*" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.*" />
+    <PackageReference Include="AWSSDK.S3Vectors" Version="4.0.*" />
+    <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RagAgent.Core\RagAgent.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Prompts\GroundedAnswer.yaml" />
+  </ItemGroup>
+
+</Project>

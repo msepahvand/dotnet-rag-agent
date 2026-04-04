@@ -31,12 +31,12 @@ jobs:
 
       - name: Build & test
         run: |
-          dotnet build VectorSearch.Api.sln --configuration Release
-          dotnet format VectorSearch.Api.sln --verify-no-changes --severity warn
-          dotnet test VectorSearch.UnitTests/VectorSearch.UnitTests.csproj \
+          dotnet build RagAgent.sln --configuration Release
+          dotnet format RagAgent.sln --verify-no-changes --severity warn
+          dotnet test RagAgent.UnitTests/RagAgent.UnitTests.csproj \
             --configuration Release --no-build --verbosity normal \
             --collect:"XPlat Code Coverage" --results-directory coverage
-          dotnet test VectorSearch.IntegrationTests/VectorSearch.IntegrationTests.csproj \
+          dotnet test RagAgent.IntegrationTests/RagAgent.IntegrationTests.csproj \
             --configuration Release --no-build --verbosity normal
 
       - name: Report coverage
@@ -46,7 +46,7 @@ jobs:
             -reports:"coverage/**/coverage.cobertura.xml" \
             -targetdir:"coverage/report" \
             -reporttypes:"TextSummary" \
-            -assemblyfilters:"+VectorSearch.Api;+VectorSearch.Core;+VectorSearch.S3"
+            -assemblyfilters:"+RagAgent.Api;+RagAgent.Core;+RagAgent.Agents"
           cat coverage/report/Summary.txt
 
   infrastructure:
@@ -127,7 +127,7 @@ jobs:
           echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
           echo "ECS_CLUSTER_NAME=${{ secrets.ECS_CLUSTER_NAME || env.ECS_CLUSTER_DEFAULT }}" >> $GITHUB_ENV
           echo "ECS_SERVICE_NAME=${{ secrets.ECS_SERVICE_NAME || env.ECS_SERVICE_DEFAULT }}" >> $GITHUB_ENV
-          docker build -f VectorSearch.Api/Dockerfile -t "$IMAGE_URI" .
+          docker build -f RagAgent.Api/Dockerfile -t "$IMAGE_URI" .
           docker push "$IMAGE_URI"
 
       - name: Deploy to ECS

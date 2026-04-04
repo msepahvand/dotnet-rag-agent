@@ -2,8 +2,8 @@ Review the current change or the file(s) I've indicated against the architecture
 
 ## Architecture Rules
 - Controllers must be thin: routing, request validation, status codes, response shaping only. Orchestration belongs in services.
-- VectorSearch.Core must stay provider-agnostic. No Redis, S3, Qdrant, or Bedrock references in Core.
-- Provider-specific implementation details belong in VectorSearch.Redis or VectorSearch.S3.
+- RagAgent.Core must stay provider-agnostic. No Redis, S3, Qdrant, or Bedrock references in Core.
+- Provider-specific implementation details belong in RagAgent.Redis or RagAgent.Agents.
 - Do not leak provider-specific types into Core or controllers.
 
 ## Placement Guide
@@ -21,7 +21,7 @@ Review the current change or the file(s) I've indicated against the architecture
 
 ## Change Checklist
 1. Can any controller code be moved into a service?
-2. Does any shared logic belong in VectorSearch.Core instead of a provider project?
+2. Does any shared logic belong in RagAgent.Core instead of a provider project?
 3. Are unit tests added or updated for the changed logic?
 4. Are integration tests scoped to end-to-end API behaviour only?
 5. Does the change couple controllers or Core to a specific provider?
