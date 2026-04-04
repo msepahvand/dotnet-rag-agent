@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using VectorSearch.Redis;
 using VectorSearch.S3;
 

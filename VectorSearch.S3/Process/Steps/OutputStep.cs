@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.Process;
 using VectorSearch.Core.Models;
 
 namespace VectorSearch.S3.Process.Steps;

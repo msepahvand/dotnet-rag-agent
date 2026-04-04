@@ -1,7 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using VectorSearch.Api.Services.Contracts;
 using VectorSearch.Core;
 
 namespace VectorSearch.Api.Services;
