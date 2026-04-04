@@ -65,7 +65,7 @@ public class IndexingPluginIntegrationTests
         public Task<float[]> GenerateEmbeddingAsync(string text) => Task.FromResult(new[] { 0.1f, 0.2f, 0.3f });
 
         public async IAsyncEnumerable<(int PostId, float[] Embedding)> StreamEmbeddings(
-            List<Post> posts, int maxConcurrency = 3, CancellationToken cancellationToken = default)
+            List<Post> posts, int maxConcurrency = 3, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             foreach (var post in posts)
             {

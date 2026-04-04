@@ -24,13 +24,17 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
 
         if (provider == "Qdrant")
         {
+#pragma warning disable CS0618
             _qdrantContainer = new QdrantBuilder()
+#pragma warning restore CS0618
                 .WithImage("qdrant/qdrant:latest")
                 .Build();
         }
         else if (provider == "Redis")
         {
+#pragma warning disable CS0618
             _redisContainer = new RedisBuilder()
+#pragma warning restore CS0618
                 .WithImage("redis/redis-stack:latest")
                 .Build();
         }
@@ -74,7 +78,6 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
             // Remove all AWS-related services to avoid credential requirements
             services.RemoveAll<Amazon.BedrockRuntime.IAmazonBedrockRuntime>();
             services.RemoveAll<Amazon.S3Vectors.IAmazonS3Vectors>();
-            services.RemoveAll<Microsoft.SemanticKernel.Embeddings.ITextEmbeddingGenerationService>();
             services.RemoveAll<Microsoft.SemanticKernel.Kernel>();
             services.RemoveAll<IAgentAnswerService>();
 

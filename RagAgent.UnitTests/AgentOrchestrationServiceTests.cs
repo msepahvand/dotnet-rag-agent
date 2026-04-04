@@ -142,10 +142,10 @@ public class AgentOrchestrationServiceTests
 
         capturedHistory.Should().NotBeNull();
         capturedHistory!.Should().HaveCount(2);
-        capturedHistory[0].Role.Should().Be("user");
-        capturedHistory[0].Content.Should().Be("First question");
-        capturedHistory[1].Role.Should().Be("assistant");
-        capturedHistory[1].Content.Should().Be("answer");
+        capturedHistory[0]!.Role.Should().Be("user");
+        capturedHistory[0]!.Content.Should().Be("First question");
+        capturedHistory[1]!.Role.Should().Be("assistant");
+        capturedHistory[1]!.Content.Should().Be("answer");
     }
 
     [Fact]
