@@ -37,7 +37,7 @@ public sealed class WriteStep : KernelProcessStep<WriteStep.State>
 
     /// <summary>Called on the first write attempt (no critic feedback yet).</summary>
     [KernelFunction]
-    public async Task WriteAsync(
+    public async Task Write(
         KernelProcessStepContext context,
         Kernel kernel,
         ResearchPayload payload)
@@ -49,7 +49,7 @@ public sealed class WriteStep : KernelProcessStep<WriteStep.State>
 
     /// <summary>Called on subsequent attempts with critic feedback injected.</summary>
     [KernelFunction]
-    public async Task ReviseAsync(
+    public async Task Revise(
         KernelProcessStepContext context,
         Kernel kernel,
         RevisionPayload payload)
