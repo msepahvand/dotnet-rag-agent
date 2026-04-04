@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -25,6 +26,13 @@ public sealed class WriterAgent : IWriterAgent
         "{\"answer\": \"<your answer>\", \"citations\": [{\"postId\": <N>, \"quote\": \"<excerpt>\"}], \"grounded\": true}. " +
         "Do not use outside knowledge. If the results are insufficient, set grounded to false and explain why in answer.";
 
+    private const string StreamingSystemPrompt =
+        "You are a synthesis specialist. Answer questions based solely on the provided search results. " +
+        "Be concise and direct. Write your answer as natural prose — do not use JSON or code formatting.";
+
+    private const string StreamingInstruction =
+        "Answer the question above based solely on the search results. Write a clear, direct answer in natural prose.";
+
     private readonly IChatCompletionService _chatService;
     private readonly Kernel _kernel;
 
@@ -34,36 +42,14 @@ public sealed class WriterAgent : IWriterAgent
         _kernel = kernel;
     }
 
+    // ── Batch (structured JSON) ───────────────────────────────────────────────
     public async Task<AgentAnswerResult> WriteAsync(
         string question,
         ResearchResult research,
         IReadOnlyList<ChatMessage> history,
         string? criticFeedback = null)
     {
-        var chatHistory = new ChatHistory(SystemPrompt);
-
-        foreach (var msg in history)
-        {
-            var role = msg.Role switch
-            {
-                "assistant" => AuthorRole.Assistant,
-                "system" => AuthorRole.System,
-                _ => AuthorRole.User,
-            };
-            chatHistory.Add(new ChatMessageContent(role, msg.Content));
-        }
-
-        chatHistory.AddUserMessage(question);
-        chatHistory.AddUserMessage($"Search results:\n{research.SourcesJson}");
-
-        if (!string.IsNullOrWhiteSpace(criticFeedback))
-        {
-            chatHistory.AddUserMessage(
-                $"A critic reviewed a previous draft of this answer and identified the following issues: " +
-                $"{criticFeedback} Please address these issues in your revised answer.");
-        }
-
-        chatHistory.AddUserMessage(SynthesisInstruction);
+        var chatHistory = BuildBatchChatHistory(question, research, history, criticFeedback);
 
         var settings = new AmazonClaudeExecutionSettings
         {
@@ -76,6 +62,85 @@ public sealed class WriterAgent : IWriterAgent
 
         var fallback = BuildDeterministicAnswer(question, research.Sources);
         return ParseStructuredAnswer(rawOutput, research.Sources, research.ToolsUsed, fallback);
+    }
+
+    // ── Streaming (plain-text prose) ─────────────────────────────────────────
+
+    /// <inheritdoc/>
+    public async IAsyncEnumerable<string> StreamAsync(
+        string question,
+        ResearchResult research,
+        IReadOnlyList<ChatMessage> history,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var chatHistory = BuildStreamingChatHistory(question, research, history);
+
+        var settings = new AmazonClaudeExecutionSettings
+        {
+            MaxTokensToSample = 2048,
+            FunctionChoiceBehavior = FunctionChoiceBehavior.None(),
+        };
+
+        await foreach (var chunk in _chatService.GetStreamingChatMessageContentsAsync(
+            chatHistory, settings, _kernel, ct))
+        {
+            if (!string.IsNullOrEmpty(chunk.Content))
+            {
+                yield return chunk.Content;
+            }
+        }
+    }
+
+    // ── Chat history builders ─────────────────────────────────────────────────
+    private static ChatHistory BuildBatchChatHistory(
+        string question,
+        ResearchResult research,
+        IReadOnlyList<ChatMessage> history,
+        string? criticFeedback)
+    {
+        var chatHistory = new ChatHistory(SystemPrompt);
+        AddConversationHistory(chatHistory, history);
+
+        chatHistory.AddUserMessage(question);
+        chatHistory.AddUserMessage($"Search results:\n{research.SourcesJson}");
+
+        if (!string.IsNullOrWhiteSpace(criticFeedback))
+        {
+            chatHistory.AddUserMessage(
+                $"A critic reviewed a previous draft of this answer and identified the following issues: " +
+                $"{criticFeedback} Please address these issues in your revised answer.");
+        }
+
+        chatHistory.AddUserMessage(SynthesisInstruction);
+        return chatHistory;
+    }
+
+    private static ChatHistory BuildStreamingChatHistory(
+        string question,
+        ResearchResult research,
+        IReadOnlyList<ChatMessage> history)
+    {
+        var chatHistory = new ChatHistory(StreamingSystemPrompt);
+        AddConversationHistory(chatHistory, history);
+
+        chatHistory.AddUserMessage(question);
+        chatHistory.AddUserMessage($"Search results:\n{research.SourcesJson}");
+        chatHistory.AddUserMessage(StreamingInstruction);
+        return chatHistory;
+    }
+
+    private static void AddConversationHistory(ChatHistory chatHistory, IReadOnlyList<ChatMessage> history)
+    {
+        foreach (var msg in history)
+        {
+            var role = msg.Role switch
+            {
+                "assistant" => AuthorRole.Assistant,
+                "system" => AuthorRole.System,
+                _ => AuthorRole.User,
+            };
+            chatHistory.Add(new ChatMessageContent(role, msg.Content));
+        }
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

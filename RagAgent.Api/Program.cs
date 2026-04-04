@@ -27,6 +27,7 @@ public class Program
         builder.Services.AddScoped<IPostIndexingService, PostIndexingService>();
         builder.Services.AddScoped<ISemanticSearchService, SemanticSearchService>();
         builder.Services.AddScoped<IAgentOrchestrationService, AgentOrchestrationService>();
+        builder.Services.AddScoped<IAgentStreamingService, AgentStreamingService>();
         builder.Services.AddSingleton<IConversationStore, InMemoryConversationStore>();
         builder.Services.AddSingleton<IngestionTracker>();
         builder.Services.AddHostedService<IndexingStartupService>();

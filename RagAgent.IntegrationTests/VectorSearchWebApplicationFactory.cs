@@ -112,6 +112,11 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
             // so agent endpoint tests do not depend on Bedrock runtime services.
             services.AddScoped<IAgentAnswerService, TestAgentAnswerService>();
 
+            // Replace streaming service with a no-op stub so the controller can be
+            // instantiated without the SK Kernel (which is removed above).
+            services.RemoveAll<IAgentStreamingService>();
+            services.AddScoped<IAgentStreamingService, StubAgentStreamingService>();
+
             // Remove startup indexing — tests control index state themselves.
             var indexingService = services.FirstOrDefault(d => d.ImplementationType == typeof(IndexingStartupService));
             if (indexingService != null)
