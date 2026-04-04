@@ -32,7 +32,7 @@ RagAgent.Agents/                    # AWS + Qdrant implementations
 ├── Process/                        # SK KernelProcess pipeline
 │   ├── ProcessAnswerService.cs     # IAgentAnswerService backed by KernelProcess
 │   └── Steps/                      # ResearchStep, WriteStep, CriticStep, OutputStep
-├── EmbeddingService.cs             # Bedrock Titan via IEmbeddingGenerator (Channel-based streaming)
+├── EmbeddingService.cs             # Cohere embed-english-v3 via IEmbeddingGenerator (Channel-based streaming)
 ├── SemanticSearchPlugin.cs         # SK plugin: embed query → vector search → enrich snippets
 ├── IndexingPlugin.cs               # SK plugin: auto-index if vector store is empty
 ├── ToolInvocationFilter.cs         # SK invocation filter: logging + topK normalisation
@@ -91,7 +91,7 @@ flowchart LR
   ORC --> PAS[ProcessAnswerService]
   PAS --> RS[ResearchStep]
   RS --> SP[SemanticSearchPlugin]
-  SP --> BRT[Bedrock Titan]
+  SP --> BRT[Cohere Embed]
   BRT --> VS[(Vector Store)]
   PAS --> WS[WriteStep]
   WS --> BRC[Bedrock Claude]
@@ -108,7 +108,7 @@ flowchart LR
 
 | Capability | Implementation |
 |---|---|
-| **Embeddings** | `EmbeddingService` — Bedrock Titan via `IEmbeddingGenerator`, Channel-based streaming with backpressure |
+| **Embeddings** | `EmbeddingService` — Cohere embed-english-v3 via `IEmbeddingGenerator`, Channel-based streaming with backpressure |
 | **Research** | `ResearcherAgent` — invokes `SemanticSearchPlugin` to retrieve and enrich sources |
 | **Answer synthesis** | `WriterAgent` — Bedrock Claude via `IChatCompletionService`, structured JSON output (answer + citations + grounded flag) |
 | **Critique** | `CriticAgent` — Bedrock Claude reviews draft; approves or triggers a revision loop |
