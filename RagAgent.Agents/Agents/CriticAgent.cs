@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.Amazon;
@@ -15,8 +14,6 @@ namespace RagAgent.Agents.Agents;
 /// </summary>
 public sealed class CriticAgent : ICriticAgent
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
-
     private const string SystemPrompt =
         "You are a quality critic for AI-generated answers. " +
         "Evaluate whether the given answer is relevant to the question and grounded in the provided sources. " +
@@ -84,10 +81,10 @@ public sealed class CriticAgent : ICriticAgent
 
     private static CriticResult ParseCriticResponse(string rawOutput)
     {
-        var json = ExtractJson(rawOutput);
+        var json = AgentJsonHelpers.ExtractJson(rawOutput);
         try
         {
-            var parsed = JsonSerializer.Deserialize<CriticLlmResponse>(json, JsonOptions);
+            var parsed = JsonSerializer.Deserialize<CriticLlmResponse>(json, AgentJsonHelpers.JsonOptions);
             if (parsed != null)
             {
                 return new CriticResult
@@ -102,24 +99,6 @@ public sealed class CriticAgent : ICriticAgent
 
         // If we can't parse the critic response, approve and move on rather than looping forever
         return new CriticResult { Approved = true, Feedback = string.Empty, Checks = [] };
-    }
-
-    private static string ExtractJson(string raw)
-    {
-        var fenceMatch = Regex.Match(raw, @"```(?:json)?\s*\n?(.*?)\n?\s*```", RegexOptions.Singleline);
-        if (fenceMatch.Success)
-        {
-            return fenceMatch.Groups[1].Value.Trim();
-        }
-
-        var start = raw.IndexOf('{');
-        var end = raw.LastIndexOf('}');
-        if (start >= 0 && end > start)
-        {
-            return raw[start..(end + 1)];
-        }
-
-        return raw;
     }
 
     private sealed record CriticLlmResponse

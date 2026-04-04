@@ -13,8 +13,6 @@ namespace RagAgent.Agents.Agents;
 /// </summary>
 public sealed class ResearcherAgent : IResearcherAgent
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
-
     private readonly SemanticSearchPlugin _searchPlugin;
 
     public ResearcherAgent(SemanticSearchPlugin searchPlugin)
@@ -25,7 +23,7 @@ public sealed class ResearcherAgent : IResearcherAgent
     public async Task<ResearchResult> ResearchAsync(string question, int topK)
     {
         var sourcesJson = await _searchPlugin.SearchPostsAsync(question, topK);
-        var sources = JsonSerializer.Deserialize<List<AgentSource>>(sourcesJson, JsonOptions) ?? [];
+        var sources = JsonSerializer.Deserialize<List<AgentSource>>(sourcesJson, AgentJsonHelpers.JsonOptions) ?? [];
 
         return new ResearchResult
         {

@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.Amazon;
@@ -15,8 +14,6 @@ namespace RagAgent.Agents.Agents;
 /// </summary>
 public sealed class WriterAgent : IWriterAgent
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
-
     private const string SystemPrompt =
         "You are a synthesis specialist. You receive pre-retrieved search results and produce a concise, " +
         "grounded answer. You do not call any tools. Answer solely from the provided sources.";
@@ -150,10 +147,10 @@ public sealed class WriterAgent : IWriterAgent
         IReadOnlyList<string> toolsUsed,
         string fallback)
     {
-        var json = ExtractJson(rawOutput);
+        var json = AgentJsonHelpers.ExtractJson(rawOutput);
         try
         {
-            var structured = JsonSerializer.Deserialize<StructuredLlmAnswer>(json, JsonOptions);
+            var structured = JsonSerializer.Deserialize<StructuredLlmAnswer>(json, AgentJsonHelpers.JsonOptions);
             if (structured != null && !string.IsNullOrWhiteSpace(structured.Answer))
             {
                 return new AgentAnswerResult
@@ -183,24 +180,6 @@ public sealed class WriterAgent : IWriterAgent
         var evidence = string.Join("\n", sources.Take(3).Select((s, i) =>
             $"{i + 1}. {s.Title} [PostId: {s.PostId}] - {s.Snippet}"));
         return $"Grounded answer for: {question}\n\nSupporting evidence:\n{evidence}";
-    }
-
-    private static string ExtractJson(string raw)
-    {
-        var fenceMatch = Regex.Match(raw, @"```(?:json)?\s*\n?(.*?)\n?\s*```", RegexOptions.Singleline);
-        if (fenceMatch.Success)
-        {
-            return fenceMatch.Groups[1].Value.Trim();
-        }
-
-        var start = raw.IndexOf('{');
-        var end = raw.LastIndexOf('}');
-        if (start >= 0 && end > start)
-        {
-            return raw[start..(end + 1)];
-        }
-
-        return raw;
     }
 
     private sealed record StructuredLlmAnswer

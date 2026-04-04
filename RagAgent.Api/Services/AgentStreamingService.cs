@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using RagAgent.Agents.Agents;
-using RagAgent.Agents.Filters;
 using RagAgent.Agents.Telemetry;
 using RagAgent.Api.Dtos;
 using RagAgent.Api.Dtos.Mappers;
@@ -18,8 +17,6 @@ public sealed class AgentStreamingService(
     IWriterAgent writerAgent,
     IConversationStore conversationStore) : IAgentStreamingService
 {
-    private const int MaxAnswerLength = 3_000;
-
     public async IAsyncEnumerable<StreamEventDto> StreamAsync(
         AgentAskRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
@@ -27,7 +24,7 @@ public sealed class AgentStreamingService(
         using var activity = AgentActivitySource.Source.StartActivity("agent.stream");
 
         // Input guardrails — store any violation outside try/catch so we can yield after.
-        var guardrailViolation = CheckGuardrails(request.Question);
+        var guardrailViolation = CaptureGuardrailViolation(request.Question);
         if (guardrailViolation is not null)
         {
             activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, guardrailViolation);
@@ -70,9 +67,9 @@ public sealed class AgentStreamingService(
         var answer = buffer.ToString().Trim();
 
         // Output guardrail: length limit.
-        if (answer.Length > MaxAnswerLength)
+        if (answer.Length > AgentPipelineConstants.MaxAnswerLength)
         {
-            answer = answer[..MaxAnswerLength] + " … [response truncated]";
+            answer = answer[..AgentPipelineConstants.MaxAnswerLength] + " … [response truncated]";
         }
 
         await conversationStore.AppendAsync(conversationId, new ChatMessage("assistant", answer));
@@ -91,13 +88,11 @@ public sealed class AgentStreamingService(
     /// Runs input guardrail checks and returns the violation reason, or null if clean.
     /// Cannot throw inside an async iterator, so we capture the result here instead.
     /// </summary>
-    private static string? CheckGuardrails(string question)
+    private static string? CaptureGuardrailViolation(string question)
     {
         try
         {
-            InputGuardrailFilter.CheckForInjection(question);
-            InputGuardrailFilter.CheckForPii(question);
-            InputGuardrailFilter.CheckTopicScope(question);
+            AgentPipelineGuardrails.ValidateQuestion(question);
             return null;
         }
         catch (GuardrailException ex)

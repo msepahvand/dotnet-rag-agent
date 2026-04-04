@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using RagAgent.Agents.Filters;
 using RagAgent.Agents.Telemetry;
 using RagAgent.Core;
 using RagAgent.Core.Models;
@@ -10,8 +9,6 @@ public sealed class AgentOrchestrationService(
     IAgentAnswerService agentAnswerService,
     IConversationStore conversationStore) : IAgentOrchestrationService
 {
-    private const int MaxAnswerLength = 3_000;
-
     public async Task<AgentAskResponse> AskAsync(AgentAskRequest request)
     {
         using var activity = AgentActivitySource.Source.StartActivity("agent.ask");
@@ -19,7 +16,7 @@ public sealed class AgentOrchestrationService(
         try
         {
             // Input guardrails: validate the user question before invoking the agent pipeline.
-            ValidateQuestion(request.Question);
+            AgentPipelineGuardrails.ValidateQuestion(request.Question);
 
             var conversationId = string.IsNullOrWhiteSpace(request.ConversationId)
                 ? Guid.NewGuid().ToString()
@@ -69,20 +66,6 @@ public sealed class AgentOrchestrationService(
         }
     }
 
-    // ── Input guardrails ─────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Validates the user question against prompt injection, PII, and topic scope rules.
-    /// Delegates to the same checks used by <see cref="InputGuardrailFilter"/> so both
-    /// code paths are consistent.
-    /// </summary>
-    private static void ValidateQuestion(string question)
-    {
-        InputGuardrailFilter.CheckForInjection(question);
-        InputGuardrailFilter.CheckForPii(question);
-        InputGuardrailFilter.CheckTopicScope(question);
-    }
-
     // ── Output guardrails ────────────────────────────────────────────────────
 
     /// <summary>
@@ -100,8 +83,8 @@ public sealed class AgentOrchestrationService(
             .Where(c => validPostIds.Contains(c.PostId))
             .ToList();
 
-        var answer = result.Answer.Length > MaxAnswerLength
-            ? result.Answer[..MaxAnswerLength] + " … [response truncated]"
+        var answer = result.Answer.Length > AgentPipelineConstants.MaxAnswerLength
+            ? result.Answer[..AgentPipelineConstants.MaxAnswerLength] + " … [response truncated]"
             : result.Answer;
 
         return result with
