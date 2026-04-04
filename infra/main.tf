@@ -65,8 +65,8 @@ resource "aws_security_group" "ecs_tasks" {
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
-    from_port       = 8080
-    to_port         = 8080
+    from_port       = var.container_port
+    to_port         = var.container_port
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
@@ -91,7 +91,7 @@ resource "aws_lb" "api" {
 
 resource "aws_lb_target_group" "api" {
   name        = var.ecs_service_name
-  port        = 8080
+  port        = var.container_port
   protocol    = "HTTP"
   vpc_id      = data.aws_vpc.default.id
   target_type = "ip"
@@ -258,7 +258,7 @@ resource "aws_ecs_task_definition" "api" {
     essential = true
 
     portMappings = [{
-      containerPort = 8080
+      containerPort = var.container_port
       protocol      = "tcp"
     }]
 
@@ -294,7 +294,7 @@ resource "aws_ecs_service" "api" {
   load_balancer {
     target_group_arn = aws_lb_target_group.api.arn
     container_name   = var.ecs_container_name
-    container_port   = 8080
+    container_port   = var.container_port
   }
 
   # Rolling deployment: ECS keeps the old task running until the new one is healthy.

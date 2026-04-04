@@ -128,3 +128,9 @@ variable "ecs_bootstrap_image_tag" {
   type        = string
   default     = "latest"
 }
+
+variable "container_port" {
+  description = "Port the API container listens on"
+  type        = number
+  default     = 8080
+}
