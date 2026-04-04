@@ -7,7 +7,6 @@ public sealed class SemanticSearchService(IVectorService vectorService) : ISeman
 {
     public Task<List<SearchResult>> SearchAsync(string query, int topK)
     {
-        var normalizedTopK = topK <= 0 ? 10 : topK;
-        return vectorService.SemanticSearchAsync(query, normalizedTopK);
+        return vectorService.SemanticSearchAsync(query, TopKNormaliser.Normalise(topK));
     }
 }

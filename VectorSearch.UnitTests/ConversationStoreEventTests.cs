@@ -118,4 +118,23 @@ public class ConversationStoreEventTests
             .Should().ContainSingle()
             .Which.ConversationId.Should().Be("conv-a");
     }
+
+    // ── Message cap ─────────────────────────────────────────────────────────
+    [Fact]
+    public async Task AppendAsync_WhenMessagesExceedCap_RemovesOldestMessages()
+    {
+        var store = CreateStore();
+        const string convId = "conv-trim";
+
+        for (var i = 0; i < 42; i++)
+        {
+            await store.AppendAsync(convId, new ChatMessage("user", $"message-{i}"));
+        }
+
+        var history = await store.GetHistoryAsync(convId);
+
+        history.Should().HaveCount(40);
+        history[0].Content.Should().Be("message-2");   // first two trimmed
+        history[^1].Content.Should().Be("message-41"); // last message retained
+    }
 }

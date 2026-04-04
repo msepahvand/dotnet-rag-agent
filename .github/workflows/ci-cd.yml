@@ -33,8 +33,21 @@ jobs:
         run: |
           dotnet build VectorSearch.Api.sln --configuration Release
           dotnet format VectorSearch.Api.sln --verify-no-changes --severity warn
+          dotnet test VectorSearch.UnitTests/VectorSearch.UnitTests.csproj \
+            --configuration Release --no-build --verbosity normal \
+            --collect:"XPlat Code Coverage" --results-directory coverage
           dotnet test VectorSearch.IntegrationTests/VectorSearch.IntegrationTests.csproj \
             --configuration Release --no-build --verbosity normal
+
+      - name: Report coverage
+        run: |
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+          reportgenerator \
+            -reports:"coverage/**/coverage.cobertura.xml" \
+            -targetdir:"coverage/report" \
+            -reporttypes:"TextSummary" \
+            -assemblyfilters:"+VectorSearch.Api;+VectorSearch.Core;+VectorSearch.S3"
+          cat coverage/report/Summary.txt
 
   infrastructure:
     name: Deploy infrastructure
