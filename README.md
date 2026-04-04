@@ -1,12 +1,17 @@
 # .NET RAG Agent with Multiple Vector Store Providers
 
-Retrieval-augmented generation (RAG) API using a Researcher + Writer multi-agent pattern, vector embeddings, and pluggable vector store backends. Built on ASP.NET Core 8.0 and Semantic Kernel.
+[![CI/CD](https://github.com/msepahvand/dotnet-rag-agent/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/msepahvand/dotnet-rag-agent/actions/workflows/ci-cd.yml)
+
+Retrieval-augmented generation (RAG) API using a Researcher → Critic → Writer SK Process pipeline, vector embeddings, and pluggable vector store backends. Built on ASP.NET Core 8.0 and Semantic Kernel.
 
 ```
 POST /api/agent/ask
   → AgentOrchestrationService
-    → ResearcherAgent (SemanticSearchPlugin → vector store)
-    → WriterAgent (Bedrock Claude → grounded answer + citations)
+    → ProcessAnswerService (KernelProcess)
+      → ResearchStep  (SemanticSearchPlugin → vector store)
+      → WriteStep     (Bedrock Claude → draft answer + citations)
+      → CriticStep    (Bedrock Claude → approve or request revision)
+      → OutputStep    (final grounded answer)
   → persisted to InMemoryConversationStore
 ```
 
@@ -21,8 +26,12 @@ RagAgent.Core/                      # Provider-agnostic contracts
 RagAgent.Agents/                    # AWS + Qdrant implementations
 ├── Agents/
 │   ├── ResearcherAgent.cs          # Runs SemanticSearchPlugin, returns sources
-│   └── WriterAgent.cs              # Synthesises sources → grounded answer via Bedrock Claude
-├── MultiAgentAnswerService.cs      # Orchestrates Researcher → Writer
+│   ├── WriterAgent.cs              # Synthesises sources → grounded answer via Bedrock Claude
+│   ├── CriticAgent.cs              # Reviews draft answer, approves or requests revision
+│   └── EvaluationAgent.cs         # Runs question set, computes hit@k / groundedness / citation metrics
+├── Process/                        # SK KernelProcess pipeline
+│   ├── ProcessAnswerService.cs     # IAgentAnswerService backed by KernelProcess
+│   └── Steps/                      # ResearchStep, WriteStep, CriticStep, OutputStep
 ├── EmbeddingService.cs             # Bedrock Titan via IEmbeddingGenerator (Channel-based streaming)
 ├── SemanticSearchPlugin.cs         # SK plugin: embed query → vector search → enrich snippets
 ├── IndexingPlugin.cs               # SK plugin: auto-index if vector store is empty
@@ -33,14 +42,18 @@ RagAgent.Agents/                    # AWS + Qdrant implementations
 
 RagAgent.Redis/                     # RedisVectorStore.cs
 RagAgent.Api/                       # Controllers + thin services
-├── Controllers/                    # Agent, Conversations, Index, Posts, Search
+├── Controllers/                    # Agent, Conversations, Evaluation, Index, Posts, Search
 ├── Services/
 │   ├── AgentOrchestrationService.cs    # Loads history, calls IAgentAnswerService, persists messages
 │   ├── InMemoryConversationStore.cs    # Singleton; exposes Subscribe() → IAsyncEnumerable<ConversationEvent>
+│   ├── IngestionBackgroundService.cs   # Polls HackerNews, indexes new posts automatically
+│   ├── IngestionTracker.cs             # Tracks which post IDs have been indexed this process lifetime
+│   ├── IndexingStartupService.cs       # Seeds IngestionTracker on startup
 │   ├── PostIndexingService.cs          # Streams embeddings with backpressure (max 3 concurrent)
 │   ├── PostsQueryService.cs
 │   └── SemanticSearchService.cs
-RagAgent.IntegrationTests/          # 24 tests
+RagAgent.UnitTests/                 # Unit tests (business logic, orchestration, agents)
+RagAgent.IntegrationTests/          # Integration tests (end-to-end API via Testcontainers)
 ```
 
 ---
@@ -77,12 +90,16 @@ dotnet test RagAgent.IntegrationTests                         # run tests
 ```mermaid
 flowchart LR
   A[POST /agent/ask] --> ORC[AgentOrchestrationService]
-  ORC --> RA[ResearcherAgent]
-  ORC --> WA[WriterAgent]
-  RA --> SP[SemanticSearchPlugin]
+  ORC --> PAS[ProcessAnswerService]
+  PAS --> RS[ResearchStep]
+  RS --> SP[SemanticSearchPlugin]
   SP --> BRT[Bedrock Titan]
   BRT --> VS[(Vector Store)]
-  WA --> BRC[Bedrock Claude]
+  PAS --> WS[WriteStep]
+  WS --> BRC[Bedrock Claude]
+  PAS --> CS2[CriticStep]
+  CS2 --> BRC
+  PAS --> OS[OutputStep]
   ORC --> CS[InMemoryConversationStore]
 
   SC[GET /search] --> BRT
@@ -96,7 +113,9 @@ flowchart LR
 | **Embeddings** | `EmbeddingService` — Bedrock Titan via `IEmbeddingGenerator`, Channel-based streaming with backpressure |
 | **Research** | `ResearcherAgent` — invokes `SemanticSearchPlugin` to retrieve and enrich sources |
 | **Answer synthesis** | `WriterAgent` — Bedrock Claude via `IChatCompletionService`, structured JSON output (answer + citations + grounded flag) |
-| **Orchestration** | `MultiAgentAnswerService` → `AgentOrchestrationService` (history load/persist) |
+| **Critique** | `CriticAgent` — Bedrock Claude reviews draft; approves or triggers a revision loop |
+| **Evaluation** | `EvaluationAgent` — runs a question set, scores hit@k, groundedness, and citation validity |
+| **Orchestration** | `ProcessAnswerService` (KernelProcess) → `AgentOrchestrationService` (history load/persist) |
 | **Plugins** | `SemanticSearchPlugin` (retrieval), `IndexingPlugin` (auto-index on first ask) |
 | **Invocation Filter** | `ToolInvocationFilter` — logs calls, normalises topK, enforces guardrails |
 
@@ -147,30 +166,12 @@ Or via env vars: `$env:VectorStore__Provider="Qdrant"`, etc.
 | POST | `/api/index/{id}` | Index a single post |
 | GET | `/api/search?query=<text>&topK=<n>` | Semantic search (default topK=10) |
 | POST | `/api/agent/ask` | RAG agent ask (`{ "question": "...", "topK": 5, "conversationId": "..." }`) |
+| POST | `/api/agent/evaluate` | Run evaluation question set, returns hit@k / groundedness / citation metrics |
 | GET | `/api/agent/conversations` | List all conversation IDs |
 | GET | `/api/agent/conversations/{id}` | Get full message history for a conversation |
 | DELETE | `/api/agent/conversations/{id}` | Delete a conversation |
 
 The agent endpoint auto-indexes if the vector store is empty, runs semantic retrieval via `ResearcherAgent`, and returns a grounded answer with `[PostId: N]` citations. Conversation history is maintained per `conversationId` for multi-turn context.
-
----
-
-## Testing
-
-**24 tests** — xUnit + Testcontainers + WebApplicationFactory:
-
-| Tests | Scope |
-|-------|-------|
-| 7 Theory × 2 providers (Qdrant + Redis) | End-to-end API: posts, indexing, search, error handling |
-| 5 Fact | Options validator unit tests |
-| 2 Fact | IndexingPlugin: auto-index + skip-when-populated |
-| 1 Fact | SemanticSearchPlugin round-trip |
-
-```powershell
-dotnet test                                                   # all tests
-dotnet test --filter "GetPosts_ReturnsSuccessAndPosts"         # single test
-dotnet test --filter "provider=Redis"                          # single provider
-```
 
 ---
 
