@@ -73,7 +73,7 @@ public sealed class ProcessAnswerService : IAgentAnswerService
         // Research complete → first write
         researchStep
             .OnEvent(ResearchStep.Events.ResearchComplete)
-            .SendEventTo(new ProcessFunctionTargetBuilder(writeStep, nameof(WriteStep.Write)));
+            .SendEventTo(new ProcessFunctionTargetBuilder(writeStep, "Write"));
 
         // Draft ready → critic evaluation
         writeStep
@@ -88,7 +88,7 @@ public sealed class ProcessAnswerService : IAgentAnswerService
         // Critic requests revision → writer revises (loop)
         criticStep
             .OnEvent(CriticStep.Events.RevisionRequested)
-            .SendEventTo(new ProcessFunctionTargetBuilder(writeStep, nameof(WriteStep.Revise)));
+            .SendEventTo(new ProcessFunctionTargetBuilder(writeStep, "Revise"));
 
         // Final iteration → skip critic, capture output directly
         writeStep
