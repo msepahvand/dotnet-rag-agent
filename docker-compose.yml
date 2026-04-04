@@ -32,6 +32,16 @@ services:
       timeout: 5s
       retries: 5
 
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: vector-search-jaeger
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC receiver
+      - "4318:4318"    # OTLP HTTP receiver
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+
   api:
     build:
       context: .
@@ -46,9 +56,12 @@ services:
       - VectorStore__Qdrant__Url=http://qdrant:6333
       - VectorStore__Qdrant__CollectionName=posts
       - VectorStore__Qdrant__VectorSize=1024
+      - OpenTelemetry__OtlpEndpoint=http://jaeger:4317
     depends_on:
       qdrant:
         condition: service_healthy
+      jaeger:
+        condition: service_started
 
 volumes:
   qdrant_storage:

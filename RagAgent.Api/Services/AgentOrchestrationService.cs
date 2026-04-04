@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using RagAgent.Agents.Filters;
+using RagAgent.Agents.Telemetry;
 using RagAgent.Core;
 using RagAgent.Core.Models;
 
@@ -12,36 +14,59 @@ public sealed class AgentOrchestrationService(
 
     public async Task<AgentAskResponse> AskAsync(AgentAskRequest request)
     {
-        // Input guardrails: validate the user question before invoking the agent pipeline.
-        ValidateQuestion(request.Question);
+        using var activity = AgentActivitySource.Source.StartActivity("agent.ask");
 
-        var conversationId = string.IsNullOrWhiteSpace(request.ConversationId)
-            ? Guid.NewGuid().ToString()
-            : request.ConversationId;
-
-        var topK = TopKNormaliser.Normalise(request.TopK);
-
-        var history = await conversationStore.GetHistoryAsync(conversationId);
-
-        await conversationStore.AppendAsync(conversationId, new ChatMessage("user", request.Question));
-
-        var result = await agentAnswerService.AnswerAsync(request.Question, topK, history);
-
-        // Output guardrails: sanitise the answer before returning to the caller.
-        result = SanitiseAnswer(result);
-
-        await conversationStore.AppendAsync(conversationId, new ChatMessage("assistant", result.Answer));
-
-        return new AgentAskResponse
+        try
         {
-            ConversationId = conversationId,
-            ToolsUsed = result.ToolsUsed.Count > 0 ? result.ToolsUsed : ["search_posts"],
-            Grounded = result.Grounded,
-            Answer = result.Answer,
-            Citations = result.Citations,
-            Sources = result.Sources,
-            Iterations = result.Iterations
-        };
+            // Input guardrails: validate the user question before invoking the agent pipeline.
+            ValidateQuestion(request.Question);
+
+            var conversationId = string.IsNullOrWhiteSpace(request.ConversationId)
+                ? Guid.NewGuid().ToString()
+                : request.ConversationId;
+
+            var topK = TopKNormaliser.Normalise(request.TopK);
+
+            activity?.SetTag("conversation.id", conversationId);
+            activity?.SetTag("rag.top_k", topK);
+
+            var history = await conversationStore.GetHistoryAsync(conversationId);
+
+            await conversationStore.AppendAsync(conversationId, new ChatMessage("user", request.Question));
+
+            var result = await agentAnswerService.AnswerAsync(request.Question, topK, history);
+
+            // Output guardrails: sanitise the answer before returning to the caller.
+            result = SanitiseAnswer(result);
+
+            activity?.SetTag("rag.grounded", result.Grounded);
+            activity?.SetTag("rag.iterations", result.Iterations);
+            activity?.SetTag("rag.citations_count", result.Citations.Count);
+            activity?.SetTag("rag.tools_used", string.Join(",", result.ToolsUsed));
+
+            await conversationStore.AppendAsync(conversationId, new ChatMessage("assistant", result.Answer));
+
+            return new AgentAskResponse
+            {
+                ConversationId = conversationId,
+                ToolsUsed = result.ToolsUsed.Count > 0 ? result.ToolsUsed : ["search_posts"],
+                Grounded = result.Grounded,
+                Answer = result.Answer,
+                Citations = result.Citations,
+                Sources = result.Sources,
+                Iterations = result.Iterations
+            };
+        }
+        catch (GuardrailException ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Reason);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            throw;
+        }
     }
 
     // ── Input guardrails ─────────────────────────────────────────────────────

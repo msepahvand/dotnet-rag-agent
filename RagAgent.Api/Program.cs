@@ -1,10 +1,13 @@
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.OpenApi.Models;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using RagAgent.Agents;
+using RagAgent.Agents.Telemetry;
 using RagAgent.Api.Extensions;
 using RagAgent.Api.Services;
 using RagAgent.Core;
-using RagAgent.Agents;
 
 namespace RagAgent.Api;
 
@@ -28,6 +31,27 @@ public class Program
         builder.Services.AddSingleton<IngestionTracker>();
         builder.Services.AddHostedService<IndexingStartupService>();
         builder.Services.AddHostedService<IngestionBackgroundService>();
+
+        // OpenTelemetry tracing — active when OpenTelemetry:OtlpEndpoint is set.
+        // Sources: ASP.NET Core requests, outbound HTTP calls, SK tool/LLM invocations, agent pipeline.
+        var otlpEndpoint = builder.Configuration["OpenTelemetry:OtlpEndpoint"];
+        var serviceName = builder.Configuration["OpenTelemetry:ServiceName"] ?? "rag-agent";
+
+        builder.Services.AddOpenTelemetry()
+            .WithTracing(tracing =>
+            {
+                tracing
+                    .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(serviceName))
+                    .AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation()
+                    .AddSource("Microsoft.SemanticKernel*")
+                    .AddSource(AgentActivitySource.Name);
+
+                if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+                {
+                    tracing.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
+                }
+            });
 
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen(options =>
