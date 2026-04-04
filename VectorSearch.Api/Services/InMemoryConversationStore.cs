@@ -13,6 +13,7 @@ public sealed class InMemoryConversationStore(IMemoryCache cache) : IConversatio
     private static readonly TimeSpan ConversationTtl = TimeSpan.FromMinutes(30);
 
     private readonly ConcurrentDictionary<string, Unit> _conversationIds = new();
+    private readonly ConcurrentDictionary<string, Unit> _deletingIds = new();
     private readonly List<ChannelWriter<ConversationEvent>> _subscribers = [];
     private readonly object _subscribersLock = new();
 
@@ -56,7 +57,12 @@ public sealed class InMemoryConversationStore(IMemoryCache cache) : IConversatio
 
     public Task DeleteAsync(string conversationId)
     {
+        // Mark as intentionally deleted so the eviction callback does not also
+        // emit ConversationExpired. MemoryCache calls eviction callbacks synchronously
+        // inside Remove(), so the flag is checked before we clear it.
+        _deletingIds.TryAdd(conversationId, default);
         cache.Remove(conversationId);
+        _deletingIds.TryRemove(conversationId, out _);
         _conversationIds.TryRemove(conversationId, out _);
         Broadcast(new ConversationEvent.ConversationDeleted(conversationId));
         return Task.CompletedTask;
@@ -101,7 +107,11 @@ public sealed class InMemoryConversationStore(IMemoryCache cache) : IConversatio
 
     private void OnEviction(object key, object? value, EvictionReason reason, object? state)
     {
-        _conversationIds.TryRemove(key.ToString()!, out _);
-        Broadcast(new ConversationEvent.ConversationExpired(key.ToString()!));
+        var id = key.ToString()!;
+        _conversationIds.TryRemove(id, out _);
+        if (!_deletingIds.ContainsKey(id))
+        {
+            Broadcast(new ConversationEvent.ConversationExpired(id));
+        }
     }
 }
