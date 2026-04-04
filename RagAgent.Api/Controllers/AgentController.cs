@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using RagAgent.Api.Dtos;
 using RagAgent.Api.Dtos.Mappers;
 using RagAgent.Api.Services;
+using RagAgent.Core;
 
 namespace RagAgent.Api.Controllers;
 
@@ -12,7 +13,14 @@ public sealed class AgentController(IAgentOrchestrationService agentOrchestratio
     [HttpPost("ask")]
     public async Task<IActionResult> AskAsync([FromBody] AskRequestDto request)
     {
-        var result = await agentOrchestrationService.AskAsync(AgentMapper.ToModel(request));
-        return Ok(AgentMapper.ToDto(result));
+        try
+        {
+            var result = await agentOrchestrationService.AskAsync(AgentMapper.ToModel(request));
+            return Ok(AgentMapper.ToDto(result));
+        }
+        catch (GuardrailException ex)
+        {
+            return BadRequest(new { error = ex.Reason });
+        }
     }
 }

@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
 using RagAgent.Core;
 using RagAgent.Agents.Agents;
+using RagAgent.Agents.Filters;
 using RagAgent.Agents.Process;
 
 namespace RagAgent.Agents;
@@ -34,7 +35,14 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<IAmazonBedrockRuntime>(),
                 options.EmbeddingModelId));
         services.AddBedrockChatCompletionService(options.ChatModelId);
+
+        // Function invocation filters (tool calls): logging/normalisation, then output guardrails.
         services.AddScoped<IFunctionInvocationFilter, ToolInvocationFilter>();
+        services.AddScoped<IFunctionInvocationFilter, OutputGuardrailFilter>();
+
+        // Prompt render filter: input guardrails for kernel prompt functions.
+        services.AddScoped<IPromptRenderFilter, InputGuardrailFilter>();
+
         services.AddTransient(sp =>
         {
             var kernel = new Kernel(sp);
@@ -42,6 +50,11 @@ public static class ServiceCollectionExtensions
             foreach (var filter in sp.GetServices<IFunctionInvocationFilter>())
             {
                 kernel.FunctionInvocationFilters.Add(filter);
+            }
+
+            foreach (var filter in sp.GetServices<IPromptRenderFilter>())
+            {
+                kernel.PromptRenderFilters.Add(filter);
             }
 
             return kernel;
