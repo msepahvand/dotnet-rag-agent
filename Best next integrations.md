@@ -105,56 +105,61 @@ This is a strong foundation. Everything below builds directly on it.
 
 ## Phase 4 — Autonomous Agents
 
-### 4.1 Ingestion Agent
+### ~~4.1 Ingestion Agent~~ ✅
 
-Build an agent that watches for new content and autonomously indexes it.
+~~Build an agent that watches for new content and autonomously indexes it.~~
 
-- Background service that polls for new posts on a timer
-- Chunks content, generates embeddings, upserts into the vector store
-- Uses the existing `IndexingPlugin` but runs autonomously, not on user request
-- **Why**: Not all agents are user-facing. Background autonomous agents are a huge enterprise use case (data pipelines, monitoring, ETL).
+- ~~Background service that polls for new posts on a timer~~
+- ~~Chunks content, generates embeddings, upserts into the vector store~~
+- ~~Uses the existing `IndexingPlugin` but runs autonomously, not on user request~~
+- ~~**Why**: Not all agents are user-facing. Background autonomous agents are a huge enterprise use case (data pipelines, monitoring, ETL).~~
+- **Done**: `IngestionBackgroundService` polls HackerNews on a configurable timer, embeddings via `PostIndexingService` (Channel-based streaming with backpressure, max 3 concurrent), tracks indexed IDs in `IngestionTracker` to avoid re-indexing. `IndexingStartupService` seeds the tracker on startup.
 
-### 4.2 Evaluation Agent
+### ~~4.2 Evaluation Agent~~ ✅
 
-Build an agent that scores retrieval and answer quality.
+~~Build an agent that scores retrieval and answer quality.~~
 
-- Define a test question set with expected answers / source IDs
-- Agent runs each question, compares results, and computes metrics:
-  - **Hit@k**: Did the correct source appear in top-k results?
-  - **Groundedness**: Is every claim in the answer backed by a retrieved source?
-  - **Hallucination rate**: Does the answer contain claims not in any source?
-- Output a score report as structured JSON
-- **Why**: You can't improve what you can't measure. Evaluation is the most underrated agentic skill.
+- ~~Define a test question set with expected answers / source IDs~~
+- ~~Agent runs each question, compares results, and computes metrics:~~
+  - ~~**Hit@k**: Did the correct source appear in top-k results?~~
+  - ~~**Groundedness**: Is every claim in the answer backed by a retrieved source?~~
+  - ~~**Hallucination rate**: Does the answer contain claims not in any source?~~
+- ~~Output a score report as structured JSON~~
+- ~~**Why**: You can't improve what you can't measure. Evaluation is the most underrated agentic skill.~~
+- **Done**: `EvaluationAgent` runs a built-in or caller-supplied question set through the full pipeline and returns hit@k, groundedness, citation validity, and latency metrics. Exposed via `POST /api/agent/evaluate`.
 
 ---
 
 ## Phase 5 — Production Patterns
 
-### 5.1 Guardrails and Safety
+### ~~5.1 Guardrails and Safety~~ ✅
 
-Add defense-in-depth to the agent pipeline.
+~~Add defense-in-depth to the agent pipeline.~~
 
-- Input guardrails: prompt injection detection, PII filtering, topic scoping
-- Output guardrails: content filtering, citation verification, response length limits
-- Implement as SK `IPromptRenderFilter` (input) and `IFunctionInvocationFilter` (output)
-- **Why**: Enterprise AI requires safety layers. Building them with SK's filter pipeline is the idiomatic .NET approach.
+- ~~Input guardrails: prompt injection detection, PII filtering, topic scoping~~
+- ~~Output guardrails: content filtering, citation verification, response length limits~~
+- ~~Implement as SK `IPromptRenderFilter` (input) and `IFunctionInvocationFilter` (output)~~
+- ~~**Why**: Enterprise AI requires safety layers. Building them with SK's filter pipeline is the idiomatic .NET approach.~~
+- **Done**: `InputGuardrailFilter` (`IPromptRenderFilter`) checks injection phrases, PII (email, credit card, phone), and topic scope. `OutputGuardrailFilter` (`IFunctionInvocationFilter`) logs oversized tool results and harmful terms. `AgentOrchestrationService` and `AgentStreamingService` validate input via shared `AgentPipelineGuardrails` and truncate output at 3,000 chars.
 
-### 5.2 Observability and Tracing
+### ~~5.2 Observability and Tracing~~ ✅
 
-Add end-to-end traces to the agent execution.
+~~Add end-to-end traces to the agent execution.~~
 
-- Integrate OpenTelemetry with SK's built-in instrumentation
-- Trace: user question → tool calls → LLM invocations → final response
-- Export to a local Aspire dashboard or Jaeger for visualization
-- **Why**: When agents misbehave in production, traces are how you debug them. This is essential operational skill.
+- ~~Integrate OpenTelemetry with SK's built-in instrumentation~~
+- ~~Trace: user question → tool calls → LLM invocations → final response~~
+- ~~Export to a local Aspire dashboard or Jaeger for visualization~~
+- ~~**Why**: When agents misbehave in production, traces are how you debug them. This is essential operational skill.~~
+- **Done**: `AgentActivitySource` emits `agent.ask` and `agent.stream` spans with tags (`conversation.id`, `rag.top_k`, `rag.grounded`, etc.). OTLP exporter configured via `OpenTelemetry__OtlpEndpoint`. Local: Jaeger at http://localhost:16686 via `docker-compose up`. Production: ADOT Collector sidecar on ECS Fargate forwards to AWS X-Ray.
 
-### 5.3 Streaming Responses
+### ~~5.3 Streaming Responses~~ ✅
 
-Switch the agent endpoint from batch to streaming.
+~~Switch the agent endpoint from batch to streaming.~~
 
-- Use `IAsyncEnumerable<string>` and `GetStreamingChatMessageContentsAsync`
-- Stream partial answers to the client via SSE or chunked transfer
-- **Why**: Users expect real-time feedback from AI. Streaming is the standard UX pattern.
+- ~~Use `IAsyncEnumerable<string>` and `GetStreamingChatMessageContentsAsync`~~
+- ~~Stream partial answers to the client via SSE or chunked transfer~~
+- ~~**Why**: Users expect real-time feedback from AI. Streaming is the standard UX pattern.~~
+- **Done**: `AgentStreamingService` pipelines `ResearcherAgent` → `WriterAgent.StreamAsync` (skipping the critic loop). `POST /api/agent/ask/stream` returns SSE frames: `status`, `sources`, `token`, `done`, `error`. ~1 s to first token vs ~10 s for the batch endpoint (one LLM call vs two–three).
 
 ---
 
