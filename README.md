@@ -136,20 +136,38 @@ flowchart LR
 
 Switch providers via `appsettings.json` or environment variables:
 
-```jsonc
-// appsettings.json — S3 Vectors (production default)
-{ "VectorStore": { "Provider": "S3Vectors" },
-  "AWS": { "Region": "us-east-1", "VectorBucketName": "posts-semantic-search",
-           "VectorIndexName": "posts-content-index", "EmbeddingModelId": "cohere.embed-english-v3",
-           "ChatModelId": "us.anthropic.claude-sonnet-4-6" } }
+**appsettings.json** — S3 Vectors (production default)
+```json
+{
+  "VectorStore": { "Provider": "S3Vectors" },
+  "AWS": {
+    "Region": "us-east-1",
+    "VectorBucketName": "posts-semantic-search",
+    "VectorIndexName": "posts-content-index",
+    "EmbeddingModelId": "cohere.embed-english-v3",
+    "ChatModelId": "us.anthropic.claude-sonnet-4-6"
+  }
+}
+```
 
-// appsettings.Development.json — Qdrant
-{ "VectorStore": { "Provider": "Qdrant", "Qdrant": { "Url": "http://localhost:6333",
-  "CollectionName": "posts", "VectorSize": 1024 } } }
+**appsettings.Development.json** — Qdrant
+```json
+{
+  "VectorStore": {
+    "Provider": "Qdrant",
+    "Qdrant": { "Url": "http://localhost:6333", "CollectionName": "posts", "VectorSize": 1024 }
+  }
+}
+```
 
-// appsettings.Redis.json — Redis
-{ "VectorStore": { "Provider": "Redis", "Redis": { "ConnectionString": "localhost:6379",
-  "IndexName": "posts_idx", "VectorSize": "1024" } } }
+**appsettings.Redis.json** — Redis
+```json
+{
+  "VectorStore": {
+    "Provider": "Redis",
+    "Redis": { "ConnectionString": "localhost:6379", "IndexName": "posts_idx", "VectorSize": "1024" }
+  }
+}
 ```
 
 Or via env vars: `$env:VectorStore__Provider="Qdrant"`, etc.
