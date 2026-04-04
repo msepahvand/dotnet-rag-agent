@@ -56,6 +56,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IResearcherAgent, ResearcherAgent>();
         services.AddScoped<IWriterAgent, WriterAgent>();
         services.AddScoped<ICriticAgent, CriticAgent>();
+        services.AddScoped<IEvaluationAgent, EvaluationAgent>();
 
         // SK Process orchestration: bridges the process result back to request/response
         services.AddScoped<ProcessResultHolder>();
