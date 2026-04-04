@@ -189,6 +189,8 @@ Or via env vars: `$env:VectorStore__Provider="Qdrant"`, etc.
 
 The agent endpoint auto-indexes if the vector store is empty, runs semantic retrieval via `ResearcherAgent`, and returns a grounded answer with `[PostId: N]` citations. Conversation history is maintained per `conversationId` for multi-turn context.
 
+![Agent ask demo](docs/img/ask-agent-demo.png)
+
 ---
 
 ## Deployment
