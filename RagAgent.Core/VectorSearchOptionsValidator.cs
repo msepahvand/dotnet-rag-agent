@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Configuration;
 
-namespace RagAgent.Agents;
+namespace RagAgent.Core;
 
 public enum VectorStoreProvider
 {

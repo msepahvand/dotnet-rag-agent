@@ -5,7 +5,7 @@ using Microsoft.Extensions.Caching.Memory;
 using RagAgent.Core;
 using RagAgent.Core.Models;
 
-namespace RagAgent.Api.Services;
+namespace RagAgent.InMemory;
 
 public sealed class InMemoryConversationStore(IMemoryCache cache) : IConversationStore
 {

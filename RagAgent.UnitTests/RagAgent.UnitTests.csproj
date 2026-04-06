@@ -22,8 +22,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RagAgent.Api\RagAgent.Api.csproj" />
-    <ProjectReference Include="..\RagAgent.Core\RagAgent.Core.csproj" />
+    <ProjectReference Include="..\RagAgent.HackerNews\RagAgent.HackerNews.csproj" />
     <ProjectReference Include="..\RagAgent.Agents\RagAgent.Agents.csproj" />
+    <ProjectReference Include="..\RagAgent.Core\RagAgent.Core.csproj" />
+    <ProjectReference Include="..\RagAgent.InMemory\RagAgent.InMemory.csproj" />
   </ItemGroup>
 
 </Project>

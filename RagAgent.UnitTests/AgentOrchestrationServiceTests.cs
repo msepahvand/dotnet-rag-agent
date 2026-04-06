@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Caching.Memory;
 using RagAgent.Api.Services;
+using RagAgent.InMemory;
 using RagAgent.Core;
 using RagAgent.Core.Models;
 
@@ -19,7 +20,7 @@ public class AgentOrchestrationServiceTests
             Sources = [new AgentSource { PostId = 1, Title = "T", Snippet = "S", Distance = 0.1f }],
             Citations = [new Citation { PostId = 1, Quote = "Q" }]
         });
-        var sut = new AgentOrchestrationService(stub, CreateStore());
+        var sut = new AgentOrchestrationService(stub, CreateStore(), new NoopGuardrailsService());
 
         var response = await sut.AskAsync(new AgentAskRequest { Question = "Q?", TopK = 5 });
 
@@ -39,7 +40,7 @@ public class AgentOrchestrationServiceTests
             Sources = [new AgentSource { PostId = 1, Title = "T", Snippet = "S", Distance = 0.1f }],
             Citations = [new Citation { PostId = 1, Quote = "Q" }]
         });
-        var sut = new AgentOrchestrationService(stub, CreateStore());
+        var sut = new AgentOrchestrationService(stub, CreateStore(), new NoopGuardrailsService());
 
         var response = await sut.AskAsync(new AgentAskRequest { Question = "Q?", TopK = 5 });
 
@@ -56,7 +57,7 @@ public class AgentOrchestrationServiceTests
             Sources = [],
             Citations = []
         });
-        var sut = new AgentOrchestrationService(stub, CreateStore());
+        var sut = new AgentOrchestrationService(stub, CreateStore(), new NoopGuardrailsService());
 
         var response = await sut.AskAsync(new AgentAskRequest { Question = "Q?", TopK = 5 });
 
@@ -76,7 +77,7 @@ public class AgentOrchestrationServiceTests
             Sources = [source],
             Citations = [citation]
         });
-        var sut = new AgentOrchestrationService(stub, CreateStore());
+        var sut = new AgentOrchestrationService(stub, CreateStore(), new NoopGuardrailsService());
 
         var response = await sut.AskAsync(new AgentAskRequest { Question = "Q?", TopK = 5 });
 
@@ -98,7 +99,7 @@ public class AgentOrchestrationServiceTests
     {
         int capturedTopK = 0;
         var stub = new CapturingStubAgentAnswerService(topK => capturedTopK = topK);
-        var sut = new AgentOrchestrationService(stub, CreateStore());
+        var sut = new AgentOrchestrationService(stub, CreateStore(), new NoopGuardrailsService());
 
         await sut.AskAsync(new AgentAskRequest { Question = "Q?", TopK = requested });
 
@@ -110,7 +111,7 @@ public class AgentOrchestrationServiceTests
     public async Task AskAsync_WithNoConversationId_GeneratesNewConversationIdAsync()
     {
         var stub = new StubAgentAnswerService(new AgentAnswerResult { Answer = "ok", Grounded = true });
-        var sut = new AgentOrchestrationService(stub, CreateStore());
+        var sut = new AgentOrchestrationService(stub, CreateStore(), new NoopGuardrailsService());
 
         var response = await sut.AskAsync(new AgentAskRequest { Question = "Q?", TopK = 5 });
 
@@ -121,7 +122,7 @@ public class AgentOrchestrationServiceTests
     public async Task AskAsync_WithExistingConversationId_ReturnsTheSameConversationIdAsync()
     {
         var stub = new StubAgentAnswerService(new AgentAnswerResult { Answer = "ok", Grounded = true });
-        var sut = new AgentOrchestrationService(stub, CreateStore());
+        var sut = new AgentOrchestrationService(stub, CreateStore(), new NoopGuardrailsService());
         var fixedId = "conv-abc-123";
 
         var response = await sut.AskAsync(new AgentAskRequest { Question = "Q?", TopK = 5, ConversationId = fixedId });
@@ -135,7 +136,7 @@ public class AgentOrchestrationServiceTests
         IReadOnlyList<ChatMessage>? capturedHistory = null;
         var stub = new CapturingHistoryStubAgentAnswerService(history => capturedHistory = history);
         var store = CreateStore();
-        var sut = new AgentOrchestrationService(stub, store);
+        var sut = new AgentOrchestrationService(stub, store, new NoopGuardrailsService());
 
         var firstResponse = await sut.AskAsync(new AgentAskRequest { Question = "First question", TopK = 5 });
         await sut.AskAsync(new AgentAskRequest { Question = "Follow-up question", TopK = 5, ConversationId = firstResponse.ConversationId });
@@ -153,7 +154,7 @@ public class AgentOrchestrationServiceTests
     {
         var stub = new StubAgentAnswerService(new AgentAnswerResult { Answer = "my answer", Grounded = true });
         var store = CreateStore();
-        var sut = new AgentOrchestrationService(stub, store);
+        var sut = new AgentOrchestrationService(stub, store, new NoopGuardrailsService());
 
         var response = await sut.AskAsync(new AgentAskRequest { Question = "Hello?", TopK = 5 });
         var history = await store.GetHistoryAsync(response.ConversationId);
@@ -168,7 +169,7 @@ public class AgentOrchestrationServiceTests
     {
         var stub = new StubAgentAnswerService(new AgentAnswerResult { Answer = "ok", Grounded = true });
         var store = CreateStore();
-        var sut = new AgentOrchestrationService(stub, store);
+        var sut = new AgentOrchestrationService(stub, store, new NoopGuardrailsService());
 
         var r1 = await sut.AskAsync(new AgentAskRequest { Question = "Conv A", TopK = 5 });
         var r2 = await sut.AskAsync(new AgentAskRequest { Question = "Conv B", TopK = 5 });
@@ -181,6 +182,11 @@ public class AgentOrchestrationServiceTests
     // ── Helpers ─────────────────────────────────────────────────────────────
     private static InMemoryConversationStore CreateStore() =>
         new(new MemoryCache(new MemoryCacheOptions()));
+
+    private sealed class NoopGuardrailsService : IGuardrailsService
+    {
+        public void ValidateQuestion(string question) { }
+    }
 
     // ── Stubs ───────────────────────────────────────────────────────────────
     private sealed class StubAgentAnswerService(AgentAnswerResult result) : IAgentAnswerService

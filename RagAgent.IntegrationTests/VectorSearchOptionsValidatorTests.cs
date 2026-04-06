@@ -1,6 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
-using RagAgent.Agents;
+using RagAgent.Core;
 
 namespace RagAgent.IntegrationTests;
 

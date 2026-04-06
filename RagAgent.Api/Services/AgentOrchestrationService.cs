@@ -7,7 +7,8 @@ namespace RagAgent.Api.Services;
 
 public sealed class AgentOrchestrationService(
     IAgentAnswerService agentAnswerService,
-    IConversationStore conversationStore) : IAgentOrchestrationService
+    IConversationStore conversationStore,
+    IGuardrailsService guardrailsService) : IAgentOrchestrationService
 {
     public async Task<AgentAskResponse> AskAsync(AgentAskRequest request)
     {
@@ -16,7 +17,7 @@ public sealed class AgentOrchestrationService(
         try
         {
             // Input guardrails: validate the user question before invoking the agent pipeline.
-            AgentPipelineGuardrails.ValidateQuestion(request.Question);
+            guardrailsService.ValidateQuestion(request.Question);
 
             var conversationId = string.IsNullOrWhiteSpace(request.ConversationId)
                 ? Guid.NewGuid().ToString()

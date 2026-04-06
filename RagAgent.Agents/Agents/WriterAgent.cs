@@ -7,7 +7,7 @@ using Microsoft.SemanticKernel.Connectors.Amazon;
 using RagAgent.Core;
 using RagAgent.Core.Models;
 
-namespace RagAgent.Agents.Agents;
+namespace RagAgent.Agents;
 
 /// <summary>
 /// Responsible solely for synthesis. Receives pre-retrieved sources from the researcher agent

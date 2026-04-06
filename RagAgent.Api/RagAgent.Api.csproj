@@ -21,6 +21,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\RagAgent.HackerNews\RagAgent.HackerNews.csproj" />
+    <ProjectReference Include="..\RagAgent.InMemory\RagAgent.InMemory.csproj" />
     <ProjectReference Include="..\RagAgent.Qdrant\RagAgent.Qdrant.csproj" />
     <ProjectReference Include="..\RagAgent.Redis\RagAgent.Redis.csproj" />
     <ProjectReference Include="..\RagAgent.S3Vectors\RagAgent.S3Vectors.csproj" />

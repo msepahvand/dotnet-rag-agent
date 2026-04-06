@@ -5,7 +5,7 @@ using Microsoft.Extensions.Configuration;
 using RagAgent.Core;
 using RagAgent.Core.Models;
 
-namespace RagAgent.Agents;
+namespace RagAgent.HackerNews;
 
 public sealed class HackerNewsService(HttpClient httpClient, IConfiguration configuration) : IPostService
 {

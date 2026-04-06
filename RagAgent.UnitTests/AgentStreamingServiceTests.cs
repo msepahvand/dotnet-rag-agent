@@ -1,7 +1,9 @@
 using FluentAssertions;
 using Microsoft.Extensions.Caching.Memory;
+using RagAgent.Agents;
 using RagAgent.Api.Dtos;
 using RagAgent.Api.Services;
+using RagAgent.InMemory;
 using RagAgent.Core;
 using RagAgent.Core.Models;
 
@@ -120,13 +122,14 @@ public class AgentStreamingServiceTests
     // ── Helpers ──────────────────────────────────────────────────────────────
     private static AgentStreamingService BuildSut(
         IEnumerable<string> tokens,
-        IEnumerable<AgentSource>? sources = null)
+        IEnumerable<AgentSource>? sources = null,
+        IGuardrailsService? guardrailsService = null)
     {
         var sourceList = sources?.ToList() ?? [];
         var researcher = new StubResearcherAgent(sourceList);
         var writer = new StubWriterAgent(tokens);
         var store = new InMemoryConversationStore(new MemoryCache(new MemoryCacheOptions()));
-        return new AgentStreamingService(researcher, writer, store);
+        return new AgentStreamingService(researcher, writer, store, guardrailsService ?? new GuardrailsService());
     }
 
     // ── Stubs ─────────────────────────────────────────────────────────────────

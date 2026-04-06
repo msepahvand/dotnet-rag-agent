@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 using WireMock.RequestBuilders;
 using WireMock.ResponseBuilders;
 using WireMock.Server;
-using RagAgent.Agents;
+using RagAgent.HackerNews;
 
 namespace RagAgent.UnitTests;
 

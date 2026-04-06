@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace RagAgent.Agents.Agents;
+namespace RagAgent.Agents;
 
 /// <summary>
 /// Shared JSON utilities used by agent classes that parse LLM output.

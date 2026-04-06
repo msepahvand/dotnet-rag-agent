@@ -2,7 +2,7 @@ using System.Diagnostics;
 using RagAgent.Core;
 using RagAgent.Core.Models;
 
-namespace RagAgent.Agents.Agents;
+namespace RagAgent.Agents;
 
 /// <summary>
 /// Runs a question set through the full RAG pipeline and aggregates quality metrics.

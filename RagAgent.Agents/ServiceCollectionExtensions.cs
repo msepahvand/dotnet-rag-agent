@@ -4,7 +4,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
 using RagAgent.Core;
-using RagAgent.Agents.Agents;
 using RagAgent.Agents.Filters;
 using RagAgent.Agents.Process;
 
@@ -20,11 +19,6 @@ public static class ServiceCollectionExtensions
 
         // Required by Bedrock chat/embedding connectors regardless of vector store provider.
         services.AddAWSService<IAmazonBedrockRuntime>();
-
-        services.AddHttpClient<IPostService, HackerNewsService>(client =>
-        {
-            client.BaseAddress = new Uri("https://hacker-news.firebaseio.com/v0/");
-        });
 
         // Configure Semantic Kernel + embedding pipeline once for all providers.
         // Cohere Embed v3 uses a different request schema to the SK connector's default,
@@ -58,6 +52,7 @@ public static class ServiceCollectionExtensions
 
             return kernel;
         });
+        services.AddScoped<IGuardrailsService, GuardrailsService>();
         services.AddScoped<IEmbeddingService, EmbeddingService>();
         services.AddScoped<SemanticSearchPlugin>();
 

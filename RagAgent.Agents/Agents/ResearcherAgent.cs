@@ -2,7 +2,7 @@ using System.Text.Json;
 using RagAgent.Core;
 using RagAgent.Core.Models;
 
-namespace RagAgent.Agents.Agents;
+namespace RagAgent.Agents;
 
 /// <summary>
 /// Responsible solely for retrieval. Calls the search plugin and returns structured sources

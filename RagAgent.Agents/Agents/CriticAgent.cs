@@ -6,7 +6,7 @@ using Microsoft.SemanticKernel.Connectors.Amazon;
 using RagAgent.Core;
 using RagAgent.Core.Models;
 
-namespace RagAgent.Agents.Agents;
+namespace RagAgent.Agents;
 
 /// <summary>
 /// Evaluates the writer agent's output for relevance, groundedness, and citation validity.

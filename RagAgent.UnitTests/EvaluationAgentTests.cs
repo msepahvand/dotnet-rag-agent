@@ -1,7 +1,7 @@
 using FluentAssertions;
 using RagAgent.Core;
 using RagAgent.Core.Models;
-using RagAgent.Agents.Agents;
+using RagAgent.Agents;
 
 namespace RagAgent.UnitTests;
 

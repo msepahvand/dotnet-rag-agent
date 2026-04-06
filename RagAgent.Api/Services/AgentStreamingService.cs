@@ -14,7 +14,8 @@ namespace RagAgent.Api.Services;
 public sealed class AgentStreamingService(
     IResearcherAgent researcherAgent,
     IWriterAgent writerAgent,
-    IConversationStore conversationStore) : IAgentStreamingService
+    IConversationStore conversationStore,
+    IGuardrailsService guardrailsService) : IAgentStreamingService
 {
     public async IAsyncEnumerable<StreamEventDto> StreamAsync(
         AgentAskRequest request,
@@ -87,11 +88,11 @@ public sealed class AgentStreamingService(
     /// Runs input guardrail checks and returns the violation reason, or null if clean.
     /// Cannot throw inside an async iterator, so we capture the result here instead.
     /// </summary>
-    private static string? CaptureGuardrailViolation(string question)
+    private string? CaptureGuardrailViolation(string question)
     {
         try
         {
-            AgentPipelineGuardrails.ValidateQuestion(question);
+            guardrailsService.ValidateQuestion(question);
             return null;
         }
         catch (GuardrailException ex)

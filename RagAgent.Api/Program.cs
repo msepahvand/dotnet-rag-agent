@@ -4,6 +4,8 @@ using Microsoft.OpenApi.Models;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using RagAgent.Agents;
+using RagAgent.HackerNews;
+using RagAgent.InMemory;
 using RagAgent.Agents.Telemetry;
 using RagAgent.Api.Extensions;
 using RagAgent.Api.Services;
@@ -18,9 +20,9 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services.AddControllers();
-        builder.Services.AddMemoryCache();
         builder.Services.AddFluentValidationAutoValidation();
         builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+        builder.Services.AddHackerNewsDataSource();
         builder.Services.AddVectorSearch(builder.Configuration);
         builder.Services.AddVectorStoreProvider(builder.Configuration);
         builder.Services.AddScoped<IPostsQueryService, PostsQueryService>();
@@ -28,7 +30,7 @@ public class Program
         builder.Services.AddScoped<ISemanticSearchService, SemanticSearchService>();
         builder.Services.AddScoped<IAgentOrchestrationService, AgentOrchestrationService>();
         builder.Services.AddScoped<IAgentStreamingService, AgentStreamingService>();
-        builder.Services.AddSingleton<IConversationStore, InMemoryConversationStore>();
+        builder.Services.AddInMemoryConversationStore();
         builder.Services.AddSingleton<IngestionTracker>();
         builder.Services.AddHostedService<IndexingStartupService>();
         builder.Services.AddHostedService<IngestionBackgroundService>();

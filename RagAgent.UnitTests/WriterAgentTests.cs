@@ -2,7 +2,7 @@ using FluentAssertions;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using RagAgent.Core.Models;
-using RagAgent.Agents.Agents;
+using RagAgent.Agents;
 
 namespace RagAgent.UnitTests;
 

@@ -1,6 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Caching.Memory;
-using RagAgent.Api.Services;
+using RagAgent.InMemory;
 using RagAgent.Core.Models;
 
 namespace RagAgent.UnitTests;

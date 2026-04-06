@@ -1,4 +1,4 @@
-using RagAgent.Agents;
+using RagAgent.Core;
 using RagAgent.Qdrant;
 using RagAgent.Redis;
 using RagAgent.S3Vectors;
