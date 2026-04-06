@@ -19,18 +19,22 @@ Use conventional commit prefixes:
 
 ## Architecture
 - **Keep controllers thin.** HTTP concerns (routing, validation, status codes, response shaping) stay in controllers. Orchestration and business logic belong in services.
-- **RagAgent.Core must stay provider-agnostic.** Shared contracts, interfaces, and logic in Core must not depend on Redis, S3 Vectors, or Qdrant specifics. Provider-specific details go in RagAgent.Redis and RagAgent.Agents.
+- **RagAgent.Core must stay provider-agnostic.** Shared contracts, interfaces, and logic in Core must not depend on Redis, S3 Vectors, or Qdrant specifics. Provider-specific details go in their dedicated provider projects.
 - **Placement guide:**
   - Controller → route handling, request parsing, status codes, response DTOs
   - Service → use-case orchestration, sequencing calls to abstractions
   - Core → interfaces, shared models, provider-agnostic logic
-  - Provider project → Redis, S3, Qdrant, Bedrock integration details
+  - RagAgent.Qdrant → Qdrant vector store (local dev / integration tests)
+  - RagAgent.Redis → Redis vector store (local dev / integration tests)
+  - RagAgent.S3Vectors → S3 Vectors vector store (production)
+  - RagAgent.Agents → LLM agents, Bedrock, Semantic Kernel integration
 
 ## Testing
 - Aim for roughly **70% unit tests, 30% integration tests**.
 - Use unit tests for business logic, orchestration, mapping, validation, and provider-agnostic behavior.
 - Use integration tests to verify minimum end-to-end functionality — key 200 OK happy paths and a small set of critical failure paths (400, 404) where behavior matters.
 - Do not use integration tests as a substitute for focused unit coverage.
+- **Prefer `[InlineData]` over `[MemberData]` or `[ClassData]`** for parameterised tests. Only reach for `MemberData`/`ClassData` when the values are too complex to express inline (e.g. objects or large collections).
 
 ## Terraform
 - Always run `terraform fmt -recursive` and `terraform validate` before committing any Terraform change.
