@@ -1,7 +1,6 @@
-using RagAgent.Api.Services.Contracts;
 using RagAgent.Core.Models;
 
-namespace RagAgent.Api.Services;
+namespace RagAgent.Core;
 
 public interface IPostIndexingService
 {

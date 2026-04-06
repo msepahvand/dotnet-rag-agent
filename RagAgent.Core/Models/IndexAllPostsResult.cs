@@ -1,3 +1,3 @@
-namespace RagAgent.Api.Services.Contracts;
+namespace RagAgent.Core.Models;
 
 public sealed record IndexAllPostsResult(int Count);

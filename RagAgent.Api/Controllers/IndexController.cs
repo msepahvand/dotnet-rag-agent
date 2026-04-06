@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using RagAgent.Api.Contracts.Responses;
 using RagAgent.Api.Dtos.Mappers;
-using RagAgent.Api.Services;
+using RagAgent.Core;
 
 namespace RagAgent.Api.Controllers;
 

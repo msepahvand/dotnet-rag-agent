@@ -3,7 +3,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using RagAgent.Api.Services;
-using RagAgent.Api.Services.Contracts;
 using RagAgent.Core;
 using RagAgent.Core.Models;
 

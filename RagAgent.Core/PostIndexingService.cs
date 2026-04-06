@@ -1,8 +1,6 @@
-using RagAgent.Api.Services.Contracts;
-using RagAgent.Core;
 using RagAgent.Core.Models;
 
-namespace RagAgent.Api.Services;
+namespace RagAgent.Core;
 
 public sealed class PostIndexingService(
     IPostService postService,
