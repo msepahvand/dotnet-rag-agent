@@ -1,4 +1,5 @@
 using System.Text.Json;
+using RagAgent.Core;
 using RagAgent.Core.Models;
 
 namespace RagAgent.Agents.Agents;

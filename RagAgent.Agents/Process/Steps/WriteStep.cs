@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
+using RagAgent.Core;
 using RagAgent.Core.Models;
-using RagAgent.Agents.Agents;
 
 namespace RagAgent.Agents.Process.Steps;
 

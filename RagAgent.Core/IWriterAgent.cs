@@ -1,6 +1,6 @@
 using RagAgent.Core.Models;
 
-namespace RagAgent.Agents.Agents;
+namespace RagAgent.Core;
 
 public interface IWriterAgent
 {

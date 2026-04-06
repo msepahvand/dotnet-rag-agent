@@ -1,10 +1,10 @@
-using RagAgent.Core;
 using RagAgent.Core.Models;
 
-namespace RagAgent.Agents;
+namespace RagAgent.Core;
 
 /// <summary>
-/// Vector service that uses the configured IVectorStore (S3 Vectors, Qdrant, or Redis)
+/// Orchestrates the configured IVectorStore (S3 Vectors, Qdrant, or Redis) behind
+/// the provider-agnostic IVectorService contract.
 /// </summary>
 public class VectorService : IVectorService
 {
@@ -30,7 +30,7 @@ public class VectorService : IVectorService
         return _vectorStore.IsEmptyAsync();
     }
 
-    public async Task IndexPostAsync(Core.Models.Post post, float[] embedding)
+    public async Task IndexPostAsync(Post post, float[] embedding)
     {
         var metadata = new Dictionary<string, string>
         {
@@ -42,7 +42,7 @@ public class VectorService : IVectorService
         await _vectorStore.IndexDocumentAsync(post.Id.ToString(), embedding, metadata);
     }
 
-    public async Task IndexPostsBatchAsync(List<(Core.Models.Post Post, float[] Embedding)> posts)
+    public async Task IndexPostsBatchAsync(List<(Post Post, float[] Embedding)> posts)
     {
         var documents = posts.Select(p => (
             Key: p.Post.Id.ToString(),

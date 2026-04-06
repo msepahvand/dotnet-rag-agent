@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.Amazon;
+using RagAgent.Core;
 using RagAgent.Core.Models;
 
 namespace RagAgent.Agents.Agents;

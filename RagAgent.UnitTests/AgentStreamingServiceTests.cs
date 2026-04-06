@@ -1,6 +1,5 @@
 using FluentAssertions;
 using Microsoft.Extensions.Caching.Memory;
-using RagAgent.Agents.Agents;
 using RagAgent.Api.Dtos;
 using RagAgent.Api.Services;
 using RagAgent.Core;

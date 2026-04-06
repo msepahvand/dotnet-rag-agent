@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using RagAgent.Agents.Agents;
 using RagAgent.Agents.Telemetry;
 using RagAgent.Api.Dtos;
 using RagAgent.Api.Dtos.Mappers;
