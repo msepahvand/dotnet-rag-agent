@@ -9,6 +9,8 @@ using RagAgent.Api;
 using RagAgent.Api.Services;
 using RagAgent.Core;
 using RagAgent.Agents;
+using RagAgent.Qdrant;
+using RagAgent.Redis;
 
 namespace RagAgent.IntegrationTests;
 
@@ -90,12 +92,7 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
             }
             else if (_provider == "Redis")
             {
-                // Use reflection to avoid hard dependency on RagAgent.Redis
-                var redisStoreType = Type.GetType("RagAgent.Redis.RedisVectorStore, RagAgent.Redis");
-                if (redisStoreType != null)
-                {
-                    services.AddScoped(typeof(IVectorStore), redisStoreType);
-                }
+                services.AddScoped<IVectorStore, RedisVectorStore>();
             }
 
             // Replace the real embedding service with a mock for testing
@@ -159,18 +156,8 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
                 })
                 .Build();
 
-            var redisStoreType = Type.GetType("RagAgent.Redis.RedisVectorStore, RagAgent.Redis");
-            if (redisStoreType != null)
-            {
-                var redisStore = (IVectorStore)Activator.CreateInstance(redisStoreType, config)!;
-                await redisStore.CreateCollectionAsync(1024);
-
-                // Dispose if it implements IDisposable
-                if (redisStore is IDisposable disposable)
-                {
-                    disposable.Dispose();
-                }
-            }
+            using var redisStore = new RedisVectorStore(config);
+            await redisStore.CreateCollectionAsync(1024);
         }
     }
 

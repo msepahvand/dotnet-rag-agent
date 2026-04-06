@@ -1,5 +1,7 @@
-using RagAgent.Redis;
 using RagAgent.Agents;
+using RagAgent.Qdrant;
+using RagAgent.Redis;
+using RagAgent.S3Vectors;
 
 namespace RagAgent.Api.Extensions;
 

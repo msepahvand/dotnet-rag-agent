@@ -26,6 +26,7 @@
   <ItemGroup>
     <ProjectReference Include="..\RagAgent.Api\RagAgent.Api.csproj" />
     <ProjectReference Include="..\RagAgent.Agents\RagAgent.Agents.csproj" />
+    <ProjectReference Include="..\RagAgent.Qdrant\RagAgent.Qdrant.csproj" />
     <ProjectReference Include="..\RagAgent.Redis\RagAgent.Redis.csproj" />
     <ProjectReference Include="..\RagAgent.Core\RagAgent.Core.csproj" />
   </ItemGroup>

@@ -3,10 +3,10 @@ using Amazon.S3Vectors.Model;
 using Microsoft.Extensions.Configuration;
 using RagAgent.Core;
 
-namespace RagAgent.Agents;
+namespace RagAgent.S3Vectors;
 
 /// <summary>
-/// AWS S3 Vectors implementation - for production use
+/// AWS S3 Vectors implementation — for production use.
 /// </summary>
 public class S3VectorStore : IVectorStore
 {

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using RagAgent.Core;
 
-namespace RagAgent.Agents;
+namespace RagAgent.Qdrant;
 
 public class QdrantVectorStore : IVectorStore
 {
@@ -104,15 +104,12 @@ public class QdrantVectorStore : IVectorStore
     {
         var points = documents.Select((doc, index) => new
         {
-            id = int.Parse(doc.Key), // Convert string key to int for Qdrant
+            id = int.Parse(doc.Key),
             vector = doc.Embedding,
             payload = doc.Metadata
         }).ToList();
 
-        var payload = new
-        {
-            points = points
-        };
+        var payload = new { points = points };
 
         var content = new StringContent(
             JsonSerializer.Serialize(payload),
