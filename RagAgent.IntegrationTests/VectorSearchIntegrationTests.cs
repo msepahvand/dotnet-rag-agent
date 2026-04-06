@@ -7,14 +7,9 @@ namespace RagAgent.IntegrationTests;
 
 public class VectorSearchIntegrationTests
 {
-    public static TheoryData<string> VectorProviders => new TheoryData<string>
-    {
-        "Qdrant",
-        "Redis"
-    };
-
     [Theory]
-    [MemberData(nameof(VectorProviders))]
+    [InlineData("Qdrant")]
+    [InlineData("Redis")]
     public async Task GetPosts_ReturnsSuccessAndPostsAsync(string provider)
     {
         // Arrange
@@ -35,7 +30,8 @@ public class VectorSearchIntegrationTests
     }
 
     [Theory]
-    [MemberData(nameof(VectorProviders))]
+    [InlineData("Qdrant")]
+    [InlineData("Redis")]
     public async Task GetPost_WithValidId_ReturnsPostAsync(string provider)
     {
         // Arrange
@@ -57,7 +53,8 @@ public class VectorSearchIntegrationTests
     }
 
     [Theory]
-    [MemberData(nameof(VectorProviders))]
+    [InlineData("Qdrant")]
+    [InlineData("Redis")]
     public async Task GetPost_WithInvalidId_ReturnsNotFoundAsync(string provider)
     {
         // Arrange
@@ -73,7 +70,8 @@ public class VectorSearchIntegrationTests
     }
 
     [Theory]
-    [MemberData(nameof(VectorProviders))]
+    [InlineData("Qdrant")]
+    [InlineData("Redis")]
     public async Task IndexSinglePost_ThenSearch_ReturnsPostAsync(string provider)
     {
         // Arrange
@@ -101,7 +99,8 @@ public class VectorSearchIntegrationTests
     }
 
     [Theory]
-    [MemberData(nameof(VectorProviders))]
+    [InlineData("Qdrant")]
+    [InlineData("Redis")]
     public async Task IndexMultiplePosts_ThenSearch_ReturnsRelevantResultsAsync(string provider)
     {
         // Arrange
@@ -132,7 +131,8 @@ public class VectorSearchIntegrationTests
     }
 
     [Theory]
-    [MemberData(nameof(VectorProviders))]
+    [InlineData("Qdrant")]
+    [InlineData("Redis")]
     public async Task Search_WithNoIndexedData_ReturnsEmptyResultsAsync(string provider)
     {
         // Arrange
@@ -152,7 +152,8 @@ public class VectorSearchIntegrationTests
     }
 
     [Theory]
-    [MemberData(nameof(VectorProviders))]
+    [InlineData("Qdrant")]
+    [InlineData("Redis")]
     public async Task Search_WithEmptyQuery_ReturnsBadRequestAsync(string provider)
     {
         // Arrange
@@ -168,7 +169,8 @@ public class VectorSearchIntegrationTests
     }
 
     [Theory]
-    [MemberData(nameof(VectorProviders))]
+    [InlineData("Qdrant")]
+    [InlineData("Redis")]
     public async Task AgentAsk_UsesSemanticSearchAndReturnsGroundedSourcesAsync(string provider)
     {
         // Arrange
