@@ -25,7 +25,6 @@ public class Program
         builder.Services.AddHackerNewsDataSource();
         builder.Services.AddVectorSearch(builder.Configuration);
         builder.Services.AddVectorStoreProvider(builder.Configuration);
-        builder.Services.AddScoped<IPostsQueryService, PostsQueryService>();
         builder.Services.AddScoped<IPostIndexingService, PostIndexingService>();
         builder.Services.AddScoped<ISemanticSearchService, SemanticSearchService>();
         builder.Services.AddScoped<IAgentOrchestrationService, AgentOrchestrationService>();
