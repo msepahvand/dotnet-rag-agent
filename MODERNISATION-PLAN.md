@@ -1,6 +1,6 @@
 # Modernisation Plan: .NET 10, Microsoft.Extensions.AI, Agent Framework and Bedrock AgentCore
 
-**Status:** proposed, revision 2 (addresses review B1–B6 on PR #1) · **Date:** 2026-09-25
+**Status:** proposed, revision 3 (addresses review B1–B6 and N1–N3 on PR #1) · **Date:** 2026-09-25
 
 ## Summary
 
@@ -114,13 +114,15 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 
 1. **Frozen evaluation corpus.**
    - Add `scripts/snapshot-hn.sh` to capture ~200 real HN posts once into `eval/corpus.json`.
-   - Add a `SnapshotPostService : IPostService` (in `RagAgent.HackerNews`, selected by `DataSource:Provider = Snapshot`) that serves that file.
+   - Add a `SnapshotPostService : IPostService` (in `RagAgent.HackerNews`) that serves that file. **New wiring is needed:** today `AddHackerNewsDataSource` registers `HackerNewsService` unconditionally, and nothing reads `DataSource:Provider`. Make the registration switch on `DataSource__Provider = HackerNews | Snapshot`.
+   - **Where the eval runs:** a dedicated app instance (locally or as a CI job) configured with `DataSource__Provider=Snapshot`, the eval `VectorIndexName`, `IngestionBackgroundService` disabled, and real Bedrock. **Never** the production API.
    - Point evaluation at a **dedicated eval index/collection** so `IngestionBackgroundService` never changes it.
    - Write `eval/questions.json` (40–60 questions, so one question is ≤2.5%) with `ExpectedPostIds` taken from the snapshot, so they never drift.
 2. **Better metrics** (small code change):
    - Add `P50LatencyMs`/`P95LatencyMs` to `EvaluationReport`.
    - Add an **independent groundedness and relevance judge** using `Microsoft.Extensions.AI.Evaluation.Quality` (`GroundednessEvaluator`, `RelevanceEvaluator`) with response caching. This replaces relying on the writer's self-reported `Grounded` flag. It is the part of Phase 9 we need up front.
-3. **Deterministic runs.** Run the eval **5 times** at temperature 0 against the current SK build. Commit `eval/baseline-sk.json` with the mean and 95% confidence interval per metric. **Gate for later phases:** a metric fails if its new mean falls below the baseline CI's lower bound. Latency fails if p95 goes above an agreed budget (default +25%).
+   - The judge needs an `IChatClient`, so Phase 0 already brings in `AWSSDK.Extensions.Bedrock.MEAI` **for the judge only**, not for the agents. The evaluators' prompts are tuned for GPT-4o-class models, so treat Claude-as-judge scores as **relative** (baseline vs. candidate), not absolute.
+3. **Deterministic runs.** The code doesn't set a temperature today. Add an **eval-only** `Agent__Temperature` setting, left unset in production so production sampling doesn't change. Run the eval **5 times** at `Agent__Temperature=0` against the current SK build. Commit `eval/baseline-sk.json` with the mean and 95% confidence interval per metric. **Gate for later phases:** a metric fails if its new mean falls below the baseline CI's lower bound. Latency fails if p95 goes above an agreed budget (default +25%).
 4. **Characterisation tests against Core interfaces** (so they run unchanged against the MAF workflow in Phase 3):
    - `IAgentAnswerService` loop tests with stub `IResearcherAgent`/`IWriterAgent`/`ICriticAgent`:
      - approve first time
@@ -148,14 +150,18 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 1. Add a `global.json` pinning the .NET 10 SDK. Set `net10.0` everywhere. Move the shared `TargetFramework`/`Nullable`/`ImplicitUsings`/`LangVersion` into the **existing** `Directory.Build.props`.
 2. **Central Package Management** (`Directory.Packages.props`, `ManagePackageVersionsCentrally=true`):
    - Pin exact versions in place of `AWSSDK.* 4.0.*`.
-   - Move the StyleCop reference in `Directory.Build.props` to a `<GlobalPackageReference>` (an inline `Version` would trigger NU1008 under CPM).
+   - Remove the StyleCop `PackageReference` from `Directory.Build.props` and declare it as a `<GlobalPackageReference>` **in `Directory.Packages.props`**, next to the `PackageVersion` entries. An inline `Version` would trigger NU1008 under CPM.
    - Add Dependabot or Renovate.
 3. **Dockerfile restore layer:** copy `global.json`, `NuGet.config`, `Directory.Build.props`, `Directory.Packages.props`, `stylecop.json`, `rules.ruleset` and **every** `*.csproj` the API references before `dotnet restore`. Today only four are copied, and restore only works because `dotnet build` re-restores after `COPY . .`. Check with a clean `docker build --no-cache` in CI before merging.
 4. Package bumps: `Microsoft.Extensions.*` 10.x, `Mvc.Testing` 10.x, OpenTelemetry current, test SDK.
 5. Replace **Swashbuckle** with built-in `AddOpenApi`/`MapOpenApi` + Swagger UI or Scalar, keeping `Swagger:Enabled`. **Contract note:** the document moves from `/swagger/v1/swagger.json` to `/openapi/v1.json`. Either map the old path as an alias or update the Postman collection and README in the same commit.
 6. Base images: `aspnet:10.0` / `sdk:10.0`. The `-noble-chiseled` variant is optional.
 7. **ARM64 readiness, in its own commits and in this order:**
-   1. Build the image **multi-arch without QEMU**: use `FROM --platform=$BUILDPLATFORM sdk:10.0` and `dotnet publish -a $TARGETARCH`, which cross-compiles managed code natively, then `docker buildx build --platform linux/amd64,linux/arm64`. Alternatively, use a native `ubuntu-24.04-arm` runner. Update `scripts/bootstrap-ecr-image.sh` to push a multi-arch bootstrap image too.
+   1. Build the image **multi-arch without QEMU**, following [Microsoft's multi-platform container guidance](https://devblogs.microsoft.com/dotnet/improving-multiplatform-container-support/):
+      - The build stage uses `FROM --platform=$BUILDPLATFORM sdk:10.0`.
+      - The restore layer runs `dotnet restore -a $TARGETARCH`, and the publish step runs `dotnet publish -a $TARGETARCH --no-restore`. Without the RID-specific restore, the build fails with NETSDK1047.
+      - The final stage uses the **target-platform** `aspnet:10.0` image, without `--platform=$BUILDPLATFORM`.
+      - Then build with `docker buildx build --platform linux/amd64,linux/arm64`. Alternatively, use a native `ubuntu-24.04-arm` runner. Update `scripts/bootstrap-ecr-image.sh` to push a multi-arch bootstrap image too.
    2. Check `docker manifest inspect` shows both architectures for the deployed tag **and** the bootstrap tag.
    3. *Optional, separate commit:* switch ECS to Graviton (`runtime_platform { cpu_architecture = "ARM64" }`).
 8. CI: `setup-dotnet` → `10.0.x`.
@@ -236,7 +242,9 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
    - **Output:** a new `IGuardrailsService.ValidateAnswerAsync(answer, sources)`, called in `AgentOrchestrationService` after `SanitiseAnswer`, on the **final answer text only**, with the sources passed as the grounding source for the contextual grounding check.
    - That's **2 `ApplyGuardrail` calls per `/ask`**, not one per LLM call. The critic's JSON and intermediate drafts are never checked.
    - For **streaming**, tokens have already gone to the client, so the output check can't redact or block them. On `/ask/stream`, the output check runs on the buffered final text for **logging and metrics only**, and the persisted assistant message is the anonymised version.
-2. **Implementation:** `BedrockGuardrailsService : IGuardrailsService` in `RagAgent.Bedrock`. Violations map to the existing `GuardrailException`, so the 400 and SSE `error` frame behaviour stays the same (I1).
+2. **Implementation:** `BedrockGuardrailsService : IGuardrailsService` in `RagAgent.Bedrock`.
+   - **Input** violations map to the existing `GuardrailException`, so the 400 and SSE `error` frame behaviour stays the same (I1).
+   - **Output** violations (anonymise, grounding/relevance below threshold) **don't** throw. The request was a 200 before and stays a 200, and the user message is already stored. In Enforce mode `/ask` returns 200 with a safe fallback (`Grounded = false`, a fixed "I couldn't produce a well-grounded answer from the sources" message plus the sources). That fallback is what gets stored as the assistant message. Output blocking stays in Shadow mode until its false-positive rate has also been measured.
 3. **Policy configuration** (Terraform `aws_bedrock_guardrail` + `aws_bedrock_guardrail_version`):
    - Prompt-attack filter.
    - Sensitive-info filters (EMAIL, PHONE, CREDIT_DEBIT_CARD_NUMBER): BLOCK on input, ANONYMIZE on output.
@@ -259,13 +267,18 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 **Goal:** history is shared across tasks and survives restarts, **with the same retention, cap, ID and privacy semantics as today** (I8, I9).
 
 1. **Agree the Core contract change first** (separate commit): move `Subscribe` out of `IConversationStore` into `IConversationEventStream`. Only `InMemoryConversationStore` implements it, and only tests use it.
-2. Terraform: `aws_bedrockagentcore_memory` with the **service-minimum event expiry** (it's set in days; check the current minimum in the API reference) and **no long-term strategies**. Summary/semantic/user-preference strategies are **explicitly deferred to Phase 7**. With no real identity, every request would share one actor, and long-term memory would leak one user's extracted facts into another user's answers.
+2. Terraform: `aws_bedrockagentcore_memory` with `event_expiry_duration = 3` (the service minimum, in days) and **no long-term strategies**. Summary/semantic/user-preference strategies are **explicitly deferred to Phase 7**. With no real identity, every request would share one actor, and long-term memory would leak one user's extracted facts into another user's answers.
 3. `AgentCoreMemoryConversationStore : IConversationStore` (in `RagAgent.AgentCore`):
-   - **IDs (I9):** `sessionId = hex(SHA-256(conversationId))`. That's 64 characters matching `[a-zA-Z0-9][a-zA-Z0-9-_]*`, and it also meets AgentCore Runtime's ≥33-character `runtimeSessionId` rule for Phase 6. Store the original `conversationId` in event metadata so `ListConversationIdsAsync` can return it. Clients keep sending any free-text ID.
-   - **Retention (I8):** apply today's **30-minute sliding window in the application layer**. `GetHistoryAsync` and `ListConversationIdsAsync` ignore sessions whose last event is older than 30 minutes. The service expiry (days) is only a storage backstop. Changing retention needs an explicit product/privacy sign-off and is out of scope here.
+   - **IDs (I9):** `sessionId = hex(SHA-256(conversationId))`. That's 64 characters matching `[a-zA-Z0-9][a-zA-Z0-9-_]*`, and it also meets AgentCore Runtime's ≥33-character `runtimeSessionId` rule for Phase 6.
+     - Store the original `conversationId` **in the event payload**: a blob payload item next to the conversational message, e.g. `{"conversationId": "..."}`. **Don't put it in event metadata.** Metadata values are limited to 256 characters from `[a-zA-Z0-9\s._:/=+@-]`, so IDs containing `#`, `,` or non-ASCII characters, or longer IDs, would get a 400 where they get a 200 today.
+     - Clients keep sending any free-text ID. The tests must include IDs with `#`, `,`, emoji, and one over 256 characters, as well as `conv-xyz` and IDs with spaces and colons.
+   - **Retention (I8): same semantics as today's sliding TTL.** Today a conversation idle for more than 30 minutes is **gone completely**, and the next message starts from empty history. To match that, `GetHistoryAsync` and `AppendAsync` first read the session's latest event timestamp. If it's older than 30 minutes, they **delete all the session's events** (paged `DeleteEvent`, as for `DeleteAsync`) before returning empty history or appending. That way expired messages can never come back into a prompt or `GET /conversations/{id}` after a new append. `ListConversationIdsAsync` leaves out stale sessions.
+     - The service expiry is only a storage backstop. It's set in days, with a minimum of **3** (CreateMemory allows 3–365).
+     - Changing retention needs an explicit product/privacy sign-off and is out of scope here.
    - **Cap (I8):** page `ListEvents` explicitly (max 100 per page), sort by event timestamp, and return the last 40 messages. Don't rely on the API's default page size or ordering.
    - **Delete:** page `ListEvents` → `DeleteEvent` for each event. There's no delete-session API. With no long-term strategies, there are no memory records to purge.
    - **Actor:** fixed `actorId = "anonymous"` until Phase 7.
+   - **Listing cost:** `ListSessions` returns only `sessionId`/`createdAt`. `ListConversationIdsAsync` therefore needs one `ListSessions` pass plus one `ListEvents` per session to read the original ID and the last-event time. That's acceptable behind `Conversations__ListEnabled=false` (below), but don't call it on a hot path.
 4. **Exposure:** `GET /api/agent/conversations` already lists every conversation without auth. That's unchanged in scope, but it now spans tasks. Either keep the 30-minute window (above) so exposure matches today, or gate the list endpoint behind `Conversations__ListEnabled` (default `false` in production) until Phase 7.
 5. Map AgentCore `ValidationException`/`ResourceNotFoundException` to 400/404, never 500 (I10).
 6. Config: `ConversationStore__Provider = InMemory | AgentCore`.
@@ -275,7 +288,7 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 - The existing store tests (40-message cap, TTL, list, delete) pass against a faked `IAmazonBedrockAgentCore`.
 - A client ID like `conv-xyz` and one with spaces and colons both work.
 
-**Rollback:** `ConversationStore__Provider=InMemory`. Conversations stored in Memory are left behind and expire at the service expiry. The Memory resource can stay.
+**Rollback:** `ConversationStore__Provider=InMemory`. Conversations stored in Memory are left behind for up to 3 days (the service expiry). They're unreachable through the API after rollback. The Memory resource can stay.
 
 ---
 
@@ -298,12 +311,19 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 4. **Rollout switch:** `Agent__Host = InProcess | AgentCore` is an **ECS task-definition env var** injected by `deploy-ecs.sh`. Keep the in-process path built, deployed and tested until the runtime path has been stable in production for 2+ weeks.
 5. **Terraform, in order:**
    1. Add a second ECR repo for the agent host. Extend `bootstrap-ecr-image.sh` to push an **ARM64 bootstrap image** before the runtime is created, because the first apply fails without one.
-   2. Create `aws_bedrockagentcore_agent_runtime` + `_endpoint` with `lifecycle { ignore_changes = [agent_runtime_artifact] }`, mirroring the ECS task-definition pattern. That way the CI `infrastructure` job (terraform apply on every push) never rolls the image back, and the `deploy` job owns the image through `UpdateAgentRuntime`.
+   2. Create `aws_bedrockagentcore_agent_runtime` with `lifecycle { ignore_changes = [agent_runtime_artifact] }`, mirroring the ECS task-definition pattern. That way the CI `infrastructure` job (terraform apply on every push) never rolls the image back, and the `deploy` job owns the image.
+      - **Invoke the `DEFAULT` endpoint and don't create a custom `aws_bedrockagentcore_agent_runtime_endpoint`.** Only `DEFAULT` follows the latest runtime version. A custom endpoint stays pinned to its version after `UpdateAgentRuntime`, so CI would report success while production keeps serving the old image. If a named endpoint is needed later (blue/green), CI must also call `UpdateAgentRuntimeEndpoint` to the new version, and Terraform needs `ignore_changes` on the endpoint's version.
    3. Runtime execution role: `bedrock:InvokeModel`, `bedrock:InvokeModelWithResponseStream`, `s3vectors:QueryVectors`/`GetVectors`, CloudWatch/X-Ray.
    4. ECS task role: add `bedrock-agentcore:InvokeAgentRuntime`. **Keep** its Bedrock and S3 Vectors permissions, because search and indexing still use them.
    5. `infra/deploy-role-policy.json`: add the `bedrock-agentcore:*` control-plane actions needed.
    6. ALB: set `idle_timeout = 180` on `aws_lb.api`. With the default 60 s, a batch `/ask` (a model-driven researcher call, a network hop, up to 3 writes and 2 critic calls) can end in a 504. Check p99 against the Phase 0 baseline.
-6. **CI:** add a native ARM (or cross-compiled, see Phase 1) build job for `RagAgent.AgentHost`, push, then `UpdateAgentRuntime` after the API deploy.
+6. **CI:** add a native ARM (or cross-compiled, see Phase 1) build job for `RagAgent.AgentHost` and push the image. Then run `scripts/deploy-agentcore.sh`:
+   1. `GetAgentRuntime` to read the current full configuration: role ARN, network, protocol, environment variables, authoriser.
+   2. `UpdateAgentRuntime` with **that same configuration plus only the new container URI**. `UpdateAgentRuntime` replaces the whole configuration, so leaving out a Terraform-managed field would silently reset it.
+   3. Wait for the new version to be `READY`.
+   4. **Post-deploy check:** invoke the `DEFAULT` endpoint with a health payload. The host echoes its `APP_VERSION` (image tag, injected as an env var), and the deploy fails unless it matches the tag just pushed.
+7. **The host's dependencies:** `SemanticSearchPlugin` calls `IPostService.GetPostByIdAsync` for each source to build snippets. So the host also registers `AddHackerNewsDataSource` and needs outbound internet. That's fine with `network_mode = PUBLIC`, but it needs a NAT gateway if the runtime later moves into the VPC. Check the runtime role against the S3 Vectors calls the store actually makes (`QueryVectors`, `GetVectors`, and `ListVectors` if `IsIndexEmptyAsync` is reached).
+8. **Cold starts:** one runtime session per conversation means a microVM cold start on each conversation's first turn. Include it in the p95 budget and the load test (first-turn and follow-up latencies reported separately).
 
 **Done when:**
 - Production `/ask` and `/ask/stream` go through the runtime with p95 inside the budget and no 504s in a load test at expected concurrency.
@@ -372,10 +392,11 @@ P0 ─▶ P1 ─▶ P2 ─▶ P3 ─┬─▶ P4 (shadow ▶ enforce) ─┐
 | Guardrails fire on sources or IDs, or block legitimate questions | Guardrails only run at the request boundary on the question and final answer, with shadow mode, topic parity and a measured false-positive rate (Phases 2 and 4) |
 | Guardrail service outage | Input fails closed to regex, output fails open with a metric (Phase 4) |
 | SSE contract breaks for existing clients | The existing route is unchanged. Reviewed streaming is opt-in on a new route (Phase 3). |
-| Client conversation IDs rejected by Memory or Runtime | SHA-256 session ID mapping (Phase 5) |
-| Cross-user leakage or longer retention via Memory | No long-term strategies before identity, a 30-minute app-level window, and the list endpoint gated (Phase 5) |
+| Client conversation IDs rejected by Memory or Runtime | SHA-256 session ID mapping, and the original ID stored in the payload, not metadata (Phase 5) |
+| Cross-user leakage or longer retention via Memory | No long-term strategies before identity, stale sessions purged on the next read or append (30-minute parity), and the list endpoint gated (Phase 5) |
 | History written twice / guardrails run twice | Ownership rule: the API owns history and guardrails, and the runtime is stateless (Phase 6) |
 | Terraform rolls the runtime image back on every push | `ignore_changes` on the runtime artefact, and CI owns the image (Phase 6) |
+| CI deploy "succeeds" but production serves the old agent image | Invoke the `DEFAULT` endpoint, `UpdateAgentRuntime` resends the full config, and a post-deploy `APP_VERSION` check (Phase 6) |
 | ALB 504 on longer runs | `idle_timeout = 180` and a load test (Phase 6) |
 | Docker restore breaks under CPM | Update the Dockerfile restore layer and add a `--no-cache` CI check (Phase 1) |
 | `exec format error` after the Graviton switch | Verify multi-arch manifests (including bootstrap) before the switch, in a separate commit (Phase 1) |
