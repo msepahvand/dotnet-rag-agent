@@ -10,6 +10,8 @@ namespace RagAgent.S3Vectors;
 /// </summary>
 public class S3VectorStore : IVectorStore
 {
+    private const int MaximumVectorsPerRequest = 500;
+
     private readonly IAmazonS3Vectors _s3VectorsClient;
     private readonly string _vectorBucketName;
     private readonly string _indexName;
@@ -57,25 +59,28 @@ public class S3VectorStore : IVectorStore
 
     public async Task IndexDocumentsBatchAsync(List<(string Key, float[] Embedding, Dictionary<string, string> Metadata)> documents)
     {
-        var vectors = documents.Select(d => new PutInputVector
+        foreach (var batch in documents.Chunk(MaximumVectorsPerRequest))
         {
-            Key = d.Key,
-            Data = new VectorData
+            var vectors = batch.Select(d => new PutInputVector
             {
-                Float32 = d.Embedding.ToList()
-            },
-            Metadata = new Amazon.Runtime.Documents.Document(
-                d.Metadata.ToDictionary(
-                    kvp => kvp.Key,
-                    kvp => new Amazon.Runtime.Documents.Document(kvp.Value)))
-        }).ToList();
+                Key = d.Key,
+                Data = new VectorData
+                {
+                    Float32 = d.Embedding.ToList()
+                },
+                Metadata = new Amazon.Runtime.Documents.Document(
+                    d.Metadata.ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => new Amazon.Runtime.Documents.Document(kvp.Value)))
+            }).ToList();
 
-        await _s3VectorsClient.PutVectorsAsync(new PutVectorsRequest
-        {
-            VectorBucketName = _vectorBucketName,
-            IndexName = _indexName,
-            Vectors = vectors
-        });
+            await _s3VectorsClient.PutVectorsAsync(new PutVectorsRequest
+            {
+                VectorBucketName = _vectorBucketName,
+                IndexName = _indexName,
+                Vectors = vectors
+            });
+        }
     }
 
     public async Task<List<VectorSearchResult>> SearchAsync(float[] queryEmbedding, int topK = 10)

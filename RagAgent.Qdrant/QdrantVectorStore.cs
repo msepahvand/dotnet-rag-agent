@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Security.Cryptography;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using RagAgent.Core;
@@ -104,7 +105,7 @@ public class QdrantVectorStore : IVectorStore
     {
         var points = documents.Select((doc, index) => new
         {
-            id = int.Parse(doc.Key),
+            id = CreatePointId(doc.Key),
             vector = doc.Embedding,
             payload = doc.Metadata
         }).ToList();
@@ -174,5 +175,11 @@ public class QdrantVectorStore : IVectorStore
             JsonValueKind.Number when property.TryGetInt64(out var count) => count,
             _ => null
         };
+    }
+
+    private static Guid CreatePointId(string key)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(key));
+        return new Guid(hash.AsSpan(0, 16));
     }
 }

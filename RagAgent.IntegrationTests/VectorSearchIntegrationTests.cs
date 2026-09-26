@@ -101,6 +101,27 @@ public class VectorSearchIntegrationTests
     [Theory]
     [InlineData("Qdrant")]
     [InlineData("Redis")]
+    public async Task IndexLongPost_ThenSearch_ReturnsOnePostResultAsync(string provider)
+    {
+        await using var factory = new VectorSearchWebApplicationFactory(provider);
+        await factory.InitializeAsync();
+        var client = factory.CreateClient();
+
+        var indexResponse = await client.PostAsync("/api/index/2", null);
+        indexResponse.EnsureSuccessStatusCode();
+
+        var searchResponse = await client.GetAsync("/api/search?query=long-post-token-699&topK=10");
+        searchResponse.EnsureSuccessStatusCode();
+        var results = await searchResponse.Content.ReadFromJsonAsync<List<SearchResultDto>>();
+
+        results.Should().NotBeNull();
+        results!.Should().Contain(result => result.PostId == 2);
+        results!.Where(result => result.PostId == 2).Should().ContainSingle();
+    }
+
+    [Theory]
+    [InlineData("Qdrant")]
+    [InlineData("Redis")]
     public async Task IndexMultiplePosts_ThenSearch_ReturnsRelevantResultsAsync(string provider)
     {
         // Arrange
@@ -226,4 +247,3 @@ public class VectorSearchIntegrationTests
         public double Distance { get; init; }
     }
 }
-

@@ -37,14 +37,10 @@ public sealed class IndexingPlugin(
                 return "No posts were available to index.";
             }
 
-            var postLookup = posts.ToDictionary(p => p.Id);
-            var postsWithEmbeddings = new List<(Core.Models.Post Post, float[] Embedding)>();
-            await foreach (var (postId, embedding) in embeddingService.StreamEmbeddings(posts))
+            var postsWithEmbeddings = new List<Core.Models.PostEmbedding>();
+            await foreach (var embedding in embeddingService.StreamEmbeddings(posts))
             {
-                if (postLookup.TryGetValue(postId, out var post))
-                {
-                    postsWithEmbeddings.Add((post, embedding));
-                }
+                postsWithEmbeddings.Add(embedding);
             }
 
             await vectorService.IndexPostsBatchAsync(postsWithEmbeddings);

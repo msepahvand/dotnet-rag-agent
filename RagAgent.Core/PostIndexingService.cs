@@ -16,19 +16,15 @@ public sealed class PostIndexingService(
     public async Task<IndexAllPostsResult> IndexPostsAsync(IReadOnlyList<Post> posts)
     {
         var postList = posts.ToList();
-        var postLookup = postList.ToDictionary(p => p.Id);
-        var postsWithEmbeddings = new List<(Post Post, float[] Embedding)>();
+        var postEmbeddings = new List<PostEmbedding>();
 
-        await foreach (var (postId, embedding) in embeddingService.StreamEmbeddings(postList))
+        await foreach (var postEmbedding in embeddingService.StreamEmbeddings(postList))
         {
-            if (postLookup.TryGetValue(postId, out var post))
-            {
-                postsWithEmbeddings.Add((post, embedding));
-            }
+            postEmbeddings.Add(postEmbedding);
         }
 
-        await vectorService.IndexPostsBatchAsync(postsWithEmbeddings);
-        return new IndexAllPostsResult(postsWithEmbeddings.Count);
+        await vectorService.IndexPostsBatchAsync(postEmbeddings);
+        return new IndexAllPostsResult(postEmbeddings.Select(embedding => embedding.Post.Id).Distinct().Count());
     }
 
     public async Task<IndexSinglePostResult?> IndexSingleAsync(int id)
@@ -39,8 +35,8 @@ public sealed class PostIndexingService(
             return null;
         }
 
-        var embedding = await embeddingService.GenerateEmbeddingAsync($"{post.Title}\n\n{post.Body}");
-        await vectorService.IndexPostAsync(post, embedding);
+        var embeddings = await embeddingService.GenerateEmbeddingsAsync($"{post.Title}\n\n{post.Body}");
+        await vectorService.IndexPostAsync(post, embeddings);
 
         return new IndexSinglePostResult(post);
     }
