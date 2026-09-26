@@ -231,7 +231,7 @@ public class EvaluationAgentTests
             _answers = answers;
 
         public Task<AgentAnswerResult> AnswerAsync(
-            string question, int topK, IReadOnlyList<ChatMessage> history) =>
+            string question, int topK, IReadOnlyList<ConversationMessage> history) =>
             Task.FromResult(_answers.Count > 1 ? _answers.Dequeue() : _answers.Peek());
     }
 }

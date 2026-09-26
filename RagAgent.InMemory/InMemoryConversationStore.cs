@@ -28,19 +28,19 @@ public sealed class InMemoryConversationStore(IMemoryCache cache) : IConversatio
         return ReadEventsAsync(channel.Reader, channel.Writer, cancellationToken);
     }
 
-    public Task<IReadOnlyList<ChatMessage>> GetHistoryAsync(string conversationId)
+    public Task<IReadOnlyList<ConversationMessage>> GetHistoryAsync(string conversationId)
     {
-        var messages = cache.Get<List<ChatMessage>>(conversationId);
-        return Task.FromResult<IReadOnlyList<ChatMessage>>(messages is null ? [] : [.. messages]);
+        var messages = cache.Get<List<ConversationMessage>>(conversationId);
+        return Task.FromResult<IReadOnlyList<ConversationMessage>>(messages is null ? [] : [.. messages]);
     }
 
-    public Task AppendAsync(string conversationId, ChatMessage message)
+    public Task AppendAsync(string conversationId, ConversationMessage message)
     {
         var messages = cache.GetOrCreate(conversationId, entry =>
         {
             entry.SlidingExpiration = ConversationTtl;
             entry.RegisterPostEvictionCallback(OnEviction);
-            return new List<ChatMessage>();
+            return new List<ConversationMessage>();
         })!;
 
         messages.Add(message);

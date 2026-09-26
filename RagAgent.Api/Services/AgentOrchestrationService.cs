@@ -30,7 +30,7 @@ public sealed class AgentOrchestrationService(
 
             var history = await conversationStore.GetHistoryAsync(conversationId);
 
-            await conversationStore.AppendAsync(conversationId, new ChatMessage("user", request.Question));
+            await conversationStore.AppendAsync(conversationId, new ConversationMessage("user", request.Question));
 
             var result = await agentAnswerService.AnswerAsync(request.Question, topK, history);
 
@@ -42,7 +42,7 @@ public sealed class AgentOrchestrationService(
             activity?.SetTag("rag.citations_count", result.Citations.Count);
             activity?.SetTag("rag.tools_used", string.Join(",", result.ToolsUsed));
 
-            await conversationStore.AppendAsync(conversationId, new ChatMessage("assistant", result.Answer));
+            await conversationStore.AppendAsync(conversationId, new ConversationMessage("assistant", result.Answer));
 
             return new AgentAskResponse
             {

@@ -33,7 +33,7 @@ public class ConversationStoreEventTests
         var store = CreateStore();
         var eventStream = store.Subscribe(); // registers before append — channel buffers the event
 
-        var message = new ChatMessage("user", "hello");
+        var message = new ConversationMessage("user", "hello");
         await store.AppendAsync("conv-1", message);
 
         var events = await TakeAsync(eventStream, 1);
@@ -47,7 +47,7 @@ public class ConversationStoreEventTests
     public async Task DeleteAsync_EmitsConversationDeletedEventAsync()
     {
         var store = CreateStore();
-        await store.AppendAsync("conv-1", new ChatMessage("user", "hello"));
+        await store.AppendAsync("conv-1", new ConversationMessage("user", "hello"));
 
         var eventStream = store.Subscribe();
         await store.DeleteAsync("conv-1");
@@ -65,7 +65,7 @@ public class ConversationStoreEventTests
         var cache = new MemoryCache(new MemoryCacheOptions());
         var store = new InMemoryConversationStore(cache);
 
-        await store.AppendAsync("conv-1", new ChatMessage("user", "hello"));
+        await store.AppendAsync("conv-1", new ConversationMessage("user", "hello"));
         var eventStream = store.Subscribe();
 
         cache.Remove("conv-1"); // simulates TTL expiry
@@ -83,8 +83,8 @@ public class ConversationStoreEventTests
         var store = CreateStore();
         var eventStream = store.Subscribe();
 
-        var msg1 = new ChatMessage("user", "first");
-        var msg2 = new ChatMessage("assistant", "second");
+        var msg1 = new ConversationMessage("user", "first");
+        var msg2 = new ConversationMessage("assistant", "second");
         await store.AppendAsync("conv-1", msg1);
         await store.AppendAsync("conv-1", msg2);
         await store.DeleteAsync("conv-1");
@@ -104,8 +104,8 @@ public class ConversationStoreEventTests
         var store = CreateStore();
         var eventStream = store.Subscribe();
 
-        await store.AppendAsync("conv-a", new ChatMessage("user", "hello"));
-        await store.AppendAsync("conv-b", new ChatMessage("user", "world"));
+        await store.AppendAsync("conv-a", new ConversationMessage("user", "hello"));
+        await store.AppendAsync("conv-b", new ConversationMessage("user", "world"));
         await store.DeleteAsync("conv-a");
 
         var events = await TakeAsync(eventStream, 3);
@@ -128,7 +128,7 @@ public class ConversationStoreEventTests
 
         for (var i = 0; i < 42; i++)
         {
-            await store.AppendAsync(convId, new ChatMessage("user", $"message-{i}"));
+            await store.AppendAsync(convId, new ConversationMessage("user", $"message-{i}"));
         }
 
         var history = await store.GetHistoryAsync(convId);

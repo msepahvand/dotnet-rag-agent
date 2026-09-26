@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
 using RagAgent.Core;
-using RagAgent.Agents.Filters;
+using RagAgent.Agents.Telemetry;
 using RagAgent.Agents.Process;
 
 namespace RagAgent.Agents;
@@ -17,41 +17,25 @@ public static class ServiceCollectionExtensions
     {
         var options = VectorSearchOptionsValidator.Parse(configuration);
 
-        // Required by Bedrock chat/embedding connectors regardless of vector store provider.
+        // Required by the Bedrock MEAI chat and Cohere embedding clients.
         services.AddAWSService<IAmazonBedrockRuntime>();
 
-        // Configure Semantic Kernel + embedding pipeline once for all providers.
-        // Cohere Embed v3 uses a different request schema to the SK connector's default,
-        // so we use a custom generator rather than the SK connector's BedrockEmbeddingGenerator.
+        // Cohere Embed v3 uses a different request schema to the AWS adapter's default,
+        // so keep the custom generator for embeddings.
         services.AddScoped<IEmbeddingGenerator<string, Embedding<float>>>(sp =>
             new CohereEmbeddingGenerator(
                 sp.GetRequiredService<IAmazonBedrockRuntime>(),
                 options.EmbeddingModelId));
-        services.AddBedrockChatCompletionService(options.ChatModelId);
 
-        // Function invocation filters (tool calls): logging/normalisation, then output guardrails.
-        services.AddScoped<IFunctionInvocationFilter, ToolInvocationFilter>();
-        services.AddScoped<IFunctionInvocationFilter, OutputGuardrailFilter>();
+        services.AddChatClient(sp =>
+                sp.GetRequiredService<IAmazonBedrockRuntime>().AsIChatClient(options.ChatModelId))
+            .UseLogging()
+            .UseOpenTelemetry(
+                sourceName: AgentActivitySource.Name,
+                configure: client => client.EnableSensitiveData = false)
+            .UseFunctionInvocation();
 
-        // Prompt render filter: input guardrails for kernel prompt functions.
-        services.AddScoped<IPromptRenderFilter, InputGuardrailFilter>();
-
-        services.AddTransient(sp =>
-        {
-            var kernel = new Kernel(sp);
-
-            foreach (var filter in sp.GetServices<IFunctionInvocationFilter>())
-            {
-                kernel.FunctionInvocationFilters.Add(filter);
-            }
-
-            foreach (var filter in sp.GetServices<IPromptRenderFilter>())
-            {
-                kernel.PromptRenderFilters.Add(filter);
-            }
-
-            return kernel;
-        });
+        services.AddTransient(sp => new Kernel(sp));
         services.AddScoped<IGuardrailsService, GuardrailsService>();
         services.AddScoped<IEmbeddingService, EmbeddingService>();
         services.AddScoped<SemanticSearchPlugin>();

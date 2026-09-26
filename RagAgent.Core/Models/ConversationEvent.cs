@@ -2,7 +2,7 @@ namespace RagAgent.Core.Models;
 
 public abstract record ConversationEvent(string ConversationId)
 {
-    public sealed record MessageAppended(string ConversationId, ChatMessage Message)
+    public sealed record MessageAppended(string ConversationId, ConversationMessage Message)
         : ConversationEvent(ConversationId);
 
     public sealed record ConversationDeleted(string ConversationId)

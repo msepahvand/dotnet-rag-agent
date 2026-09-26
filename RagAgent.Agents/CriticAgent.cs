@@ -1,8 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Connectors.Amazon;
+using Microsoft.Extensions.AI;
 using RagAgent.Core;
 using RagAgent.Core.Models;
 
@@ -25,13 +23,11 @@ public sealed class CriticAgent : ICriticAgent
         "Set approved to false and provide concise feedback if either check fails. " +
         "Return only the raw JSON object.";
 
-    private readonly IChatCompletionService _chatService;
-    private readonly Kernel _kernel;
+    private readonly IChatClient _chatClient;
 
-    public CriticAgent(IChatCompletionService chatService, Kernel kernel)
+    public CriticAgent(IChatClient chatClient)
     {
-        _chatService = chatService;
-        _kernel = kernel;
+        _chatClient = chatClient;
     }
 
     public async Task<CriticResult> EvaluateAsync(
@@ -57,17 +53,19 @@ public sealed class CriticAgent : ICriticAgent
         }
 
         // LLM-based check for relevance and groundedness
-        var chatHistory = new ChatHistory(SystemPrompt);
-        chatHistory.AddUserMessage(BuildEvaluationPrompt(question, answer, research.SourcesJson));
-
-        var settings = new AmazonClaudeExecutionSettings
+        var chatHistory = new[]
         {
-            MaxTokensToSample = 512,
-            FunctionChoiceBehavior = FunctionChoiceBehavior.None()
+            new ChatMessage(ChatRole.System, SystemPrompt),
+            new ChatMessage(ChatRole.User, BuildEvaluationPrompt(question, answer, research.SourcesJson)),
         };
 
-        var response = await _chatService.GetChatMessageContentsAsync(chatHistory, settings, _kernel);
-        var rawOutput = response.FirstOrDefault()?.Content?.Trim() ?? string.Empty;
+        var options = new ChatOptions
+        {
+            MaxOutputTokens = 512,
+        };
+
+        var response = await _chatClient.GetResponseAsync(chatHistory, options);
+        var rawOutput = response.Text?.Trim() ?? string.Empty;
 
         return ParseCriticResponse(rawOutput);
     }

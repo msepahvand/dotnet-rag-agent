@@ -42,7 +42,7 @@ public sealed class AgentStreamingService(
         activity?.SetTag("rag.top_k", topK);
 
         var history = await conversationStore.GetHistoryAsync(conversationId);
-        await conversationStore.AppendAsync(conversationId, new ChatMessage("user", request.Question));
+        await conversationStore.AppendAsync(conversationId, new ConversationMessage("user", request.Question));
 
         // ── Research ─────────────────────────────────────────────────────────
         yield return StreamEventDto.ForStatus("Searching for relevant sources…");
@@ -72,7 +72,7 @@ public sealed class AgentStreamingService(
             answer = answer[..AgentPipelineConstants.MaxAnswerLength] + " … [response truncated]";
         }
 
-        await conversationStore.AppendAsync(conversationId, new ChatMessage("assistant", answer));
+        await conversationStore.AppendAsync(conversationId, new ConversationMessage("assistant", answer));
 
         activity?.SetTag("rag.grounded", research.Sources.Count > 0);
 
