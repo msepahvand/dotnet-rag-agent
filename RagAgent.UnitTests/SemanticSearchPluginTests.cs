@@ -106,8 +106,8 @@ public class SemanticSearchPluginTests
         public Task<List<SearchResult>> SemanticSearchAsync(string query, int topK = 10) =>
             Task.FromResult(results.ToList());
 
-        public Task IndexPostAsync(Post post, float[] embedding) => Task.CompletedTask;
-        public Task IndexPostsBatchAsync(List<(Post Post, float[] Embedding)> posts) => Task.CompletedTask;
+        public Task IndexPostAsync(Post post, IReadOnlyList<float[]> embeddings) => Task.CompletedTask;
+        public Task IndexPostsBatchAsync(List<PostEmbedding> embeddings) => Task.CompletedTask;
         public Task<bool> IsIndexEmptyAsync() => Task.FromResult(true);
         public Task EnsureInitializedAsync() => Task.CompletedTask;
     }
@@ -120,8 +120,8 @@ public class SemanticSearchPluginTests
             return Task.FromResult<List<SearchResult>>([]);
         }
 
-        public Task IndexPostAsync(Post post, float[] embedding) => Task.CompletedTask;
-        public Task IndexPostsBatchAsync(List<(Post Post, float[] Embedding)> posts) => Task.CompletedTask;
+        public Task IndexPostAsync(Post post, IReadOnlyList<float[]> embeddings) => Task.CompletedTask;
+        public Task IndexPostsBatchAsync(List<PostEmbedding> embeddings) => Task.CompletedTask;
         public Task<bool> IsIndexEmptyAsync() => Task.FromResult(true);
         public Task EnsureInitializedAsync() => Task.CompletedTask;
     }

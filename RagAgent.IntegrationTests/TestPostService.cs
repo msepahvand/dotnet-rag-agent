@@ -13,6 +13,8 @@ internal sealed class TestPostService : IPostService
             id == 1 ? "sunt aut facere repellat provident occaecati excepturi optio reprehenderit" : $"Test post title {id}",
             id == 1
                 ? "This is deterministic content for post 1 and includes sunt aut facere so search assertions remain stable."
+                : id == 2
+                    ? string.Join(' ', Enumerable.Range(0, 700).Select(index => $"long-post-token-{index:D3}"))
                 : $"Deterministic integration-test content for post {id}."))
         .ToList();
 

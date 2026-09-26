@@ -196,6 +196,8 @@ Or via env vars: `$env:VectorStore__Provider="Qdrant"`, etc.
 
 The agent endpoints auto-index if the vector store is empty and maintain conversation history per `conversationId` for multi-turn context.
 
+Post titles and bodies are embedded as overlapping chunks of up to 2,048 characters, so long posts are indexed in full rather than truncated. Search ranks matching chunks and returns each post only once. Clear or recreate an existing vector index before the first chunked reindex; old post-level vectors are not migrated or removed automatically.
+
 **Choosing between batch and streaming:**
 
 | | `POST /ask` | `POST /ask/stream` |

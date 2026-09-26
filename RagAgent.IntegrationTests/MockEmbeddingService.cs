@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Channels;
+using RagAgent.Agents;
 using RagAgent.Core;
 using RagAgent.Core.Models;
 
@@ -16,12 +17,12 @@ public class MockEmbeddingService : IEmbeddingService
         _dimensions = dimensions;
     }
 
-    public async IAsyncEnumerable<(int PostId, float[] Embedding)> StreamEmbeddings(
+    public async IAsyncEnumerable<PostEmbedding> StreamEmbeddings(
         List<Post> posts,
         int maxConcurrency = 3,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var channel = Channel.CreateUnbounded<(int PostId, float[] Embedding)>();
+        var channel = Channel.CreateUnbounded<PostEmbedding>();
 
         var producer = Parallel.ForEachAsync(
             posts,
@@ -33,8 +34,12 @@ public class MockEmbeddingService : IEmbeddingService
             async (post, ct) =>
             {
                 var text = $"{post.Title} {post.Body}";
-                var embedding = await GenerateEmbeddingAsync(text);
-                await channel.Writer.WriteAsync((post.Id, embedding), ct);
+                var chunks = TextChunker.Split(text);
+                for (var chunkIndex = 0; chunkIndex < chunks.Count; chunkIndex++)
+                {
+                    var embedding = await GenerateEmbeddingAsync(chunks[chunkIndex]);
+                    await channel.Writer.WriteAsync(new PostEmbedding(post, chunkIndex, embedding), ct);
+                }
             });
 
         _ = producer.ContinueWith(
@@ -51,6 +56,14 @@ public class MockEmbeddingService : IEmbeddingService
     {
         var embedding = GenerateDeterministicEmbedding(text);
         return Task.FromResult(embedding);
+    }
+
+    public Task<IReadOnlyList<float[]>> GenerateEmbeddingsAsync(string text)
+    {
+        IReadOnlyList<float[]> embeddings = TextChunker.Split(text)
+            .Select(GenerateDeterministicEmbedding)
+            .ToList();
+        return Task.FromResult(embeddings);
     }
 
     private float[] GenerateDeterministicEmbedding(string text)

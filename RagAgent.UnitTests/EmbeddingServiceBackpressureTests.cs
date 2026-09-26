@@ -84,7 +84,8 @@ public class EmbeddingServiceBackpressureTests
         var results = await CollectAsync(service.StreamEmbeddings(CreatePosts(5)));
 
         results.Should().HaveCount(5);
-        results.Select(r => r.PostId).Should().BeEquivalentTo([1, 2, 3, 4, 5]);
+        results.Select(r => r.Post.Id).Should().BeEquivalentTo([1, 2, 3, 4, 5]);
+        results.Select(r => r.ChunkIndex).Should().OnlyContain(index => index == 0);
     }
 
     [Fact]
@@ -100,7 +101,21 @@ public class EmbeddingServiceBackpressureTests
         var results = await CollectAsync(service.StreamEmbeddings(CreatePosts(4), maxConcurrency: 1));
 
         results.Should().HaveCount(4);
-        results.Select(r => r.PostId).Should().BeEquivalentTo([1, 2, 3, 4]);
+        results.Select(r => r.Post.Id).Should().BeEquivalentTo([1, 2, 3, 4]);
+    }
+
+    [Fact]
+    public async Task StreamEmbeddings_EmitsEveryChunkForLongPostsAsync()
+    {
+        var post = new Post(1, 1, "Long", string.Join(' ', Enumerable.Repeat("content", 700)));
+        var service = new EmbeddingService(new FakeEmbeddingGenerator(text =>
+            Task.FromResult(new[] { (float)text.Length })));
+
+        var results = await CollectAsync(service.StreamEmbeddings([post]));
+
+        results.Should().HaveCountGreaterThan(1);
+        results.Select(result => result.ChunkIndex).Should().Equal(Enumerable.Range(0, results.Count));
+        results.Should().OnlyContain(result => result.Embedding[0] <= TextChunker.MaximumChunkLength);
     }
 
     private sealed class FakeEmbeddingGenerator(Func<string, Task<float[]>> generate)

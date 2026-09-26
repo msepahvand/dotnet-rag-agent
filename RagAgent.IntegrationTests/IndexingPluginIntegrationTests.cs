@@ -64,12 +64,15 @@ public class IndexingPluginIntegrationTests
     {
         public Task<float[]> GenerateEmbeddingAsync(string text) => Task.FromResult(new[] { 0.1f, 0.2f, 0.3f });
 
-        public async IAsyncEnumerable<(int PostId, float[] Embedding)> StreamEmbeddings(
+        public Task<IReadOnlyList<float[]>> GenerateEmbeddingsAsync(string text) =>
+            Task.FromResult<IReadOnlyList<float[]>>([new[] { 0.1f, 0.2f, 0.3f }]);
+
+        public async IAsyncEnumerable<PostEmbedding> StreamEmbeddings(
             List<Post> posts, int maxConcurrency = 3, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             foreach (var post in posts)
             {
-                yield return (post.Id, new[] { 0.1f, 0.2f, 0.3f });
+                yield return new PostEmbedding(post, 0, new[] { 0.1f, 0.2f, 0.3f });
             }
 
             await Task.CompletedTask;
@@ -79,22 +82,23 @@ public class IndexingPluginIntegrationTests
     private sealed class EmptyVectorService(bool isEmpty = true) : IVectorService
     {
         public bool IsEmpty { get; private set; } = isEmpty;
-        public List<(Post Post, float[] Embedding)> IndexedPosts { get; } = [];
+        public List<PostEmbedding> IndexedPosts { get; } = [];
 
         public Task EnsureInitializedAsync() => Task.CompletedTask;
 
         public Task<bool> IsIndexEmptyAsync() => Task.FromResult(IsEmpty);
 
-        public Task IndexPostAsync(Post post, float[] embedding)
+        public Task IndexPostAsync(Post post, IReadOnlyList<float[]> embeddings)
         {
-            IndexedPosts.Add((post, embedding));
+            IndexedPosts.AddRange(embeddings.Select((embedding, chunkIndex) =>
+                new PostEmbedding(post, chunkIndex, embedding)));
             IsEmpty = false;
             return Task.CompletedTask;
         }
 
-        public Task IndexPostsBatchAsync(List<(Post Post, float[] Embedding)> posts)
+        public Task IndexPostsBatchAsync(List<PostEmbedding> embeddings)
         {
-            IndexedPosts.AddRange(posts);
+            IndexedPosts.AddRange(embeddings);
             IsEmpty = false;
             return Task.CompletedTask;
         }

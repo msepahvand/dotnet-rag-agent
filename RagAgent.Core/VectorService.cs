@@ -8,6 +8,8 @@ namespace RagAgent.Core;
 /// </summary>
 public class VectorService : IVectorService
 {
+    private const int MaximumSearchCandidates = 1000;
+
     private readonly IVectorStore _vectorStore;
     private readonly IEmbeddingService _embeddingService;
 
@@ -30,28 +32,22 @@ public class VectorService : IVectorService
         return _vectorStore.IsEmptyAsync();
     }
 
-    public async Task IndexPostAsync(Post post, float[] embedding)
-    {
-        var metadata = new Dictionary<string, string>
-        {
-            ["title"] = post.Title,
-            ["userId"] = post.UserId.ToString(),
-            ["postId"] = post.Id.ToString()
-        };
+    public Task IndexPostAsync(Post post, IReadOnlyList<float[]> embeddings) =>
+        IndexPostsBatchAsync(embeddings
+            .Select((embedding, chunkIndex) => new PostEmbedding(post, chunkIndex, embedding))
+            .ToList());
 
-        await _vectorStore.IndexDocumentAsync(post.Id.ToString(), embedding, metadata);
-    }
-
-    public async Task IndexPostsBatchAsync(List<(Post Post, float[] Embedding)> posts)
+    public async Task IndexPostsBatchAsync(List<PostEmbedding> embeddings)
     {
-        var documents = posts.Select(p => (
-            Key: p.Post.Id.ToString(),
-            Embedding: p.Embedding,
+        var documents = embeddings.Select(embedding => (
+            Key: CreateChunkKey(embedding.Post.Id, embedding.ChunkIndex),
+            Embedding: embedding.Embedding,
             Metadata: new Dictionary<string, string>
             {
-                ["title"] = p.Post.Title,
-                ["userId"] = p.Post.UserId.ToString(),
-                ["postId"] = p.Post.Id.ToString()
+                ["title"] = embedding.Post.Title,
+                ["userId"] = embedding.Post.UserId.ToString(),
+                ["postId"] = embedding.Post.Id.ToString(),
+                ["chunkIndex"] = embedding.ChunkIndex.ToString()
             }
         )).ToList();
 
@@ -61,14 +57,40 @@ public class VectorService : IVectorService
     public async Task<List<SearchResult>> SemanticSearchAsync(string query, int topK = 10)
     {
         float[] queryEmbedding = await _embeddingService.GenerateEmbeddingAsync(query);
-        var results = await _vectorStore.SearchAsync(queryEmbedding, topK);
+        var candidateLimit = Math.Min(topK, MaximumSearchCandidates);
+        List<VectorSearchResult> results;
+        List<SearchResult> distinctPosts;
 
-        return results.Select(r => new SearchResult
+        while (true)
         {
-            Distance = 1.0 - r.Score, // Convert similarity to distance
-            Title = r.Metadata.GetValueOrDefault("title", ""),
-            PostId = int.Parse(r.Metadata.GetValueOrDefault("postId", "0")),
-            UserId = int.Parse(r.Metadata.GetValueOrDefault("userId", "0"))
-        }).ToList();
+            results = await _vectorStore.SearchAsync(queryEmbedding, candidateLimit);
+            distinctPosts = results
+                .Select(ToSearchResult)
+                .GroupBy(result => result.PostId)
+                .Select(group => group.MinBy(result => result.Distance)!)
+                .OrderBy(result => result.Distance)
+                .Take(topK)
+                .ToList();
+
+            if (distinctPosts.Count >= topK
+                || results.Count < candidateLimit
+                || candidateLimit == MaximumSearchCandidates)
+            {
+                return distinctPosts;
+            }
+
+            candidateLimit = Math.Min(candidateLimit * 2, MaximumSearchCandidates);
+        }
     }
+
+    private static SearchResult ToSearchResult(VectorSearchResult result) =>
+        new()
+        {
+            Distance = 1.0 - result.Score,
+            Title = result.Metadata.GetValueOrDefault("title", ""),
+            PostId = int.Parse(result.Metadata.GetValueOrDefault("postId", "0")),
+            UserId = int.Parse(result.Metadata.GetValueOrDefault("userId", "0"))
+        };
+
+    private static string CreateChunkKey(int postId, int chunkIndex) => $"{postId}:{chunkIndex}";
 }
