@@ -7,6 +7,40 @@ namespace RagAgent.UnitTests;
 
 public class EvaluationAgentTests
 {
+    [Fact]
+    public async Task EvaluateAsync_CalculatesP50AndP95LatencyAsync()
+    {
+        var timer = new AdvancingTimeProvider(
+            TimeSpan.Zero.Ticks,
+            TimeSpan.FromMilliseconds(10).Ticks,
+            TimeSpan.FromMilliseconds(10).Ticks,
+            TimeSpan.FromMilliseconds(30).Ticks,
+            TimeSpan.FromMilliseconds(30).Ticks,
+            TimeSpan.FromMilliseconds(60).Ticks);
+        var sut = new EvaluationAgent(new StubAnswerService(new AgentAnswerResult()), timeProvider: timer);
+
+        var report = await sut.EvaluateAsync([new("Q1", []), new("Q2", []), new("Q3", [])]);
+
+        report.Results.Select(result => result.LatencyMs).Should().Equal(10, 20, 30);
+        report.P50LatencyMs.Should().Be(20);
+        report.P95LatencyMs.Should().Be(29);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_UsesIndependentJudgeScoresAsync()
+    {
+        var judge = new StubAnswerQualityJudge(new AnswerQualityScores(4.5, 3.5));
+        var sut = new EvaluationAgent(new StubAnswerService(new AgentAnswerResult { Answer = "Answer" }), judge);
+
+        var report = await sut.EvaluateAsync([new("Question", [])]);
+
+        report.Results.Single().JudgedGroundednessScore.Should().Be(4.5);
+        report.Results.Single().JudgedRelevanceScore.Should().Be(3.5);
+        report.AverageJudgedGroundednessScore.Should().Be(4.5);
+        report.AverageJudgedRelevanceScore.Should().Be(3.5);
+        judge.CallCount.Should().Be(1);
+    }
+
     // ── Hit@k ─────────────────────────────────────────────────────────────────
     [Fact]
     public async Task EvaluateAsync_WhenExpectedPostIdInSources_RecordsHitAtKTrueAsync()
@@ -233,5 +267,28 @@ public class EvaluationAgentTests
         public Task<AgentAnswerResult> AnswerAsync(
             string question, int topK, IReadOnlyList<ConversationMessage> history) =>
             Task.FromResult(_answers.Count > 1 ? _answers.Dequeue() : _answers.Peek());
+    }
+
+    private sealed class StubAnswerQualityJudge(AnswerQualityScores scores) : IAnswerQualityJudge
+    {
+        public int CallCount { get; private set; }
+
+        public Task<AnswerQualityScores> EvaluateAsync(
+            string question,
+            string answer,
+            IReadOnlyList<AgentSource> sources)
+        {
+            CallCount++;
+            return Task.FromResult(scores);
+        }
+    }
+
+    private sealed class AdvancingTimeProvider(params long[] timestamps) : TimeProvider
+    {
+        private int _index;
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override long GetTimestamp() => timestamps[_index++];
     }
 }

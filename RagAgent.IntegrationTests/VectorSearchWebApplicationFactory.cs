@@ -59,7 +59,10 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
             // Override configuration for testing based on provider
             var configValues = new Dictionary<string, string?>
             {
-                ["VectorStore:Provider"] = _provider
+                ["VectorStore:Provider"] = _provider,
+                ["Swagger:Enabled"] = "true",
+                ["Ingestion:Enabled"] = "false",
+                ["Ingestion:IndexOnStartup"] = "false"
             };
 
             if (_provider == "Qdrant")

@@ -22,6 +22,8 @@ public sealed record QuestionEvalResultDto
     public IReadOnlyList<int> RetrievedPostIds { get; init; } = [];
     public bool? HitAtK { get; init; }
     public bool Grounded { get; init; }
+    public double? JudgedGroundednessScore { get; init; }
+    public double? JudgedRelevanceScore { get; init; }
     public bool CitationsValid { get; init; }
     public int CitationCount { get; init; }
     public int Iterations { get; init; }
@@ -36,6 +38,10 @@ public sealed record EvaluationReportDto
     public double? HitAtKRate { get; init; }
     public double AverageIterations { get; init; }
     public double AverageLatencyMs { get; init; }
+    public double? P50LatencyMs { get; init; }
+    public double? P95LatencyMs { get; init; }
+    public double? AverageJudgedGroundednessScore { get; init; }
+    public double? AverageJudgedRelevanceScore { get; init; }
     public IReadOnlyList<QuestionEvalResultDto> Results { get; init; } = [];
     public DateTimeOffset RunAt { get; init; }
 }

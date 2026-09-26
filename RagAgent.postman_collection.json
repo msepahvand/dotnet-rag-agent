@@ -329,7 +329,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/swagger/v1/swagger.json",
+              "raw": "{{baseUrl}}/openapi/v1.json",
               "host": ["{{baseUrl}}"],
               "path": ["swagger", "v1", "swagger.json"]
             }

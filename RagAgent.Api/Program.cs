@@ -1,8 +1,8 @@
 using FluentValidation;
 using FluentValidation.AspNetCore;
-using Microsoft.OpenApi.Models;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Scalar.AspNetCore;
 using RagAgent.Agents;
 using RagAgent.HackerNews;
 using RagAgent.InMemory;
@@ -22,7 +22,7 @@ public class Program
         builder.Services.AddControllers();
         builder.Services.AddFluentValidationAutoValidation();
         builder.Services.AddValidatorsFromAssemblyContaining<Program>();
-        builder.Services.AddHackerNewsDataSource();
+        builder.Services.AddHackerNewsDataSource(builder.Configuration);
         builder.Services.AddVectorSearch(builder.Configuration);
         builder.Services.AddVectorStoreProvider(builder.Configuration);
         builder.Services.AddScoped<IPostIndexingService, PostIndexingService>();
@@ -31,8 +31,15 @@ public class Program
         builder.Services.AddScoped<IAgentStreamingService, AgentStreamingService>();
         builder.Services.AddInMemoryConversationStore();
         builder.Services.AddSingleton<IngestionTracker>();
-        builder.Services.AddHostedService<IndexingStartupService>();
-        builder.Services.AddHostedService<IngestionBackgroundService>();
+        if (builder.Configuration.GetValue<bool?>("Ingestion:IndexOnStartup") ?? true)
+        {
+            builder.Services.AddHostedService<IndexingStartupService>();
+        }
+
+        if (builder.Configuration.GetValue<bool?>("Ingestion:Enabled") ?? true)
+        {
+            builder.Services.AddHostedService<IngestionBackgroundService>();
+        }
 
         // OpenTelemetry tracing — active when OpenTelemetry:OtlpEndpoint is set.
         // Sources: ASP.NET Core requests, outbound HTTP calls, MEAI model calls, agent pipeline.
@@ -56,15 +63,7 @@ public class Program
             });
 
         builder.Services.AddEndpointsApiExplorer();
-        builder.Services.AddSwaggerGen(options =>
-        {
-            options.SwaggerDoc("v1", new OpenApiInfo
-            {
-                Title = "Vector Search API",
-                Version = "v1",
-                Description = "Semantic search API powered by vector embeddings."
-            });
-        });
+        builder.Services.AddOpenApi();
 
         var app = builder.Build();
 
@@ -73,12 +72,8 @@ public class Program
         var swaggerEnabled = app.Configuration.GetValue<bool?>("Swagger:Enabled") ?? app.Environment.IsDevelopment();
         if (swaggerEnabled)
         {
-            app.UseSwagger();
-            app.UseSwaggerUI(options =>
-            {
-                options.SwaggerEndpoint("/swagger/v1/swagger.json", "Vector Search API v1");
-                options.RoutePrefix = "swagger";
-            });
+            app.MapOpenApi();
+            app.MapScalarApiReference();
         }
 
         app.UseHttpsRedirection();

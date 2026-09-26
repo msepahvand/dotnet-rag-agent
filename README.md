@@ -2,7 +2,9 @@
 
 [![CI/CD](https://github.com/msepahvand/dotnet-rag-agent/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/msepahvand/dotnet-rag-agent/actions/workflows/ci-cd.yml)
 
-Retrieval-augmented generation (RAG) API using Microsoft.Extensions.AI for Bedrock chat and embeddings, a Semantic Kernel Process pipeline, and pluggable vector store backends. Built on ASP.NET Core 8.0.
+See the [documentation index](docs/README.md) for project guidance and modernisation plans.
+
+Retrieval-augmented generation (RAG) API using Microsoft.Extensions.AI for Bedrock chat and embeddings, a Semantic Kernel Process pipeline, and pluggable vector store backends. Built on ASP.NET Core 10.0.
 
 ```
 POST /api/agent/ask          (batch — higher quality, ~10 s)
@@ -40,7 +42,6 @@ RagAgent.Agents/                    # AWS + Qdrant implementations
 │   └── Steps/                      # ResearchStep, WriteStep, CriticStep, OutputStep
 ├── EmbeddingService.cs             # Cohere embed-english-v3 via IEmbeddingGenerator (Channel-based streaming)
 ├── SemanticSearchPlugin.cs         # embed query → vector search → enrich snippets
-├── IndexingPlugin.cs               # auto-index if vector store is empty
 ├── S3VectorStore.cs, S3VectorService.cs, QdrantVectorStore.cs
 ├── HackerNewsService.cs
 └── VectorSearchOptionsValidator.cs
@@ -65,7 +66,7 @@ RagAgent.IntegrationTests/          # Integration tests (end-to-end API via Test
 
 ## Quick Start
 
-**Prerequisites**: .NET 8.0 SDK, Docker Desktop, AWS account (S3 Vectors only)
+**Prerequisites**: .NET 10 SDK (version pinned in `global.json`), Docker Desktop, AWS account (S3 Vectors only)
 
 ```powershell
 docker-compose up          # starts Redis, Qdrant, and API
@@ -120,7 +121,7 @@ flowchart LR
 | **Critique** | `CriticAgent` — Bedrock Claude via `IChatClient` reviews draft; approves or triggers a revision loop |
 | **Evaluation** | `EvaluationAgent` — runs a question set, scores hit@k, groundedness, and citation validity |
 | **Orchestration** | `ProcessAnswerService` (KernelProcess) → `AgentOrchestrationService` (history load/persist) |
-| **Search/indexing services** | `SemanticSearchPlugin` (retrieval), `IndexingPlugin` (auto-index when the vector store is empty) |
+| **Search/indexing services** | `SemanticSearchPlugin` (retrieval), `PostIndexingService` (indexing) |
 
 Semantic Kernel is retained only for Process orchestration; chat and embedding model access use Microsoft.Extensions.AI. `ResearcherAgent` calls `SemanticSearchPlugin` directly, with model-directed tool calling deferred to the Agent Framework phase. Guardrails run in `GuardrailsService` at the request boundary.
 

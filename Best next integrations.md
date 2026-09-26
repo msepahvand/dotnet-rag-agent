@@ -5,7 +5,7 @@ A progressive roadmap for building real agentic AI skills using Semantic Kernel 
 ## What you've already built
 
 - Single-tool-calling agent (question → semantic search → grounded answer)
-- Semantic Kernel plugins: `SemanticSearchPlugin`, `IndexingPlugin`
+- Semantic Kernel plugin: `SemanticSearchPlugin`
 - Auto function-calling via `FunctionChoiceBehavior.Auto()`
 - Function invocation filter for logging, guardrails, and topK normalization
 - Bedrock-backed embeddings and text generation
@@ -111,7 +111,7 @@ This is a strong foundation. Everything below builds directly on it.
 
 - ~~Background service that polls for new posts on a timer~~
 - ~~Chunks content, generates embeddings, upserts into the vector store~~
-- ~~Uses the existing `IndexingPlugin` but runs autonomously, not on user request~~
+- ~~Uses the existing `PostIndexingService` but runs autonomously, not on user request~~
 - ~~**Why**: Not all agents are user-facing. Background autonomous agents are a huge enterprise use case (data pipelines, monitoring, ETL).~~
 - **Done**: `IngestionBackgroundService` polls HackerNews on a configurable timer, embeddings via `PostIndexingService` (Channel-based streaming with backpressure, max 3 concurrent), tracks indexed IDs in `IngestionTracker` to avoid re-indexing. `IndexingStartupService` seeds the tracker on startup.
 
@@ -174,7 +174,7 @@ This is a strong foundation. Everything below builds directly on it.
 | 5 | Researcher + Writer (3.1) | Phase 2 |
 | 6 | Self-reflection loop (3.2) | 3.1 |
 | 7 | Evaluation agent (4.2) | Phase 3 |
-| 8 | Ingestion agent (4.1) | Existing IndexingPlugin |
+| 8 | Ingestion agent (4.1) | Existing PostIndexingService |
 | 9 | Guardrails (5.1) | Existing filters |
 | 10 | Observability (5.2) | All phases |
 | 11 | Streaming (5.3) | All phases |

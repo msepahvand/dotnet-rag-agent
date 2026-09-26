@@ -1,34 +1,35 @@
 # See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
-# This stage is used when running from VS in fast mode (Default for Debug configuration)
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-WORKDIR /app
-EXPOSE 8080
-EXPOSE 8081
-ENV ASPNETCORE_URLS=http://+:8080
-ENV ASPNETCORE_HTTP_PORTS=8080
-
-
-# This stage is used to build the service project
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
+ARG TARGETARCH
 WORKDIR /src
+
+COPY ["global.json", "NuGet.config", "Directory.Build.props", "Directory.Packages.props", "stylecop.json", "rules.ruleset", "./"]
 COPY ["RagAgent.Api/RagAgent.Api.csproj", "RagAgent.Api/"]
-COPY ["RagAgent.Core/RagAgent.Core.csproj", "RagAgent.Core/"]
 COPY ["RagAgent.Agents/RagAgent.Agents.csproj", "RagAgent.Agents/"]
+COPY ["RagAgent.Core/RagAgent.Core.csproj", "RagAgent.Core/"]
+COPY ["RagAgent.HackerNews/RagAgent.HackerNews.csproj", "RagAgent.HackerNews/"]
+COPY ["RagAgent.InMemory/RagAgent.InMemory.csproj", "RagAgent.InMemory/"]
+COPY ["RagAgent.Qdrant/RagAgent.Qdrant.csproj", "RagAgent.Qdrant/"]
 COPY ["RagAgent.Redis/RagAgent.Redis.csproj", "RagAgent.Redis/"]
-RUN dotnet restore "RagAgent.Api/RagAgent.Api.csproj"
+COPY ["RagAgent.S3Vectors/RagAgent.S3Vectors.csproj", "RagAgent.S3Vectors/"]
+RUN dotnet restore "RagAgent.Api/RagAgent.Api.csproj" -a "$TARGETARCH"
+
 COPY . .
-WORKDIR "/src/RagAgent.Api"
-RUN dotnet build "RagAgent.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
-# This stage is used to publish the service project to be copied to the final stage
 FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "RagAgent.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "RagAgent.Api/RagAgent.Api.csproj" \
+    --configuration "$BUILD_CONFIGURATION" \
+    --arch "$TARGETARCH" \
+    --no-restore \
+    --output /app/publish \
+    /p:UseAppHost=false
 
-# This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
-FROM base AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+EXPOSE 8080
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_HTTP_PORTS=8080
 ENTRYPOINT ["dotnet", "RagAgent.Api.dll"]

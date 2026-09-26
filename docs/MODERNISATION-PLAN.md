@@ -22,7 +22,7 @@ The rules in `CLAUDE.md` still apply: **Core stays provider-agnostic**, controll
 
 | Concern | Today | File(s) |
 |---|---|---|
-| Runtime | .NET 8, floating `AWSSDK.* 4.0.*`, no central package management. `Directory.Build.props` exists (StyleCop + ruleset). | `*/*.csproj`, `Directory.Build.props`, `RagAgent.Api/Dockerfile` (`aspnet:8.0`, restore layer copies 4 csproj files only) |
+| Runtime | .NET 10 with SDK `10.0.400` pinned in `global.json`; target framework and shared compiler settings are centralised; package versions use Central Package Management. The Dockerfile still uses `aspnet:8.0` / `sdk:8.0` and its restore layer copies only four project files. | `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `*/*.csproj`, `RagAgent.Api/Dockerfile` |
 | Chat model | SK `IChatCompletionService` via `AddBedrockChatCompletionService` (alpha) + `AmazonClaudeExecutionSettings` | `RagAgent.Agents/ServiceCollectionExtensions.cs`, `WriterAgent.cs`, `CriticAgent.cs` |
 | Embeddings | Custom MEAI `IEmbeddingGenerator` calling Cohere Embed v3 via `InvokeModel` (1024 dims) | `CohereEmbeddingGenerator.cs`, `EmbeddingService.cs` |
 | Tools | `SemanticSearchPlugin` has `[KernelFunction]`, but `ResearcherAgent` calls it **directly**, not through the kernel. `IndexingPlugin` is only used by tests. | `SemanticSearchPlugin.cs`, `ResearcherAgent.cs`, `IndexingPlugin.cs` |
@@ -108,22 +108,20 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 
 ---
 
-## Phase 0: Baseline and safety net *(~2–3 days)*
+## Phase 0: Baseline and safety net *(implementation complete; live baseline pending)*
 
 **Goal:** a regression signal we can trust, built on Core interfaces so it survives the SK → MAF swap.
 
-1. **Frozen evaluation corpus.**
-   - Add `scripts/snapshot-hn.sh` to capture ~200 real HN posts once into `eval/corpus.json`.
-   - Add a `SnapshotPostService : IPostService` (in `RagAgent.HackerNews`) that serves that file. **New wiring is needed:** today `AddHackerNewsDataSource` registers `HackerNewsService` unconditionally, and nothing reads `DataSource:Provider`. Make the registration switch on `DataSource__Provider = HackerNews | Snapshot`.
-   - **Where the eval runs:** a dedicated app instance (locally or as a CI job) configured with `DataSource__Provider=Snapshot`, the eval `VectorIndexName`, `IngestionBackgroundService` disabled, and real Bedrock. **Never** the production API.
-   - Point evaluation at a **dedicated eval index/collection** so `IngestionBackgroundService` never changes it.
-   - Write `eval/questions.json` (40–60 questions, so one question is ≤2.5%) with `ExpectedPostIds` taken from the snapshot, so they never drift.
-2. **Better metrics** (small code change):
-   - Add `P50LatencyMs`/`P95LatencyMs` to `EvaluationReport`.
-   - Add an **independent groundedness and relevance judge** using `Microsoft.Extensions.AI.Evaluation.Quality` (`GroundednessEvaluator`, `RelevanceEvaluator`) with response caching. This replaces relying on the writer's self-reported `Grounded` flag. It is the part of Phase 9 we need up front.
-   - The judge needs an `IChatClient`, so Phase 0 already brings in `AWSSDK.Extensions.Bedrock.MEAI` **for the judge only**, not for the agents. The evaluators' prompts are tuned for GPT-4o-class models, so treat Claude-as-judge scores as **relative** (baseline vs. candidate), not absolute.
-3. **Deterministic runs.** The code doesn't set a temperature today. Add an **eval-only** `Agent__Temperature` setting, left unset in production so production sampling doesn't change. Run the eval **5 times** at `Agent__Temperature=0` against the current SK build. Commit `eval/baseline-sk.json` with the mean and 95% confidence interval per metric. **Gate for later phases:** a metric fails if its new mean falls below the baseline CI's lower bound. Latency fails if p95 goes above an agreed budget (default +25%).
-4. **Characterisation tests against Core interfaces** (so they run unchanged against the MAF workflow in Phase 3):
+1. [x] **Frozen evaluation corpus.**
+   - [x] `scripts/snapshot-hn.sh` captures the story snapshot and creates 50 title-grounded questions.
+   - [x] `SnapshotPostService : IPostService` and the `DataSource:Provider=HackerNews|Snapshot` registration are implemented.
+   - [x] Evaluation supports an isolated snapshot-backed app, a dedicated vector collection, and disabled periodic ingestion. The corpus and question files are git-ignored to avoid committing third-party story content.
+2. [x] **Better metrics:**
+   - [x] Add `P50LatencyMs`/`P95LatencyMs` to `EvaluationReport`.
+   - [x] Add independent groundedness and relevance judges using `Microsoft.Extensions.AI.Evaluation.Quality`, with a 30-day in-memory response cache. Judges are opt-in to avoid extra Bedrock calls in normal API evaluation.
+   - [x] Add per-question and aggregate judge scores. Treat Claude-as-judge scores as relative comparisons, not absolute quality ratings.
+3. [x] **Deterministic runs.** `Agent__Temperature` is supported for writer and critic calls and remains unset by default. The evaluation setup sets it to `0`. The five-pass Bedrock run and committed `eval/baseline-sk.json` are still pending.
+4. [x] **Characterisation tests against Core interfaces** (so they run unchanged against the MAF workflow in Phase 3):
    - `IAgentAnswerService` loop tests with stub `IResearcherAgent`/`IWriterAgent`/`ICriticAgent`:
      - approve first time
      - revise then approve
@@ -131,19 +129,20 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
      - `Iterations` is reported correctly
    - SSE **error path** test: a guardrail violation gives exactly one `error` frame, and nothing is appended to the store (I1, I2).
    - Keep the existing tests. They already cover SSE order, critic parse fallback, citation stripping, writer raw-output fallback (I5) and the history cap (I8).
-5. **One real-pipeline integration test.** Add a second `WebApplicationFactory` variant that keeps the real `IAgentAnswerService` and replaces only the model layer. It uses a stub `IChatCompletionService` now and becomes `FakeChatClient` in Phase 2. Assert I1–I6 through HTTP.
-6. **Remove dead code** (no behaviour change, because none of it runs today):
-   - the unused `GroundedAnswer.yaml` resource
-   - the Handlebars/Yaml SK packages
-   - `IndexingPlugin`, with its test moved to `PostIndexingService`
-7. **Check a production gap:** the ECS task role lacks `bedrock:InvokeModelWithResponseStream`. Confirm whether `/ask/stream` works in production today, and fix the IAM in this phase so the baseline covers streaming.
+5. [x] **One real-pipeline integration test.** The integration-test host keeps the real `IAgentAnswerService` and replaces only `IChatClient`; it exercises the HTTP ask path with deterministic model responses.
+6. [x] **Remove dead code** (no behaviour change, because none of it runs today):
+   - [x] `GroundedAnswer.yaml` is absent.
+   - [x] Remove `IndexingPlugin` and its tests; indexing is covered at the service boundary.
+   - [x] No direct Handlebars or SK YAML package references remain. `YamlDotNet` remains transitive through SK Process dependencies and must be revisited when Process is removed.
+7. [x] **Check the streaming IAM action in Terraform:** `bedrock:InvokeModelWithResponseStream` is present in the task-role policy. Live `/ask/stream` behaviour and the deployed role have not been verified from this environment.
 
-**Done when:** the baseline is committed and the new tests pass on the current SK code.
+**Done when:** the five-pass baseline is committed and the new tests pass on the current SK code.
+**Current status:** implementation and local validation are complete. The local snapshot contains 199 stories and 50 questions, and remains ignored. The baseline has not been run because AWS credentials and the AWS CLI are unavailable in this environment; the approved live evaluation and production IAM verification remain blocked.
 **Rollback:** nothing to roll back. These are tests, eval assets and dead-code removal.
 
 ---
 
-## Phase 1: Platform refresh: .NET 10 LTS *(~2 days)*
+## Phase 1: Platform refresh: .NET 10 LTS *(implementation complete; deployment verification pending)*
 
 **Goal:** move to the current LTS runtime without changing behaviour.
 
@@ -151,22 +150,23 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 2. [x] **Central Package Management** (`Directory.Packages.props`, `ManagePackageVersionsCentrally=true`):
    - Pin exact versions in place of `AWSSDK.* 4.0.*`.
    - Remove the StyleCop `PackageReference` from `Directory.Build.props` and declare it as a `<GlobalPackageReference>` **in `Directory.Packages.props`**, next to the `PackageVersion` entries. An inline `Version` would trigger NU1008 under CPM.
-   - [ ] Add Dependabot or Renovate.
-3. [ ] **Dockerfile restore layer:** copy `global.json`, `NuGet.config`, `Directory.Build.props`, `Directory.Packages.props`, `stylecop.json`, `rules.ruleset` and **every** `*.csproj` the API references before `dotnet restore`. Today only four are copied, and restore only works because `dotnet build` re-restores after `COPY . .`. Check with a clean `docker build --no-cache` in CI before merging.
+   - [x] Add Dependabot for NuGet, GitHub Actions and Terraform.
+3. [x] **Dockerfile restore layer:** copy `global.json`, `NuGet.config`, shared build settings, and every referenced project file before `dotnet restore`. Exclude host `bin`/`obj` outputs from the Docker context. A clean multi-architecture build has passed locally.
 4. [x] Package bumps: `Microsoft.Extensions.*` 10.x, `Mvc.Testing` 10.x, OpenTelemetry current, test SDK.
-5. [ ] Replace **Swashbuckle** with built-in `AddOpenApi`/`MapOpenApi` + Swagger UI or Scalar, keeping `Swagger:Enabled`. **Contract note:** the document moves from `/swagger/v1/swagger.json` to `/openapi/v1.json`. Either map the old path as an alias or update the Postman collection and README in the same commit.
-6. [ ] Base images: `aspnet:10.0` / `sdk:10.0`. The `-noble-chiseled` variant is optional.
-7. [ ] **ARM64 readiness, in its own commits and in this order:**
-   1. Build the image **multi-arch without QEMU**, following [Microsoft's multi-platform container guidance](https://devblogs.microsoft.com/dotnet/improving-multiplatform-container-support/):
+5. [x] Replace **Swashbuckle** with built-in OpenAPI and Scalar, retaining `Swagger:Enabled`; update the Postman collection to `/openapi/v1.json`.
+6. [x] Use `aspnet:10.0` / `sdk:10.0` base images. The `-noble-chiseled` variant remains optional.
+7. [x] **ARM64 readiness, in this order:**
+   1. [x] Build the image **multi-arch without QEMU**, following [Microsoft's multi-platform container guidance](https://devblogs.microsoft.com/dotnet/improving-multiplatform-container-support/):
       - The build stage uses `FROM --platform=$BUILDPLATFORM sdk:10.0`.
       - The restore layer runs `dotnet restore -a $TARGETARCH`, and the publish step runs `dotnet publish -a $TARGETARCH --no-restore`. Without the RID-specific restore, the build fails with NETSDK1047.
       - The final stage uses the **target-platform** `aspnet:10.0` image, without `--platform=$BUILDPLATFORM`.
       - Then build with `docker buildx build --platform linux/amd64,linux/arm64`. Alternatively, use a native `ubuntu-24.04-arm` runner. Update `scripts/bootstrap-ecr-image.sh` to push a multi-arch bootstrap image too.
-   2. Check `docker manifest inspect` shows both architectures for the deployed tag **and** the bootstrap tag.
+   2. [x] Add CI manifest checks for both architectures on deployment and bootstrap images. Remote ECR tags remain unverified until deployment.
    3. *Optional, separate commit:* switch ECS to Graviton (`runtime_platform { cpu_architecture = "ARM64" }`).
-8. CI: `setup-dotnet` → `10.0.x`.
+8. [x] CI: `setup-dotnet` → `10.0.x`.
 
 **Done when:** a clean Docker build passes, unit and integration tests are green, the ECS deploy is healthy, and the eval is within the baseline CI.
+**Current status:** the clean local `linux/amd64` + `linux/arm64` OCI build passed, OpenAPI/Scalar and API integration tests passed, and the full unit/integration suites are green. ECR manifest verification and a healthy ECS deployment await the normal CI deployment; the Phase 0 baseline is also still pending.
 **Rollback:** revert the commit. The ECS task definition still points at the previous image. The Graviton switch is its own revertible commit.
 
 ---

@@ -15,6 +15,12 @@ public static class ServiceCollectionExtensions
         IConfiguration configuration)
     {
         var options = VectorSearchOptionsValidator.Parse(configuration);
+        var agentTemperature = configuration.GetValue<float?>("Agent:Temperature");
+        if (agentTemperature is < 0 or > 1 ||
+            (agentTemperature.HasValue && !float.IsFinite(agentTemperature.Value)))
+        {
+            throw new InvalidOperationException("Agent:Temperature must be between 0 and 1 when configured.");
+        }
 
         // Required by the Bedrock MEAI chat and Cohere embedding clients.
         services.AddAWSService<IAmazonBedrockRuntime>();
@@ -43,9 +49,20 @@ public static class ServiceCollectionExtensions
 
         // Multi-agent: researcher retrieves, writer synthesises, critic reflects
         services.AddScoped<IResearcherAgent, ResearcherAgent>();
-        services.AddScoped<IWriterAgent, WriterAgent>();
-        services.AddScoped<ICriticAgent, CriticAgent>();
-        services.AddScoped<IEvaluationAgent, EvaluationAgent>();
+        services.AddScoped<IWriterAgent>(sp =>
+            new WriterAgent(sp.GetRequiredService<IChatClient>(), agentTemperature));
+        services.AddScoped<ICriticAgent>(sp =>
+            new CriticAgent(sp.GetRequiredService<IChatClient>(), agentTemperature));
+        if (configuration.GetValue<bool>("Evaluation:EnableQualityJudges"))
+        {
+            services.AddMemoryCache();
+            services.AddScoped<IAnswerQualityJudge, MeaiAnswerQualityJudge>();
+        }
+
+        services.AddScoped<IEvaluationAgent>(serviceProvider =>
+            new EvaluationAgent(
+                serviceProvider.GetRequiredService<IAgentAnswerService>(),
+                serviceProvider.GetService<IAnswerQualityJudge>()));
 
         // Process orchestration bridges the workflow result back to request/response.
         services.AddProcessOrchestration();

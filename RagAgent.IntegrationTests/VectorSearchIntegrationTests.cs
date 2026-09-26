@@ -7,6 +7,22 @@ namespace RagAgent.IntegrationTests;
 
 public class VectorSearchIntegrationTests
 {
+    [Fact]
+    public async Task OpenApiDocumentAndScalarUi_AreAvailableWhenEnabledAsync()
+    {
+        await using var factory = new VectorSearchWebApplicationFactory("Qdrant");
+        await factory.InitializeAsync();
+        var client = factory.CreateClient();
+
+        var openApiResponse = await client.GetAsync("/openapi/v1.json");
+        var openApiContent = await openApiResponse.Content.ReadAsStringAsync();
+        var scalarResponse = await client.GetAsync("/scalar/v1");
+
+        openApiResponse.EnsureSuccessStatusCode();
+        openApiContent.Should().Contain("/api/agent/ask");
+        scalarResponse.EnsureSuccessStatusCode();
+    }
+
     [Theory]
     [InlineData("Qdrant")]
     [InlineData("Redis")]

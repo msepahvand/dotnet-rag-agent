@@ -24,10 +24,12 @@ public sealed class CriticAgent : ICriticAgent
         "Return only the raw JSON object.";
 
     private readonly IChatClient _chatClient;
+    private readonly float? _temperature;
 
-    public CriticAgent(IChatClient chatClient)
+    public CriticAgent(IChatClient chatClient, float? temperature = null)
     {
         _chatClient = chatClient;
+        _temperature = temperature;
     }
 
     public async Task<CriticResult> EvaluateAsync(
@@ -62,6 +64,7 @@ public sealed class CriticAgent : ICriticAgent
         var options = new ChatOptions
         {
             MaxOutputTokens = 512,
+            Temperature = _temperature,
         };
 
         var response = await _chatClient.GetResponseAsync(chatHistory, options);
