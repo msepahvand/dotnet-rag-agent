@@ -194,7 +194,8 @@ data "aws_iam_policy_document" "ecs_task_runtime" {
     sid    = "AllowBedrockInvokeModel"
     effect = "Allow"
     actions = [
-      "bedrock:InvokeModel"
+      "bedrock:InvokeModel",
+      "bedrock:InvokeModelWithResponseStream"
     ]
     resources = [
       "arn:aws:bedrock:*::foundation-model/*",

@@ -7,10 +7,6 @@ namespace RagAgent.Agents;
 /// <summary>
 /// Responsible solely for retrieval. Calls the search plugin and returns structured sources
 /// for the writer agent to synthesise into an answer.
-///
-/// NOTE: The SK Bedrock connector does not support FunctionChoiceBehavior for Claude models
-/// (microsoft/semantic-kernel#9750), so plugins are called directly rather than dispatched
-/// via FunctionChoiceBehavior.Required/Auto.
 /// </summary>
 public sealed class ResearcherAgent : IResearcherAgent
 {

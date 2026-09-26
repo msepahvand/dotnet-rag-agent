@@ -8,7 +8,7 @@ using RagAgent.Core.Models;
 namespace RagAgent.Api.Services;
 
 /// <summary>
-/// Streaming variant of the agent pipeline. Bypasses the SK Process framework to allow
+/// Streaming variant of the agent pipeline. Bypasses the process framework to allow
 /// token-level SSE streaming: research → stream write (plain-text prose, no critic loop).
 /// </summary>
 public sealed class AgentStreamingService(

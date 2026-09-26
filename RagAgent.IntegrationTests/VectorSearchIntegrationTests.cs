@@ -195,14 +195,12 @@ public class VectorSearchIntegrationTests
     public async Task AgentAsk_UsesSemanticSearchAndReturnsGroundedSourcesAsync(string provider)
     {
         // Arrange
-        await using var factory = new VectorSearchWebApplicationFactory(provider);
+        await using var factory = new VectorSearchWebApplicationFactory(provider, useRealAgentPipeline: true);
         await factory.InitializeAsync();
         var client = factory.CreateClient();
 
         var indexResponse = await client.PostAsync("/api/index/1", null);
         indexResponse.EnsureSuccessStatusCode();
-
-        await Task.Delay(2000);
 
         // Act
         var response = await client.PostAsJsonAsync("/api/agent/ask", new

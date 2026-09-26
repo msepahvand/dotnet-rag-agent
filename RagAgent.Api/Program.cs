@@ -35,7 +35,7 @@ public class Program
         builder.Services.AddHostedService<IngestionBackgroundService>();
 
         // OpenTelemetry tracing — active when OpenTelemetry:OtlpEndpoint is set.
-        // Sources: ASP.NET Core requests, outbound HTTP calls, SK tool/LLM invocations, agent pipeline.
+        // Sources: ASP.NET Core requests, outbound HTTP calls, MEAI model calls, agent pipeline.
         var otlpEndpoint = builder.Configuration["OpenTelemetry:OtlpEndpoint"];
         var serviceName = builder.Configuration["OpenTelemetry:ServiceName"] ?? "rag-agent";
 
@@ -46,7 +46,7 @@ public class Program
                     .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(serviceName))
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddSource("Microsoft.SemanticKernel*")
+                    .AddSource("Microsoft.Extensions.AI")
                     .AddSource(AgentActivitySource.Name);
 
                 if (!string.IsNullOrWhiteSpace(otlpEndpoint))

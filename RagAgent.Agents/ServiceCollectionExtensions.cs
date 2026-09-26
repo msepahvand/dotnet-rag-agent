@@ -2,7 +2,6 @@ using Amazon.BedrockRuntime;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.SemanticKernel;
 using RagAgent.Core;
 using RagAgent.Agents.Telemetry;
 using RagAgent.Agents.Process;
@@ -35,7 +34,6 @@ public static class ServiceCollectionExtensions
                 configure: client => client.EnableSensitiveData = false)
             .UseFunctionInvocation();
 
-        services.AddTransient(sp => new Kernel(sp));
         services.AddScoped<IGuardrailsService, GuardrailsService>();
         services.AddScoped<IEmbeddingService, EmbeddingService>();
         services.AddScoped<SemanticSearchPlugin>();
@@ -49,9 +47,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICriticAgent, CriticAgent>();
         services.AddScoped<IEvaluationAgent, EvaluationAgent>();
 
-        // SK Process orchestration: bridges the process result back to request/response
-        services.AddScoped<ProcessResultHolder>();
-        services.AddScoped<IAgentAnswerService, ProcessAnswerService>();
+        // Process orchestration bridges the workflow result back to request/response.
+        services.AddProcessOrchestration();
 
         return services;
     }
