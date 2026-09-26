@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel;
 using RagAgent.Core;
 
 namespace RagAgent.Agents;
@@ -12,9 +11,9 @@ public sealed class IndexingPlugin(
     ILogger<IndexingPlugin> logger)
 {
     public const string PluginName = "Indexing";
+
     private static readonly SemaphoreSlim IndexLock = new(1, 1);
 
-    [KernelFunction("index_posts_if_empty")]
     [Description("Indexes the configured source posts only when the vector index is empty.")]
     public async Task<string> IndexPostsIfEmptyAsync()
     {

@@ -2,7 +2,7 @@
 
 [![CI/CD](https://github.com/msepahvand/dotnet-rag-agent/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/msepahvand/dotnet-rag-agent/actions/workflows/ci-cd.yml)
 
-Retrieval-augmented generation (RAG) API using a Researcher → Critic → Writer SK Process pipeline, vector embeddings, and pluggable vector store backends. Built on ASP.NET Core 8.0 and Semantic Kernel.
+Retrieval-augmented generation (RAG) API using Microsoft.Extensions.AI for Bedrock chat and embeddings, a Semantic Kernel Process pipeline, and pluggable vector store backends. Built on ASP.NET Core 8.0.
 
 ```
 POST /api/agent/ask          (batch — higher quality, ~10 s)
@@ -27,7 +27,7 @@ POST /api/agent/ask/stream   (SSE streaming — lower latency, ~1 s to first tok
 RagAgent.Core/                      # Provider-agnostic contracts
 ├── IVectorStore.cs, IVectorService.cs, IEmbeddingService.cs
 ├── IPostService.cs, IAgentAnswerService.cs, IConversationStore.cs
-└── Models/                         # Post, ChatMessage, AgentAnswerResult, ConversationEvent, AgentSource
+└── Models/                         # Post, ConversationMessage, AgentAnswerResult, ConversationEvent, AgentSource
 
 RagAgent.Agents/                    # AWS + Qdrant implementations
 ├── Agents/
@@ -39,9 +39,8 @@ RagAgent.Agents/                    # AWS + Qdrant implementations
 │   ├── ProcessAnswerService.cs     # IAgentAnswerService backed by KernelProcess
 │   └── Steps/                      # ResearchStep, WriteStep, CriticStep, OutputStep
 ├── EmbeddingService.cs             # Cohere embed-english-v3 via IEmbeddingGenerator (Channel-based streaming)
-├── SemanticSearchPlugin.cs         # SK plugin: embed query → vector search → enrich snippets
-├── IndexingPlugin.cs               # SK plugin: auto-index if vector store is empty
-├── ToolInvocationFilter.cs         # SK invocation filter: logging + topK normalisation
+├── SemanticSearchPlugin.cs         # embed query → vector search → enrich snippets
+├── IndexingPlugin.cs               # auto-index if vector store is empty
 ├── S3VectorStore.cs, S3VectorService.cs, QdrantVectorStore.cs
 ├── HackerNewsService.cs
 └── VectorSearchOptionsValidator.cs
@@ -110,18 +109,20 @@ flowchart LR
   SC --> VS
 ```
 
-### Semantic Kernel Integration
+### Model and process integration
 
 | Capability | Implementation |
 |---|---|
+| **Chat** | `WriterAgent` and `CriticAgent` — Bedrock Converse through `Microsoft.Extensions.AI.IChatClient` |
 | **Embeddings** | `EmbeddingService` — Cohere embed-english-v3 via `IEmbeddingGenerator`, Channel-based streaming with backpressure |
 | **Research** | `ResearcherAgent` — invokes `SemanticSearchPlugin` to retrieve and enrich sources |
-| **Answer synthesis** | `WriterAgent` — Bedrock Claude via `IChatCompletionService`, structured JSON output (answer + citations + grounded flag) |
-| **Critique** | `CriticAgent` — Bedrock Claude reviews draft; approves or triggers a revision loop |
+| **Answer synthesis** | `WriterAgent` — Bedrock Claude via `IChatClient`, structured JSON output (answer + citations + grounded flag) |
+| **Critique** | `CriticAgent` — Bedrock Claude via `IChatClient` reviews draft; approves or triggers a revision loop |
 | **Evaluation** | `EvaluationAgent` — runs a question set, scores hit@k, groundedness, and citation validity |
 | **Orchestration** | `ProcessAnswerService` (KernelProcess) → `AgentOrchestrationService` (history load/persist) |
-| **Plugins** | `SemanticSearchPlugin` (retrieval), `IndexingPlugin` (auto-index on first ask) |
-| **Invocation Filter** | `ToolInvocationFilter` — logs calls, normalises topK, enforces guardrails |
+| **Search/indexing services** | `SemanticSearchPlugin` (retrieval), `IndexingPlugin` (auto-index when the vector store is empty) |
+
+Semantic Kernel is retained only for Process orchestration; chat and embedding model access use Microsoft.Extensions.AI. `ResearcherAgent` calls `SemanticSearchPlugin` directly, with model-directed tool calling deferred to the Agent Framework phase. Guardrails run in `GuardrailsService` at the request boundary.
 
 ---
 

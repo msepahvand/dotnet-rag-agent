@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.AI;
 using Testcontainers.Qdrant;
 using Testcontainers.Redis;
 using RagAgent.Api;
@@ -17,12 +18,14 @@ namespace RagAgent.IntegrationTests;
 public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private readonly string _provider;
+    private readonly bool _useRealAgentPipeline;
     private readonly QdrantContainer? _qdrantContainer;
     private readonly RedisContainer? _redisContainer;
 
-    public VectorSearchWebApplicationFactory(string provider)
+    public VectorSearchWebApplicationFactory(string provider, bool useRealAgentPipeline = false)
     {
         _provider = provider;
+        _useRealAgentPipeline = useRealAgentPipeline;
 
         if (provider == "Qdrant")
         {
@@ -80,8 +83,19 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
             // Remove all AWS-related services to avoid credential requirements
             services.RemoveAll<Amazon.BedrockRuntime.IAmazonBedrockRuntime>();
             services.RemoveAll<Amazon.S3Vectors.IAmazonS3Vectors>();
-            services.RemoveAll<Microsoft.SemanticKernel.Kernel>();
-            services.RemoveAll<IAgentAnswerService>();
+            if (!_useRealAgentPipeline)
+            {
+                services.RemoveAll<IAgentAnswerService>();
+            }
+            else
+            {
+                services.RemoveAll<IChatClient>();
+                services.AddSingleton<IChatClient>(_ => new IntegrationTestChatClient(
+                [
+                    """{"answer":"Post 1 is about a test story.","citations":[{"postId":1,"quote":"This is deterministic content for post 1"}],"grounded":true}""",
+                    """{"approved":true,"feedback":"","checks":["relevance: PASS","groundedness: PASS"]}"""
+                ]));
+            }
 
             // Remove and replace the IVectorStore implementation based on provider
             services.RemoveAll<IVectorStore>();
@@ -105,12 +119,14 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
             services.RemoveAll<IPostService>();
             services.AddScoped<IPostService, TestPostService>();
 
-            // Replace grounded answer generation with a test implementation
-            // so agent endpoint tests do not depend on Bedrock runtime services.
-            services.AddScoped<IAgentAnswerService, TestAgentAnswerService>();
+            if (!_useRealAgentPipeline)
+            {
+                // Replace grounded answer generation so ordinary endpoint tests do not
+                // depend on Bedrock runtime services.
+                services.AddScoped<IAgentAnswerService, TestAgentAnswerService>();
+            }
 
-            // Replace streaming service with a no-op stub so the controller can be
-            // instantiated without the SK Kernel (which is removed above).
+            // Streaming endpoint tests use a deterministic stub.
             services.RemoveAll<IAgentStreamingService>();
             services.AddScoped<IAgentStreamingService, StubAgentStreamingService>();
 
