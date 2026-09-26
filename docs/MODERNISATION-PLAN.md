@@ -22,7 +22,7 @@ The rules in `CLAUDE.md` still apply: **Core stays provider-agnostic**, controll
 
 | Concern | Today | File(s) |
 |---|---|---|
-| Runtime | .NET 8, floating `AWSSDK.* 4.0.*`, no central package management. `Directory.Build.props` exists (StyleCop + ruleset). | `*/*.csproj`, `Directory.Build.props`, `RagAgent.Api/Dockerfile` (`aspnet:8.0`, restore layer copies 4 csproj files only) |
+| Runtime | .NET 10 with SDK `10.0.400` pinned in `global.json`; target framework and shared compiler settings are centralised; package versions use Central Package Management. The Dockerfile still uses `aspnet:8.0` / `sdk:8.0` and its restore layer copies only four project files. | `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `*/*.csproj`, `RagAgent.Api/Dockerfile` |
 | Chat model | SK `IChatCompletionService` via `AddBedrockChatCompletionService` (alpha) + `AmazonClaudeExecutionSettings` | `RagAgent.Agents/ServiceCollectionExtensions.cs`, `WriterAgent.cs`, `CriticAgent.cs` |
 | Embeddings | Custom MEAI `IEmbeddingGenerator` calling Cohere Embed v3 via `InvokeModel` (1024 dims) | `CohereEmbeddingGenerator.cs`, `EmbeddingService.cs` |
 | Tools | `SemanticSearchPlugin` has `[KernelFunction]`, but `ResearcherAgent` calls it **directly**, not through the kernel. `IndexingPlugin` is only used by tests. | `SemanticSearchPlugin.cs`, `ResearcherAgent.cs`, `IndexingPlugin.cs` |

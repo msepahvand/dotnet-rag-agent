@@ -2,7 +2,9 @@
 
 [![CI/CD](https://github.com/msepahvand/dotnet-rag-agent/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/msepahvand/dotnet-rag-agent/actions/workflows/ci-cd.yml)
 
-Retrieval-augmented generation (RAG) API using Microsoft.Extensions.AI for Bedrock chat and embeddings, a Semantic Kernel Process pipeline, and pluggable vector store backends. Built on ASP.NET Core 8.0.
+See the [documentation index](docs/README.md) for project guidance and modernisation plans.
+
+Retrieval-augmented generation (RAG) API using Microsoft.Extensions.AI for Bedrock chat and embeddings, a Semantic Kernel Process pipeline, and pluggable vector store backends. Built on ASP.NET Core 10.0.
 
 ```
 POST /api/agent/ask          (batch — higher quality, ~10 s)
@@ -65,7 +67,7 @@ RagAgent.IntegrationTests/          # Integration tests (end-to-end API via Test
 
 ## Quick Start
 
-**Prerequisites**: .NET 8.0 SDK, Docker Desktop, AWS account (S3 Vectors only)
+**Prerequisites**: .NET 10 SDK (version pinned in `global.json`), Docker Desktop, AWS account (S3 Vectors only)
 
 ```powershell
 docker-compose up          # starts Redis, Qdrant, and API
