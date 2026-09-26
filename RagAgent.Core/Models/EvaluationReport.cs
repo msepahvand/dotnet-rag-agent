@@ -20,6 +20,12 @@ public sealed record QuestionEvalResult
     /// <summary>Whether the writer flagged the answer as grounded in the retrieved sources.</summary>
     public bool Grounded { get; init; }
 
+    /// <summary>Independent LLM-judged groundedness score on the evaluator's 1–5 scale.</summary>
+    public double? JudgedGroundednessScore { get; init; }
+
+    /// <summary>Independent LLM-judged relevance score on the evaluator's 1–5 scale.</summary>
+    public double? JudgedRelevanceScore { get; init; }
+
     /// <summary>
     /// Whether every cited post ID existed in the retrieved sources (deterministic check).
     /// </summary>
@@ -61,6 +67,18 @@ public sealed record EvaluationReport
 
     /// <summary>Average end-to-end latency per question in milliseconds.</summary>
     public double AverageLatencyMs { get; init; }
+
+    /// <summary>Median end-to-end latency per question in milliseconds.</summary>
+    public double? P50LatencyMs { get; init; }
+
+    /// <summary>95th percentile end-to-end latency per question in milliseconds.</summary>
+    public double? P95LatencyMs { get; init; }
+
+    /// <summary>Average independent groundedness score on the evaluator's 1–5 scale, if judges ran.</summary>
+    public double? AverageJudgedGroundednessScore { get; init; }
+
+    /// <summary>Average independent relevance score on the evaluator's 1–5 scale, if judges ran.</summary>
+    public double? AverageJudgedRelevanceScore { get; init; }
 
     public IReadOnlyList<QuestionEvalResult> Results { get; init; } = [];
 

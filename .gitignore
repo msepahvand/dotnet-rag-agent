@@ -503,3 +503,8 @@ qdrant_storage/
 infra/.terraform/
 infra/terraform.tfstate
 infra/terraform.tfstate.backup
+
+# Local evaluation data and model responses; HN story content is not committed.
+eval/corpus.json
+eval/questions.json
+eval/runs/

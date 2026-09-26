@@ -8,6 +8,8 @@
   <ItemGroup>
     <PackageReference Include="AWSSDK.Extensions.Bedrock.MEAI" />
     <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Quality" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
     <PackageReference Include="Microsoft.SemanticKernel" />
     <PackageReference Include="Microsoft.SemanticKernel.Process.Core" />
     <PackageReference Include="Microsoft.SemanticKernel.Process.LocalRuntime" />

@@ -42,7 +42,6 @@ RagAgent.Agents/                    # AWS + Qdrant implementations
 │   └── Steps/                      # ResearchStep, WriteStep, CriticStep, OutputStep
 ├── EmbeddingService.cs             # Cohere embed-english-v3 via IEmbeddingGenerator (Channel-based streaming)
 ├── SemanticSearchPlugin.cs         # embed query → vector search → enrich snippets
-├── IndexingPlugin.cs               # auto-index if vector store is empty
 ├── S3VectorStore.cs, S3VectorService.cs, QdrantVectorStore.cs
 ├── HackerNewsService.cs
 └── VectorSearchOptionsValidator.cs
@@ -122,7 +121,7 @@ flowchart LR
 | **Critique** | `CriticAgent` — Bedrock Claude via `IChatClient` reviews draft; approves or triggers a revision loop |
 | **Evaluation** | `EvaluationAgent` — runs a question set, scores hit@k, groundedness, and citation validity |
 | **Orchestration** | `ProcessAnswerService` (KernelProcess) → `AgentOrchestrationService` (history load/persist) |
-| **Search/indexing services** | `SemanticSearchPlugin` (retrieval), `IndexingPlugin` (auto-index when the vector store is empty) |
+| **Search/indexing services** | `SemanticSearchPlugin` (retrieval), `PostIndexingService` (indexing) |
 
 Semantic Kernel is retained only for Process orchestration; chat and embedding model access use Microsoft.Extensions.AI. `ResearcherAgent` calls `SemanticSearchPlugin` directly, with model-directed tool calling deferred to the Agent Framework phase. Guardrails run in `GuardrailsService` at the request boundary.
 

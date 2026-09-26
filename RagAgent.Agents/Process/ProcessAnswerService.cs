@@ -23,8 +23,6 @@ namespace RagAgent.Agents.Process;
 /// </summary>
 public sealed class ProcessAnswerService : IAgentAnswerService
 {
-    private static readonly KernelProcess Process = BuildProcess();
-
     private readonly Kernel _kernel;
     private readonly ProcessResultHolder _resultHolder;
 
@@ -40,7 +38,8 @@ public sealed class ProcessAnswerService : IAgentAnswerService
         var normalisedTopK = TopKNormaliser.Normalise(topK);
         var request = new AgentAnswerRequest(question, normalisedTopK, history);
 
-        await Process.StartAsync(_kernel, new KernelProcessEvent
+        var process = BuildProcess();
+        await process.StartAsync(_kernel, new KernelProcessEvent
         {
             Id = ProcessEvents.Start,
             Data = request,

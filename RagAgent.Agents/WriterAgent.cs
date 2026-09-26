@@ -30,10 +30,12 @@ public sealed class WriterAgent : IWriterAgent
         "Answer the question above based solely on the search results. Write a clear, direct answer in natural prose.";
 
     private readonly IChatClient _chatClient;
+    private readonly float? _temperature;
 
-    public WriterAgent(IChatClient chatClient)
+    public WriterAgent(IChatClient chatClient, float? temperature = null)
     {
         _chatClient = chatClient;
+        _temperature = temperature;
     }
 
     // ── Batch (structured JSON) ───────────────────────────────────────────────
@@ -48,6 +50,7 @@ public sealed class WriterAgent : IWriterAgent
         var options = new ChatOptions
         {
             MaxOutputTokens = 2048,
+            Temperature = _temperature,
         };
 
         var response = await _chatClient.GetResponseAsync(chatHistory, options);
@@ -71,6 +74,7 @@ public sealed class WriterAgent : IWriterAgent
         var options = new ChatOptions
         {
             MaxOutputTokens = 2048,
+            Temperature = _temperature,
         };
 
         await foreach (var chunk in _chatClient.GetStreamingResponseAsync(

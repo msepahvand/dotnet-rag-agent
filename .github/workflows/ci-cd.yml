@@ -98,6 +98,8 @@ jobs:
           terraform_version: '1.5.0'
           terraform_wrapper: false
 
+      - uses: docker/setup-buildx-action@v3
+
       - name: Provision infrastructure
         run: |
           export TF_VAR_github_repo="${{ github.repository }}"
@@ -139,6 +141,8 @@ jobs:
         with:
           mask-password: 'true'
 
+      - uses: docker/setup-buildx-action@v3
+
       - name: Build and push Docker image
         run: |
           REGION="${AWS_REGION:-${{ env.AWS_REGION_DEFAULT }}}"
@@ -150,8 +154,16 @@ jobs:
           echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
           echo "ECS_CLUSTER_NAME=${{ secrets.ECS_CLUSTER_NAME || env.ECS_CLUSTER_DEFAULT }}" >> $GITHUB_ENV
           echo "ECS_SERVICE_NAME=${{ secrets.ECS_SERVICE_NAME || env.ECS_SERVICE_DEFAULT }}" >> $GITHUB_ENV
-          docker build -f RagAgent.Api/Dockerfile -t "$IMAGE_URI" .
-          docker push "$IMAGE_URI"
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --file RagAgent.Api/Dockerfile \
+            --tag "$IMAGE_URI" \
+            --push \
+            .
+
+          docker buildx imagetools inspect --raw "$IMAGE_URI" \
+            | jq -e '([.manifests[].platform.architecture] | index("amd64")) and ([.manifests[].platform.architecture] | index("arm64"))' \
+            >/dev/null
 
       - name: Deploy to ECS
         run: bash scripts/deploy-ecs.sh "$REGION" "$ECS_CLUSTER_NAME" "$ECS_SERVICE_NAME" "$IMAGE_URI"

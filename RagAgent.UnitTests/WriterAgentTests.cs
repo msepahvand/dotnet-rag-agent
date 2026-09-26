@@ -135,7 +135,7 @@ public class WriterAgentTests
     public async Task StreamAsync_YieldsTextChunksFromChatClientAsync()
     {
         var chatClient = new ScriptedChatClient(string.Empty, streamedChunks: ["Hello", " world"]);
-        var sut = new WriterAgent(chatClient);
+        var sut = new WriterAgent(chatClient, temperature: 0);
         var chunks = new List<string>();
 
         await foreach (var chunk in sut.StreamAsync("Q?", EmptyResearch(), []))
@@ -145,6 +145,18 @@ public class WriterAgentTests
 
         chunks.Should().Equal("Hello", " world");
         chatClient.LastOptions!.MaxOutputTokens.Should().Be(2048);
+        chatClient.LastOptions.Temperature.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task WriteAsync_LeavesTemperatureUnsetByDefaultAsync()
+    {
+        var chatClient = new ScriptedChatClient("""{"answer":"A","citations":[],"grounded":true}""");
+        var sut = new WriterAgent(chatClient);
+
+        await sut.WriteAsync("Q?", EmptyResearch(), []);
+
+        chatClient.LastOptions!.Temperature.Should().BeNull();
     }
 
     // ── ToolsUsed passthrough ────────────────────────────────────────────────

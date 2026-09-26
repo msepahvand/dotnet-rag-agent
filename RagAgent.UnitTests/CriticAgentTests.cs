@@ -71,6 +71,20 @@ public class CriticAgentTests
     }
 
     [Fact]
+    public async Task EvaluateAsync_PassesConfiguredTemperatureToChatClientAsync()
+    {
+        const string llmResponse = """{"approved":true,"feedback":"","checks":[]}""";
+        var chatClient = new ScriptedChatClient(llmResponse);
+        var sut = new CriticAgent(chatClient, temperature: 0);
+        var answer = AnswerWith(citations: [new Citation { PostId = 1, Quote = "q" }]);
+        var research = ResearchWith(sourceIds: [1]);
+
+        await sut.EvaluateAsync("Q?", answer, research);
+
+        chatClient.LastOptions!.Temperature.Should().Be(0);
+    }
+
+    [Fact]
     public async Task EvaluateAsync_WhenLlmReturnsRejected_ReturnsRejectedWithFeedbackAsync()
     {
         const string llmResponse = """{"approved":false,"feedback":"Answer is not relevant.","checks":["relevance: FAIL","groundedness: PASS"]}""";
