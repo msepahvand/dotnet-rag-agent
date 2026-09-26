@@ -66,10 +66,28 @@ internal sealed class CohereEmbeddingGenerator : IEmbeddingGenerator<string, Emb
     internal static string CreateRequestBody(List<string> texts, string inputType)
         => JsonSerializer.Serialize(new CohereEmbedRequest
         {
-            Texts = texts,
+            Texts = texts.Select(TruncateText).ToList(),
             InputType = inputType,
             Truncate = "END"
         });
+
+    private static string TruncateText(string text)
+    {
+        var builder = new StringBuilder(Math.Min(text.Length, MaximumTextLength));
+        foreach (var rune in text.EnumerateRunes())
+        {
+            if (builder.Length + rune.Utf16SequenceLength > MaximumTextLength)
+            {
+                break;
+            }
+
+            builder.Append(rune);
+        }
+
+        return builder.ToString();
+    }
+
+    private const int MaximumTextLength = 2048;
 
     private sealed class CohereEmbedRequest
     {
