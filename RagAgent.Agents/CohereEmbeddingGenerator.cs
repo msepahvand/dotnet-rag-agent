@@ -9,8 +9,7 @@ namespace RagAgent.Agents;
 
 /// <summary>
 /// Calls the Cohere Embed v3 API on Bedrock directly.
-/// The SK Amazon Bedrock connector always uses the Titan inputText request schema regardless of model,
-/// so we bypass it and build the correct Cohere request ourselves.
+/// Cohere uses a different request schema and truncation policy from the other Bedrock embedding models.
 /// </summary>
 internal sealed class CohereEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>
 {
@@ -36,12 +35,7 @@ internal sealed class CohereEmbeddingGenerator : IEmbeddingGenerator<string, Emb
             ? it?.ToString() ?? "search_document"
             : "search_document";
 
-        var body = JsonSerializer.Serialize(new CohereEmbedRequest
-        {
-            Texts = texts,
-            InputType = inputType,
-            Truncate = "NONE"
-        });
+        var body = CreateRequestBody(texts, inputType);
 
         var response = await _bedrockRuntime.InvokeModelAsync(
             new InvokeModelRequest
@@ -69,6 +63,14 @@ internal sealed class CohereEmbeddingGenerator : IEmbeddingGenerator<string, Emb
 
     public void Dispose() { }
 
+    internal static string CreateRequestBody(List<string> texts, string inputType)
+        => JsonSerializer.Serialize(new CohereEmbedRequest
+        {
+            Texts = texts,
+            InputType = inputType,
+            Truncate = "END"
+        });
+
     private sealed class CohereEmbedRequest
     {
         [JsonPropertyName("texts")]
@@ -78,6 +80,6 @@ internal sealed class CohereEmbeddingGenerator : IEmbeddingGenerator<string, Emb
         public string InputType { get; init; } = "search_document";
 
         [JsonPropertyName("truncate")]
-        public string Truncate { get; init; } = "NONE";
+        public string Truncate { get; init; } = "END";
     }
 }
