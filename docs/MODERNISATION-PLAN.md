@@ -147,16 +147,16 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 
 **Goal:** move to the current LTS runtime without changing behaviour.
 
-1. Add a `global.json` pinning the .NET 10 SDK. Set `net10.0` everywhere. Move the shared `TargetFramework`/`Nullable`/`ImplicitUsings`/`LangVersion` into the **existing** `Directory.Build.props`.
-2. **Central Package Management** (`Directory.Packages.props`, `ManagePackageVersionsCentrally=true`):
+1. [x] Add a `global.json` pinning the .NET 10 SDK. Set `net10.0` everywhere. Move the shared `TargetFramework`/`Nullable`/`ImplicitUsings`/`LangVersion` into the **existing** `Directory.Build.props`, and update CI to install .NET 10.
+2. [x] **Central Package Management** (`Directory.Packages.props`, `ManagePackageVersionsCentrally=true`):
    - Pin exact versions in place of `AWSSDK.* 4.0.*`.
    - Remove the StyleCop `PackageReference` from `Directory.Build.props` and declare it as a `<GlobalPackageReference>` **in `Directory.Packages.props`**, next to the `PackageVersion` entries. An inline `Version` would trigger NU1008 under CPM.
-   - Add Dependabot or Renovate.
-3. **Dockerfile restore layer:** copy `global.json`, `NuGet.config`, `Directory.Build.props`, `Directory.Packages.props`, `stylecop.json`, `rules.ruleset` and **every** `*.csproj` the API references before `dotnet restore`. Today only four are copied, and restore only works because `dotnet build` re-restores after `COPY . .`. Check with a clean `docker build --no-cache` in CI before merging.
-4. Package bumps: `Microsoft.Extensions.*` 10.x, `Mvc.Testing` 10.x, OpenTelemetry current, test SDK.
-5. Replace **Swashbuckle** with built-in `AddOpenApi`/`MapOpenApi` + Swagger UI or Scalar, keeping `Swagger:Enabled`. **Contract note:** the document moves from `/swagger/v1/swagger.json` to `/openapi/v1.json`. Either map the old path as an alias or update the Postman collection and README in the same commit.
-6. Base images: `aspnet:10.0` / `sdk:10.0`. The `-noble-chiseled` variant is optional.
-7. **ARM64 readiness, in its own commits and in this order:**
+   - [ ] Add Dependabot or Renovate.
+3. [ ] **Dockerfile restore layer:** copy `global.json`, `NuGet.config`, `Directory.Build.props`, `Directory.Packages.props`, `stylecop.json`, `rules.ruleset` and **every** `*.csproj` the API references before `dotnet restore`. Today only four are copied, and restore only works because `dotnet build` re-restores after `COPY . .`. Check with a clean `docker build --no-cache` in CI before merging.
+4. [x] Package bumps: `Microsoft.Extensions.*` 10.x, `Mvc.Testing` 10.x, OpenTelemetry current, test SDK.
+5. [ ] Replace **Swashbuckle** with built-in `AddOpenApi`/`MapOpenApi` + Swagger UI or Scalar, keeping `Swagger:Enabled`. **Contract note:** the document moves from `/swagger/v1/swagger.json` to `/openapi/v1.json`. Either map the old path as an alias or update the Postman collection and README in the same commit.
+6. [ ] Base images: `aspnet:10.0` / `sdk:10.0`. The `-noble-chiseled` variant is optional.
+7. [ ] **ARM64 readiness, in its own commits and in this order:**
    1. Build the image **multi-arch without QEMU**, following [Microsoft's multi-platform container guidance](https://devblogs.microsoft.com/dotnet/improving-multiplatform-container-support/):
       - The build stage uses `FROM --platform=$BUILDPLATFORM sdk:10.0`.
       - The restore layer runs `dotnet restore -a $TARGETARCH`, and the publish step runs `dotnet publish -a $TARGETARCH --no-restore`. Without the RID-specific restore, the build fails with NETSDK1047.
