@@ -7,7 +7,7 @@ public interface IWriterAgent
     Task<AgentAnswerResult> WriteAsync(
         string question,
         ResearchResult research,
-        IReadOnlyList<ChatMessage> history,
+        IReadOnlyList<ConversationMessage> history,
         string? criticFeedback = null);
 
     /// <summary>
@@ -17,6 +17,6 @@ public interface IWriterAgent
     IAsyncEnumerable<string> StreamAsync(
         string question,
         ResearchResult research,
-        IReadOnlyList<ChatMessage> history,
+        IReadOnlyList<ConversationMessage> history,
         CancellationToken ct = default);
 }

@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Text.Json;
-using Microsoft.SemanticKernel;
 using RagAgent.Core;
 using RagAgent.Core.Models;
 
@@ -8,7 +7,6 @@ namespace RagAgent.Agents;
 
 public sealed class SemanticSearchPlugin(IVectorService vectorService, IPostService postService)
 {
-    [KernelFunction("search_posts")]
     [Description("Runs semantic search over indexed posts and returns grounded sources with PostId, title, snippet, and distance.")]
     public async Task<string> SearchPostsAsync(
         [Description("Natural language question to search for.")] string question,

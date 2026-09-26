@@ -35,7 +35,7 @@ public sealed class ProcessAnswerService : IAgentAnswerService
     }
 
     public async Task<AgentAnswerResult> AnswerAsync(
-        string question, int topK, IReadOnlyList<ChatMessage> history)
+        string question, int topK, IReadOnlyList<ConversationMessage> history)
     {
         var normalisedTopK = TopKNormaliser.Normalise(topK);
         var request = new AgentAnswerRequest(question, normalisedTopK, history);

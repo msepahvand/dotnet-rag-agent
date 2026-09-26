@@ -1,6 +1,5 @@
 using FluentAssertions;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.Extensions.AI;
 using RagAgent.Core.Models;
 using RagAgent.Agents;
 
@@ -87,13 +86,15 @@ public class WriterAgentTests
     public async Task WriteAsync_WithCriticFeedback_InjectsFeedbackMessageBeforeSynthesisInstructionAsync()
     {
         const string json = """{"answer":"Revised","citations":[],"grounded":true}""";
-        var capturing = new CapturingChatService(json);
-        var sut = new WriterAgent(capturing, new Kernel());
+        var chatClient = new ScriptedChatClient(json);
+        var sut = new WriterAgent(chatClient);
 
         await sut.WriteAsync("Q?", EmptyResearch(), [], criticFeedback: "Citations missing quotes.");
 
-        var history = capturing.LastChatHistory!;
-        var userMessages = history.Where(m => m.Role == AuthorRole.User).Select(m => m.Content ?? "").ToList();
+        var userMessages = chatClient.LastMessages!
+            .Where(m => m.Role == ChatRole.User)
+            .Select(m => m.Text)
+            .ToList();
         userMessages.Should().Contain(m => m.Contains("Citations missing quotes."));
     }
 
@@ -101,13 +102,12 @@ public class WriterAgentTests
     public async Task WriteAsync_WithoutCriticFeedback_DoesNotInjectFeedbackMessageAsync()
     {
         const string json = """{"answer":"A","citations":[],"grounded":true}""";
-        var capturing = new CapturingChatService(json);
-        var sut = new WriterAgent(capturing, new Kernel());
+        var chatClient = new ScriptedChatClient(json);
+        var sut = new WriterAgent(chatClient);
 
         await sut.WriteAsync("Q?", EmptyResearch(), [], criticFeedback: null);
 
-        var history = capturing.LastChatHistory!;
-        history.Should().NotContain(m => (m.Content ?? "").Contains("critic"));
+        chatClient.LastMessages.Should().NotContain(m => m.Text.Contains("critic"));
     }
 
     // ── Conversation history role mapping ────────────────────────────────────
@@ -115,9 +115,9 @@ public class WriterAgentTests
     public async Task WriteAsync_MapsConversationHistoryRolesToCorrectAuthorRolesAsync()
     {
         const string json = """{"answer":"A","citations":[],"grounded":true}""";
-        var capturing = new CapturingChatService(json);
-        var sut = new WriterAgent(capturing, new Kernel());
-        var history = new List<ChatMessage>
+        var chatClient = new ScriptedChatClient(json);
+        var sut = new WriterAgent(chatClient);
+        var history = new List<ConversationMessage>
         {
             new("user", "First question"),
             new("assistant", "First answer"),
@@ -126,10 +126,25 @@ public class WriterAgentTests
 
         await sut.WriteAsync("Q?", EmptyResearch(), history);
 
-        var chatHistory = capturing.LastChatHistory!;
-        chatHistory.Should().Contain(m => m.Role == AuthorRole.User && m.Content == "First question");
-        chatHistory.Should().Contain(m => m.Role == AuthorRole.Assistant && m.Content == "First answer");
-        chatHistory.Should().Contain(m => m.Role == AuthorRole.System && m.Content == "System note");
+        chatClient.LastMessages.Should().Contain(m => m.Role == ChatRole.User && m.Text == "First question");
+        chatClient.LastMessages.Should().Contain(m => m.Role == ChatRole.Assistant && m.Text == "First answer");
+        chatClient.LastMessages.Should().Contain(m => m.Role == ChatRole.System && m.Text == "System note");
+    }
+
+    [Fact]
+    public async Task StreamAsync_YieldsTextChunksFromChatClientAsync()
+    {
+        var chatClient = new ScriptedChatClient(string.Empty, streamedChunks: ["Hello", " world"]);
+        var sut = new WriterAgent(chatClient);
+        var chunks = new List<string>();
+
+        await foreach (var chunk in sut.StreamAsync("Q?", EmptyResearch(), []))
+        {
+            chunks.Add(chunk);
+        }
+
+        chunks.Should().Equal("Hello", " world");
+        chatClient.LastOptions!.MaxOutputTokens.Should().Be(2048);
     }
 
     // ── ToolsUsed passthrough ────────────────────────────────────────────────
@@ -147,7 +162,7 @@ public class WriterAgentTests
 
     // ── Helpers ──────────────────────────────────────────────────────────────
     private static WriterAgent BuildWriter(string llmResponse) =>
-        new(new StubChatService(llmResponse), new Kernel());
+        new(new ScriptedChatClient(llmResponse));
 
     private static ResearchResult EmptyResearch() =>
         new() { Sources = [], SourcesJson = "[]", ToolsUsed = ["search_posts"] };
@@ -156,51 +171,5 @@ public class WriterAgentTests
     {
         var json = System.Text.Json.JsonSerializer.Serialize(sources);
         return new ResearchResult { Sources = sources, SourcesJson = json, ToolsUsed = ["search_posts"] };
-    }
-
-    // ── Stubs ────────────────────────────────────────────────────────────────
-    private sealed class StubChatService(string responseContent) : IChatCompletionService
-    {
-        public IReadOnlyDictionary<string, object?> Attributes => new Dictionary<string, object?>();
-
-        public Task<IReadOnlyList<ChatMessageContent>> GetChatMessageContentsAsync(
-            ChatHistory chatHistory,
-            PromptExecutionSettings? executionSettings = null,
-            Kernel? kernel = null,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<ChatMessageContent>>(
-                [new ChatMessageContent(AuthorRole.Assistant, responseContent)]);
-
-        public IAsyncEnumerable<StreamingChatMessageContent> GetStreamingChatMessageContentsAsync(
-            ChatHistory chatHistory,
-            PromptExecutionSettings? executionSettings = null,
-            Kernel? kernel = null,
-            CancellationToken cancellationToken = default) =>
-            throw new NotImplementedException();
-    }
-
-    private sealed class CapturingChatService(string responseContent) : IChatCompletionService
-    {
-        public ChatHistory? LastChatHistory { get; private set; }
-
-        public IReadOnlyDictionary<string, object?> Attributes => new Dictionary<string, object?>();
-
-        public Task<IReadOnlyList<ChatMessageContent>> GetChatMessageContentsAsync(
-            ChatHistory chatHistory,
-            PromptExecutionSettings? executionSettings = null,
-            Kernel? kernel = null,
-            CancellationToken cancellationToken = default)
-        {
-            LastChatHistory = chatHistory;
-            return Task.FromResult<IReadOnlyList<ChatMessageContent>>(
-                [new ChatMessageContent(AuthorRole.Assistant, responseContent)]);
-        }
-
-        public IAsyncEnumerable<StreamingChatMessageContent> GetStreamingChatMessageContentsAsync(
-            ChatHistory chatHistory,
-            PromptExecutionSettings? executionSettings = null,
-            Kernel? kernel = null,
-            CancellationToken cancellationToken = default) =>
-            throw new NotImplementedException();
     }
 }

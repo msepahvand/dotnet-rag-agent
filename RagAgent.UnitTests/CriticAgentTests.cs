@@ -1,6 +1,5 @@
 using FluentAssertions;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.Extensions.AI;
 using RagAgent.Core.Models;
 using RagAgent.Agents;
 
@@ -12,8 +11,10 @@ public class CriticAgentTests
     [Fact]
     public async Task EvaluateAsync_WhenCitationPostIdNotInSources_ReturnsFailWithoutCallingLlmAsync()
     {
-        var throwingService = new ThrowingChatService();
-        var sut = new CriticAgent(throwingService, new Kernel());
+        var chatClient = new ScriptedChatClient(
+            string.Empty,
+            new InvalidOperationException("LLM should not be called when deterministic check fails."));
+        var sut = new CriticAgent(chatClient);
         var answer = AnswerWith(citations: [new Citation { PostId = 99, Quote = "q" }]);
         var research = ResearchWith(sourceIds: [1, 2, 3]);
 
@@ -26,7 +27,9 @@ public class CriticAgentTests
     [Fact]
     public async Task EvaluateAsync_WhenMultipleInvalidPostIds_ListsAllInFeedbackAsync()
     {
-        var sut = new CriticAgent(new ThrowingChatService(), new Kernel());
+        var sut = new CriticAgent(new ScriptedChatClient(
+            string.Empty,
+            new InvalidOperationException("LLM should not be called when deterministic check fails.")));
         var answer = AnswerWith(citations:
         [
             new Citation { PostId = 10, Quote = "q" },
@@ -43,7 +46,7 @@ public class CriticAgentTests
     public async Task EvaluateAsync_WhenNoCitations_ProceedsToLlmEvaluationAsync()
     {
         const string llmResponse = """{"approved":true,"feedback":"","checks":["relevance: PASS"]}""";
-        var sut = new CriticAgent(new StubChatService(llmResponse), new Kernel());
+        var sut = new CriticAgent(new ScriptedChatClient(llmResponse));
         var answer = AnswerWith(citations: []);
         var research = ResearchWith(sourceIds: []);
 
@@ -57,7 +60,7 @@ public class CriticAgentTests
     public async Task EvaluateAsync_WhenLlmReturnsApproved_ReturnsApprovedAsync()
     {
         const string llmResponse = """{"approved":true,"feedback":"","checks":["relevance: PASS","groundedness: PASS"]}""";
-        var sut = new CriticAgent(new StubChatService(llmResponse), new Kernel());
+        var sut = new CriticAgent(new ScriptedChatClient(llmResponse));
         var answer = AnswerWith(citations: [new Citation { PostId = 1, Quote = "q" }]);
         var research = ResearchWith(sourceIds: [1]);
 
@@ -71,7 +74,7 @@ public class CriticAgentTests
     public async Task EvaluateAsync_WhenLlmReturnsRejected_ReturnsRejectedWithFeedbackAsync()
     {
         const string llmResponse = """{"approved":false,"feedback":"Answer is not relevant.","checks":["relevance: FAIL","groundedness: PASS"]}""";
-        var sut = new CriticAgent(new StubChatService(llmResponse), new Kernel());
+        var sut = new CriticAgent(new ScriptedChatClient(llmResponse));
         var answer = AnswerWith(citations: [new Citation { PostId = 1, Quote = "q" }]);
         var research = ResearchWith(sourceIds: [1]);
 
@@ -86,7 +89,7 @@ public class CriticAgentTests
     public async Task EvaluateAsync_WhenLlmReturnsCodeFencedJson_ParsesCorrectlyAsync()
     {
         const string fenced = "```json\n{\"approved\":false,\"feedback\":\"Missing citations.\",\"checks\":[]}\n```";
-        var sut = new CriticAgent(new StubChatService(fenced), new Kernel());
+        var sut = new CriticAgent(new ScriptedChatClient(fenced));
         var answer = AnswerWith(citations: []);
         var research = ResearchWith(sourceIds: []);
 
@@ -100,7 +103,7 @@ public class CriticAgentTests
     [Fact]
     public async Task EvaluateAsync_WhenLlmResponseIsUnparseable_FallsBackToApprovedAsync()
     {
-        var sut = new CriticAgent(new StubChatService("I cannot evaluate this."), new Kernel());
+        var sut = new CriticAgent(new ScriptedChatClient("I cannot evaluate this."));
         var answer = AnswerWith(citations: []);
         var research = ResearchWith(sourceIds: []);
 
@@ -114,7 +117,7 @@ public class CriticAgentTests
     [Fact]
     public async Task EvaluateAsync_WhenLlmResponseIsEmpty_FallsBackToApprovedAsync()
     {
-        var sut = new CriticAgent(new StubChatService(string.Empty), new Kernel());
+        var sut = new CriticAgent(new ScriptedChatClient(string.Empty));
         var answer = AnswerWith(citations: []);
         var research = ResearchWith(sourceIds: []);
 
@@ -145,46 +148,5 @@ public class CriticAgentTests
             SourcesJson = System.Text.Json.JsonSerializer.Serialize(sources),
             ToolsUsed = ["search_posts"]
         };
-    }
-
-    // ── Stubs ────────────────────────────────────────────────────────────────
-    private sealed class StubChatService(string responseContent) : IChatCompletionService
-    {
-        public IReadOnlyDictionary<string, object?> Attributes => new Dictionary<string, object?>();
-
-        public Task<IReadOnlyList<ChatMessageContent>> GetChatMessageContentsAsync(
-            ChatHistory chatHistory,
-            PromptExecutionSettings? executionSettings = null,
-            Kernel? kernel = null,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<ChatMessageContent>>(
-                [new ChatMessageContent(AuthorRole.Assistant, responseContent)]);
-
-        public IAsyncEnumerable<StreamingChatMessageContent> GetStreamingChatMessageContentsAsync(
-            ChatHistory chatHistory,
-            PromptExecutionSettings? executionSettings = null,
-            Kernel? kernel = null,
-            CancellationToken cancellationToken = default) =>
-            throw new NotImplementedException();
-    }
-
-    /// <summary>Stub that throws if called — used to assert the LLM is NOT called.</summary>
-    private sealed class ThrowingChatService : IChatCompletionService
-    {
-        public IReadOnlyDictionary<string, object?> Attributes => new Dictionary<string, object?>();
-
-        public Task<IReadOnlyList<ChatMessageContent>> GetChatMessageContentsAsync(
-            ChatHistory chatHistory,
-            PromptExecutionSettings? executionSettings = null,
-            Kernel? kernel = null,
-            CancellationToken cancellationToken = default) =>
-            throw new InvalidOperationException("LLM should not be called when deterministic check fails.");
-
-        public IAsyncEnumerable<StreamingChatMessageContent> GetStreamingChatMessageContentsAsync(
-            ChatHistory chatHistory,
-            PromptExecutionSettings? executionSettings = null,
-            Kernel? kernel = null,
-            CancellationToken cancellationToken = default) =>
-            throw new NotImplementedException();
     }
 }

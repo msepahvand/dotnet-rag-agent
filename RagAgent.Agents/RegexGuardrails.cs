@@ -1,19 +1,9 @@
 using System.Text.RegularExpressions;
-using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel;
 using RagAgent.Core;
 
-namespace RagAgent.Agents.Filters;
+namespace RagAgent.Agents;
 
-/// <summary>
-/// SK <see cref="IPromptRenderFilter"/> that runs input guardrail checks whenever a kernel
-/// prompt function is rendered. Catches prompt injection, PII, and off-topic requests before
-/// the rendered prompt reaches the LLM.
-///
-/// Note: WriterAgent and CriticAgent call IChatCompletionService directly, so this filter
-/// is complemented by question-level validation in AgentOrchestrationService.
-/// </summary>
-public sealed class InputGuardrailFilter(ILogger<InputGuardrailFilter> logger) : IPromptRenderFilter
+public static class RegexGuardrails
 {
     private static readonly string[] InjectionPhrases =
     [
@@ -49,30 +39,6 @@ public sealed class InputGuardrailFilter(ILogger<InputGuardrailFilter> logger) :
         "tax advice",
     ];
 
-    public async Task OnPromptRenderAsync(
-        PromptRenderContext context,
-        Func<PromptRenderContext, Task> next)
-    {
-        // Check argument values before rendering — catches template injection via variable substitution.
-        foreach (var arg in context.Arguments)
-        {
-            var value = arg.Value?.ToString() ?? string.Empty;
-            CheckForInjection(value);
-            CheckForPii(value);
-            CheckTopicScope(value);
-        }
-
-        await next(context);
-
-        // Re-check the fully rendered prompt — catches multi-step or compound injection patterns.
-        CheckForInjection(context.RenderedPrompt ?? string.Empty);
-
-        logger.LogDebug(
-            "Input guardrail passed for function {Plugin}.{Function}",
-            context.Function.PluginName,
-            context.Function.Name);
-    }
-
     public static void CheckForInjection(string text)
     {
         var lower = text.ToLowerInvariant();
@@ -94,8 +60,6 @@ public sealed class InputGuardrailFilter(ILogger<InputGuardrailFilter> logger) :
                 "Input contains a detected email address. Please remove personal information before submitting.");
         }
 
-        // Check credit cards before generic phone pattern — credit card format is a subset of
-        // digit sequences that would otherwise match the phone regex.
         if (CreditCardPattern.IsMatch(text))
         {
             throw new GuardrailException(

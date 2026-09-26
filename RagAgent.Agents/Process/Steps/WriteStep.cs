@@ -64,7 +64,7 @@ public sealed class WriteStep : KernelProcessStep<WriteStep.State>
     private async Task EmitAnswerEventAsync(
         KernelProcessStepContext context,
         string question,
-        IReadOnlyList<ChatMessage> history,
+        IReadOnlyList<ConversationMessage> history,
         ResearchResult research,
         AgentAnswerResult answer)
     {

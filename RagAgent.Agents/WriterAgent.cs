@@ -1,9 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Connectors.Amazon;
+using Microsoft.Extensions.AI;
 using RagAgent.Core;
 using RagAgent.Core.Models;
 
@@ -31,32 +29,29 @@ public sealed class WriterAgent : IWriterAgent
     private const string StreamingInstruction =
         "Answer the question above based solely on the search results. Write a clear, direct answer in natural prose.";
 
-    private readonly IChatCompletionService _chatService;
-    private readonly Kernel _kernel;
+    private readonly IChatClient _chatClient;
 
-    public WriterAgent(IChatCompletionService chatService, Kernel kernel)
+    public WriterAgent(IChatClient chatClient)
     {
-        _chatService = chatService;
-        _kernel = kernel;
+        _chatClient = chatClient;
     }
 
     // ── Batch (structured JSON) ───────────────────────────────────────────────
     public async Task<AgentAnswerResult> WriteAsync(
         string question,
         ResearchResult research,
-        IReadOnlyList<ChatMessage> history,
+        IReadOnlyList<ConversationMessage> history,
         string? criticFeedback = null)
     {
         var chatHistory = BuildBatchChatHistory(question, research, history, criticFeedback);
 
-        var settings = new AmazonClaudeExecutionSettings
+        var options = new ChatOptions
         {
-            MaxTokensToSample = 2048,
-            FunctionChoiceBehavior = FunctionChoiceBehavior.None(),
+            MaxOutputTokens = 2048,
         };
 
-        var response = await _chatService.GetChatMessageContentsAsync(chatHistory, settings, _kernel);
-        var rawOutput = response.FirstOrDefault()?.Content?.Trim() ?? string.Empty;
+        var response = await _chatClient.GetResponseAsync(chatHistory, options);
+        var rawOutput = response.Text?.Trim() ?? string.Empty;
 
         var fallback = BuildDeterministicAnswer(question, research.Sources);
         return ParseStructuredAnswer(rawOutput, research.Sources, research.ToolsUsed, fallback);
@@ -68,76 +63,84 @@ public sealed class WriterAgent : IWriterAgent
     public async IAsyncEnumerable<string> StreamAsync(
         string question,
         ResearchResult research,
-        IReadOnlyList<ChatMessage> history,
+        IReadOnlyList<ConversationMessage> history,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var chatHistory = BuildStreamingChatHistory(question, research, history);
 
-        var settings = new AmazonClaudeExecutionSettings
+        var options = new ChatOptions
         {
-            MaxTokensToSample = 2048,
-            FunctionChoiceBehavior = FunctionChoiceBehavior.None(),
+            MaxOutputTokens = 2048,
         };
 
-        await foreach (var chunk in _chatService.GetStreamingChatMessageContentsAsync(
-            chatHistory, settings, _kernel, ct))
+        await foreach (var chunk in _chatClient.GetStreamingResponseAsync(
+            chatHistory, options, ct))
         {
-            if (!string.IsNullOrEmpty(chunk.Content))
+            if (!string.IsNullOrEmpty(chunk.Text))
             {
-                yield return chunk.Content;
+                yield return chunk.Text;
             }
         }
     }
 
     // ── Chat history builders ─────────────────────────────────────────────────
-    private static ChatHistory BuildBatchChatHistory(
+    private static List<ChatMessage> BuildBatchChatHistory(
         string question,
         ResearchResult research,
-        IReadOnlyList<ChatMessage> history,
+        IReadOnlyList<ConversationMessage> history,
         string? criticFeedback)
     {
-        var chatHistory = new ChatHistory(SystemPrompt);
+        var chatHistory = new List<ChatMessage>
+        {
+            new(ChatRole.System, SystemPrompt),
+        };
         AddConversationHistory(chatHistory, history);
 
-        chatHistory.AddUserMessage(question);
-        chatHistory.AddUserMessage($"Search results:\n{research.SourcesJson}");
+        chatHistory.Add(new ChatMessage(ChatRole.User, question));
+        chatHistory.Add(new ChatMessage(ChatRole.User, $"Search results:\n{research.SourcesJson}"));
 
         if (!string.IsNullOrWhiteSpace(criticFeedback))
         {
-            chatHistory.AddUserMessage(
+            chatHistory.Add(new ChatMessage(
+                ChatRole.User,
                 $"A critic reviewed a previous draft of this answer and identified the following issues: " +
-                $"{criticFeedback} Please address these issues in your revised answer.");
+                $"{criticFeedback} Please address these issues in your revised answer."));
         }
 
-        chatHistory.AddUserMessage(SynthesisInstruction);
+        chatHistory.Add(new ChatMessage(ChatRole.User, SynthesisInstruction));
         return chatHistory;
     }
 
-    private static ChatHistory BuildStreamingChatHistory(
+    private static List<ChatMessage> BuildStreamingChatHistory(
         string question,
         ResearchResult research,
-        IReadOnlyList<ChatMessage> history)
+        IReadOnlyList<ConversationMessage> history)
     {
-        var chatHistory = new ChatHistory(StreamingSystemPrompt);
+        var chatHistory = new List<ChatMessage>
+        {
+            new(ChatRole.System, StreamingSystemPrompt),
+        };
         AddConversationHistory(chatHistory, history);
 
-        chatHistory.AddUserMessage(question);
-        chatHistory.AddUserMessage($"Search results:\n{research.SourcesJson}");
-        chatHistory.AddUserMessage(StreamingInstruction);
+        chatHistory.Add(new ChatMessage(ChatRole.User, question));
+        chatHistory.Add(new ChatMessage(ChatRole.User, $"Search results:\n{research.SourcesJson}"));
+        chatHistory.Add(new ChatMessage(ChatRole.User, StreamingInstruction));
         return chatHistory;
     }
 
-    private static void AddConversationHistory(ChatHistory chatHistory, IReadOnlyList<ChatMessage> history)
+    private static void AddConversationHistory(
+        List<ChatMessage> chatHistory,
+        IReadOnlyList<ConversationMessage> history)
     {
         foreach (var msg in history)
         {
             var role = msg.Role switch
             {
-                "assistant" => AuthorRole.Assistant,
-                "system" => AuthorRole.System,
-                _ => AuthorRole.User,
+                "assistant" => ChatRole.Assistant,
+                "system" => ChatRole.System,
+                _ => ChatRole.User,
             };
-            chatHistory.Add(new ChatMessageContent(role, msg.Content));
+            chatHistory.Add(new ChatMessage(role, msg.Content));
         }
     }
 

@@ -133,7 +133,7 @@ public class AgentOrchestrationServiceTests
     [Fact]
     public async Task AskAsync_TwoTurns_SecondTurnReceivesHistoryAsync()
     {
-        IReadOnlyList<ChatMessage>? capturedHistory = null;
+        IReadOnlyList<ConversationMessage>? capturedHistory = null;
         var stub = new CapturingHistoryStubAgentAnswerService(history => capturedHistory = history);
         var store = CreateStore();
         var sut = new AgentOrchestrationService(stub, store, new NoopGuardrailsService());
@@ -160,8 +160,8 @@ public class AgentOrchestrationServiceTests
         var history = await store.GetHistoryAsync(response.ConversationId);
 
         history.Should().HaveCount(2);
-        history[0].Should().Be(new ChatMessage("user", "Hello?"));
-        history[1].Should().Be(new ChatMessage("assistant", "my answer"));
+        history[0].Should().Be(new ConversationMessage("user", "Hello?"));
+        history[1].Should().Be(new ConversationMessage("assistant", "my answer"));
     }
 
     [Fact]
@@ -191,22 +191,22 @@ public class AgentOrchestrationServiceTests
     // ── Stubs ───────────────────────────────────────────────────────────────
     private sealed class StubAgentAnswerService(AgentAnswerResult result) : IAgentAnswerService
     {
-        public Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ChatMessage> history) =>
+        public Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ConversationMessage> history) =>
             Task.FromResult(result);
     }
 
     private sealed class CapturingStubAgentAnswerService(Action<int> onAnswer) : IAgentAnswerService
     {
-        public Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ChatMessage> history)
+        public Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ConversationMessage> history)
         {
             onAnswer(topK);
             return Task.FromResult(new AgentAnswerResult { Answer = "x", Grounded = false });
         }
     }
 
-    private sealed class CapturingHistoryStubAgentAnswerService(Action<IReadOnlyList<ChatMessage>> onAnswer) : IAgentAnswerService
+    private sealed class CapturingHistoryStubAgentAnswerService(Action<IReadOnlyList<ConversationMessage>> onAnswer) : IAgentAnswerService
     {
-        public Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ChatMessage> history)
+        public Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ConversationMessage> history)
         {
             onAnswer(history);
             return Task.FromResult(new AgentAnswerResult { Answer = "answer", Grounded = true });
