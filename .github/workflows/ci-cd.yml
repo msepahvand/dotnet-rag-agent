@@ -93,7 +93,7 @@ jobs:
           echo "REGION=$REGION" >> $GITHUB_ENV
           echo "ACCOUNT_ID=$ACCOUNT_ID" >> $GITHUB_ENV
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: '1.5.0'
           terraform_wrapper: false
