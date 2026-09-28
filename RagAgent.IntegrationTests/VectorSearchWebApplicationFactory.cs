@@ -95,9 +95,26 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
                 services.RemoveAll<IChatClient>();
                 services.AddSingleton<IChatClient>(_ => new IntegrationTestChatClient(
                 [
-                    """{"answer":"Post 1 is about a test story.","citations":[{"postId":1,"quote":"This is deterministic content for post 1"}],"grounded":true}""",
-                    """{"approved":true,"feedback":"","checks":["relevance: PASS","groundedness: PASS"]}"""
-                ]));
+                    new ChatResponse(new ChatMessage(
+                        ChatRole.Assistant,
+                    [
+                        new FunctionCallContent(
+                            "search-call",
+                            "search_posts",
+                            new Dictionary<string, object?>
+                            {
+                                ["question"] = "test story",
+                                ["topK"] = 5,
+                            }),
+                    ])),
+                    new ChatResponse(new ChatMessage(ChatRole.Assistant, "Research complete.")),
+                    new ChatResponse(new ChatMessage(
+                        ChatRole.Assistant,
+                        """{"answer":"Post 1 is about a test story.","citations":[{"postId":1,"quote":"This is deterministic content for post 1"}],"grounded":true}""")),
+                    new ChatResponse(new ChatMessage(
+                        ChatRole.Assistant,
+                        """{"approved":true,"feedback":"","checks":["relevance: PASS","groundedness: PASS"]}""")),
+                ]).AsBuilder().UseFunctionInvocation().Build());
             }
 
             // Remove and replace the IVectorStore implementation based on provider

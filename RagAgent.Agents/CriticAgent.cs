@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using RagAgent.Core;
 using RagAgent.Core.Models;
@@ -23,12 +24,12 @@ public sealed class CriticAgent : ICriticAgent
         "Set approved to false and provide concise feedback if either check fails. " +
         "Return only the raw JSON object.";
 
-    private readonly IChatClient _chatClient;
+    private readonly ChatClientAgent _agent;
     private readonly float? _temperature;
 
     public CriticAgent(IChatClient chatClient, float? temperature = null)
     {
-        _chatClient = chatClient;
+        _agent = new ChatClientAgent(chatClient);
         _temperature = temperature;
     }
 
@@ -67,7 +68,9 @@ public sealed class CriticAgent : ICriticAgent
             Temperature = _temperature,
         };
 
-        var response = await _chatClient.GetResponseAsync(chatHistory, options);
+        var response = await _agent.RunAsync(
+            chatHistory,
+            options: new ChatClientAgentRunOptions(options));
         var rawOutput = response.Text?.Trim() ?? string.Empty;
 
         return ParseCriticResponse(rawOutput);

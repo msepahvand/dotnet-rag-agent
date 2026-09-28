@@ -27,7 +27,7 @@ Use conventional commit prefixes:
   - RagAgent.Qdrant → Qdrant vector store (local dev / integration tests)
   - RagAgent.Redis → Redis vector store (local dev / integration tests)
   - RagAgent.S3Vectors → S3 Vectors vector store (production)
-  - RagAgent.Agents → LLM agents, Bedrock, Semantic Kernel integration
+  - RagAgent.Agents → LLM agents, Bedrock, Microsoft.Extensions.AI, and Microsoft Agent Framework
 
 ## Testing
 - Aim for roughly **70% unit tests, 30% integration tests**.

@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using RagAgent.Core;
 using RagAgent.Core.Models;
@@ -29,12 +30,12 @@ public sealed class WriterAgent : IWriterAgent
     private const string StreamingInstruction =
         "Answer the question above based solely on the search results. Write a clear, direct answer in natural prose.";
 
-    private readonly IChatClient _chatClient;
+    private readonly ChatClientAgent _agent;
     private readonly float? _temperature;
 
     public WriterAgent(IChatClient chatClient, float? temperature = null)
     {
-        _chatClient = chatClient;
+        _agent = new ChatClientAgent(chatClient);
         _temperature = temperature;
     }
 
@@ -53,7 +54,9 @@ public sealed class WriterAgent : IWriterAgent
             Temperature = _temperature,
         };
 
-        var response = await _chatClient.GetResponseAsync(chatHistory, options);
+        var response = await _agent.RunAsync(
+            chatHistory,
+            options: new ChatClientAgentRunOptions(options));
         var rawOutput = response.Text?.Trim() ?? string.Empty;
 
         var fallback = BuildDeterministicAnswer(question, research.Sources);
@@ -77,12 +80,14 @@ public sealed class WriterAgent : IWriterAgent
             Temperature = _temperature,
         };
 
-        await foreach (var chunk in _chatClient.GetStreamingResponseAsync(
-            chatHistory, options, ct))
+        await foreach (var update in _agent.RunStreamingAsync(
+            chatHistory,
+            options: new ChatClientAgentRunOptions(options),
+            cancellationToken: ct))
         {
-            if (!string.IsNullOrEmpty(chunk.Text))
+            if (!string.IsNullOrEmpty(update.Text))
             {
-                yield return chunk.Text;
+                yield return update.Text;
             }
         }
     }

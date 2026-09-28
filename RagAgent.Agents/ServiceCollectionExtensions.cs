@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using RagAgent.Core;
 using RagAgent.Agents.Telemetry;
-using RagAgent.Agents.Process;
+using RagAgent.Agents.Workflow;
 
 namespace RagAgent.Agents;
 
@@ -27,10 +27,14 @@ public static class ServiceCollectionExtensions
 
         // Cohere Embed v3 uses a different request schema to the AWS adapter's default,
         // so keep the custom generator for embeddings.
-        services.AddScoped<IEmbeddingGenerator<string, Embedding<float>>>(sp =>
-            new CohereEmbeddingGenerator(
+        services.AddEmbeddingGenerator<string, Embedding<float>>(
+            sp => new CohereEmbeddingGenerator(
                 sp.GetRequiredService<IAmazonBedrockRuntime>(),
-                options.EmbeddingModelId));
+                options.EmbeddingModelId),
+            ServiceLifetime.Scoped)
+            .UseOpenTelemetry(
+                sourceName: AgentActivitySource.Name,
+                configure: generator => generator.EnableSensitiveData = false);
 
         services.AddChatClient(sp =>
                 sp.GetRequiredService<IAmazonBedrockRuntime>().AsIChatClient(options.ChatModelId))
@@ -64,8 +68,7 @@ public static class ServiceCollectionExtensions
                 serviceProvider.GetRequiredService<IAgentAnswerService>(),
                 serviceProvider.GetService<IAnswerQualityJudge>()));
 
-        // Process orchestration bridges the workflow result back to request/response.
-        services.AddProcessOrchestration();
+        services.AddScoped<IAgentAnswerService, AgentAnswerWorkflowService>();
 
         return services;
     }

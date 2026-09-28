@@ -1,13 +1,12 @@
-# Mastering Agentic AI in .NET — Learning Roadmap
+# Agentic AI in .NET — Learning Roadmap
 
-A progressive roadmap for building real agentic AI skills using Semantic Kernel and this repo as a working lab.
+A progressive roadmap for building agentic AI skills using this repository as a working lab. The current application architecture uses Microsoft.Extensions.AI and Microsoft Agent Framework; historical Semantic Kernel exercises below describe earlier implementation steps, not current runtime dependencies.
 
 ## What you've already built
 
-- Single-tool-calling agent (question → semantic search → grounded answer)
-- Semantic Kernel plugin: `SemanticSearchPlugin`
-- Auto function-calling via `FunctionChoiceBehavior.Auto()`
-- Function invocation filter for logging, guardrails, and topK normalization
+- Single-tool-calling researcher (question → semantic search → grounded answer)
+- `search_posts` exposed as an MEAI `AIFunction` to a MAF `ChatClientAgent`
+- Function invocation through Microsoft.Extensions.AI; user `topK` is clamped and multiple search results are merged
 - Bedrock-backed embeddings and text generation
 - Provider-agnostic core with S3 Vectors / Qdrant implementations
 
@@ -91,15 +90,14 @@ This is a strong foundation. Everything below builds directly on it.
 - ~~Cap at 2-3 iterations to avoid runaway loops~~
 - **Done**: `CriticAgent` evaluates citation validity deterministically (postId existence check) then uses the LLM for relevance and groundedness. `MultiAgentAnswerService` runs up to 3 writer passes, passing critic feedback into each retry. `AgentAnswerResult.Iterations` (and `AskResponseDto.Iterations`) exposes how many passes were needed.
 
-### ~~3.3 SK Process Framework (Nested Steps)~~ ✅
+### ~~3.3 Microsoft Agent Framework Workflows~~ ✅
 
-~~Rewrite the orchestration as an SK `Process` with discrete steps.~~
+~~Replace the Semantic Kernel Process orchestration with a typed Microsoft Agent Framework Workflow.~~
 
-- ~~Step 1: Retrieve sources → Step 2: Generate answer → Step 3: Validate → Step 4: Respond~~
-- ~~Each step is independently testable and observable~~
-- ~~Add branching: if validation fails, loop back to Step 2 with adjusted prompt~~
-- ~~**Why**: The Process framework is SK's answer to complex agent workflows. Learning it early gives you a structured way to build production agent pipelines.~~
-- **Done**: `ProcessAnswerService` implements `IAgentAnswerService` as a `KernelProcess` with four discrete steps: `ResearchStep` → `WriteStep` → `CriticStep` → `OutputStep`. The process branches: critic approval routes to output; revision routes back to `WriteStep.ReviseAsync`. A `WriteStepState.Iteration` counter caps loops at 3. `ProcessResultHolder` (scoped) bridges the fire-and-forget process back to the request/response pattern.
+- ~~Research → Write → Critic → Output, with the third draft routed directly to Output~~
+- ~~Keep iteration state in workflow messages so each request has isolated state~~
+- ~~Use MAF `ChatClientAgent`s for research, writing and critique; preserve the Core interfaces and API contracts~~
+- **Done**: `AgentAnswerWorkflowService` executes a Microsoft Agent Framework Workflow with typed executors and a three-draft cap. Critic approval routes to output; rejected drafts return to the writer; the third draft bypasses the critic. Research uses a bounded `search_posts` tool and falls back to the original question if the model does not call it.
 
 ---
 

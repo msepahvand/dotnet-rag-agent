@@ -4,21 +4,21 @@
 
 See the [documentation index](docs/README.md) for project guidance and modernisation plans.
 
-Retrieval-augmented generation (RAG) API using Microsoft.Extensions.AI for Bedrock chat and embeddings, a Semantic Kernel Process pipeline, and pluggable vector store backends. Built on ASP.NET Core 10.0.
+Retrieval-augmented generation (RAG) API using Microsoft.Extensions.AI for Bedrock chat and embeddings, Microsoft Agent Framework for model-directed retrieval and workflow orchestration, and pluggable vector store backends. Built on ASP.NET Core 10.0.
 
 ```
 POST /api/agent/ask          (batch — higher quality, ~10 s)
   → AgentOrchestrationService
-    → ProcessAnswerService (KernelProcess)
-      → ResearchStep  (SemanticSearchPlugin → vector store)
-      → WriteStep     (Bedrock Claude → draft answer + citations)
-      → CriticStep    (Bedrock Claude → approve or request revision)
-      → OutputStep    (final grounded answer)
+    → AgentAnswerWorkflowService (MAF Workflow)
+      → ResearchExecutor (Researcher ChatClientAgent → search_posts tool)
+      → WriteExecutor    (Writer ChatClientAgent → draft answer + citations)
+      → CriticExecutor   (Critic ChatClientAgent → approve or request revision)
+      → OutputExecutor   (final grounded answer)
   → persisted to InMemoryConversationStore
 
 POST /api/agent/ask/stream   (SSE streaming — lower latency, ~1 s to first token)
   → AgentStreamingService
-      → ResearcherAgent  (SemanticSearchPlugin → vector store)
+      → ResearcherAgent  (Researcher ChatClientAgent → search_posts tool → vector store)
       → WriterAgent      (Bedrock Claude → token-by-token prose, no critic loop)
   → persisted to InMemoryConversationStore
 ```
@@ -31,15 +31,14 @@ RagAgent.Core/                      # Provider-agnostic contracts
 ├── IPostService.cs, IAgentAnswerService.cs, IConversationStore.cs
 └── Models/                         # Post, ConversationMessage, AgentAnswerResult, ConversationEvent, AgentSource
 
-RagAgent.Agents/                    # AWS + Qdrant implementations
-├── Agents/
-│   ├── ResearcherAgent.cs          # Runs SemanticSearchPlugin, returns sources
-│   ├── WriterAgent.cs              # Synthesises sources → grounded answer via Bedrock Claude
-│   ├── CriticAgent.cs              # Reviews draft answer, approves or requests revision
-│   └── EvaluationAgent.cs         # Runs question set, computes hit@k / groundedness / citation metrics
-├── Process/                        # SK KernelProcess pipeline
-│   ├── ProcessAnswerService.cs     # IAgentAnswerService backed by KernelProcess
-│   └── Steps/                      # ResearchStep, WriteStep, CriticStep, OutputStep
+RagAgent.Agents/                    # Model agents and orchestration
+├── Workflow/                       # Microsoft Agent Framework workflow
+│   ├── AgentAnswerWorkflowService.cs
+│   └── *Executor.cs                # Research → Write → Critic → Output
+├── ResearcherAgent.cs              # ChatClientAgent with bounded search_posts tool
+├── WriterAgent.cs                  # Synthesises sources → grounded answer via Bedrock Claude
+├── CriticAgent.cs                  # Reviews draft answer, approves or requests revision
+├── EvaluationAgent.cs              # Runs question set and computes evaluation metrics
 ├── EmbeddingService.cs             # Cohere embed-english-v3 via IEmbeddingGenerator (Channel-based streaming)
 ├── SemanticSearchPlugin.cs         # embed query → vector search → enrich snippets
 ├── S3VectorStore.cs, S3VectorService.cs, QdrantVectorStore.cs
@@ -94,16 +93,17 @@ dotnet test RagAgent.IntegrationTests                         # run tests
 ```mermaid
 flowchart LR
   A[POST /agent/ask] --> ORC[AgentOrchestrationService]
-  ORC --> PAS[ProcessAnswerService]
-  PAS --> RS[ResearchStep]
-  RS --> SP[SemanticSearchPlugin]
+  ORC --> PAS[AgentAnswerWorkflowService]
+  PAS --> RS[ResearchExecutor]
+  RS --> RA[Researcher ChatClientAgent]
+  RA --> SP[search_posts AIFunction]
   SP --> BRT[Cohere Embed]
   BRT --> VS[(Vector Store)]
-  PAS --> WS[WriteStep]
+  PAS --> WS[WriteExecutor / Writer ChatClientAgent]
   WS --> BRC[Bedrock Claude]
-  PAS --> CS2[CriticStep]
+  PAS --> CS2[CriticExecutor / Critic ChatClientAgent]
   CS2 --> BRC
-  PAS --> OS[OutputStep]
+  PAS --> OS[OutputExecutor]
   ORC --> CS[InMemoryConversationStore]
 
   SC[GET /search] --> BRT
@@ -116,14 +116,14 @@ flowchart LR
 |---|---|
 | **Chat** | `WriterAgent` and `CriticAgent` — Bedrock Converse through `Microsoft.Extensions.AI.IChatClient` |
 | **Embeddings** | `EmbeddingService` — Cohere embed-english-v3 via `IEmbeddingGenerator`, Channel-based streaming with backpressure |
-| **Research** | `ResearcherAgent` — invokes `SemanticSearchPlugin` to retrieve and enrich sources |
+| **Research** | `ResearcherAgent` — MAF `ChatClientAgent` calls a bounded `search_posts` function; multiple searches are merged and direct search is the no-tool fallback |
 | **Answer synthesis** | `WriterAgent` — Bedrock Claude via `IChatClient`, structured JSON output (answer + citations + grounded flag) |
 | **Critique** | `CriticAgent` — Bedrock Claude via `IChatClient` reviews draft; approves or triggers a revision loop |
 | **Evaluation** | `EvaluationAgent` — runs a question set, scores hit@k, groundedness, and citation validity |
-| **Orchestration** | `ProcessAnswerService` (KernelProcess) → `AgentOrchestrationService` (history load/persist) |
+| **Orchestration** | `AgentAnswerWorkflowService` (MAF Workflow) → `AgentOrchestrationService` (history load/persist); third draft bypasses the critic |
 | **Search/indexing services** | `SemanticSearchPlugin` (retrieval), `PostIndexingService` (indexing) |
 
-Semantic Kernel is retained only for Process orchestration; chat and embedding model access use Microsoft.Extensions.AI. `ResearcherAgent` calls `SemanticSearchPlugin` directly, with model-directed tool calling deferred to the Agent Framework phase. Guardrails run in `GuardrailsService` at the request boundary.
+Chat and embedding model access use Microsoft.Extensions.AI. Researcher, writer and critic are Microsoft Agent Framework `ChatClientAgent`s, and the batch answer pipeline is a typed MAF Workflow. Guardrails run in `GuardrailsService` at the request boundary.
 
 ---
 

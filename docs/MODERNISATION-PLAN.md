@@ -1,6 +1,6 @@
 # Modernisation Plan: .NET 10, Microsoft.Extensions.AI, Agent Framework and Bedrock AgentCore
 
-**Status:** Phases 0 and 1 implementation complete; subsequent phase status is recorded in its section · **Date:** 2026-09-26
+**Status:** Phases 0 and 1 complete; Phases 2 and 3 are implemented locally and awaiting repository-level validation · **Date:** 2026-09-26
 
 ### Authoritative phase status
 
@@ -8,6 +8,8 @@
 |---|---|---|---|
 | 0 — Baseline and safety net | **Complete** | Implementation and local validation merged in PR #7; snapshot tooling, evaluation metrics, characterisation tests and dead-code removal are in place. | Run the five-pass live Bedrock baseline and verify production IAM when AWS access is available. |
 | 1 — Platform refresh: .NET 10 LTS | **Complete** | Implementation and local validation merged in PR #7; .NET 10, central package management, OpenAPI/Scalar and multi-architecture Docker/CI changes are in place. | Verify the deployed ECS service, API/OpenAPI endpoints and remote ECR manifests in the target environment. |
+| 2 — Model access on Microsoft.Extensions.AI | **Implementation complete locally; validation pending** | Writer, critic and embeddings use MEAI; embedding telemetry is enabled. | Run required unit, format and integration validation; the integration suite currently requires Docker. |
+| 3 — Orchestration on Microsoft Agent Framework | **Implementation complete locally; validation pending** | Typed MAF Workflow, three ChatClientAgents, bounded researcher tool, workflow telemetry, and updated implementation guidance are in the worktree. | Run required unit, format and integration validation; the integration suite currently requires Docker. |
 
 **Status convention:** a phase is complete when its planned implementation is merged and its repository-level validation passes. Live AWS evaluation, deployed-service checks and other environment-dependent verification are tracked explicitly as follow-up; they do not change the implementation status above.
 
@@ -32,15 +34,15 @@ The rules in `CLAUDE.md` still apply: **Core stays provider-agnostic**, controll
 | Concern | Today | File(s) |
 |---|---|---|
 | Runtime | .NET 10 with SDK `10.0.400` pinned in `global.json`; target framework and shared compiler settings are centralised; package versions use Central Package Management. The Dockerfile still uses `aspnet:8.0` / `sdk:8.0` and its restore layer copies only four project files. | `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `*/*.csproj`, `RagAgent.Api/Dockerfile` |
-| Chat model | SK `IChatCompletionService` via `AddBedrockChatCompletionService` (alpha) + `AmazonClaudeExecutionSettings` | `RagAgent.Agents/ServiceCollectionExtensions.cs`, `WriterAgent.cs`, `CriticAgent.cs` |
-| Embeddings | Custom MEAI `IEmbeddingGenerator` calling Cohere Embed v3 via `InvokeModel` (1024 dims) | `CohereEmbeddingGenerator.cs`, `EmbeddingService.cs` |
-| Tools | `SemanticSearchPlugin` has `[KernelFunction]`, but `ResearcherAgent` calls it **directly**, not through the kernel. `IndexingPlugin` is only used by tests. | `SemanticSearchPlugin.cs`, `ResearcherAgent.cs`, `IndexingPlugin.cs` |
-| Orchestration | SK Process (alpha): Research → Write → Critic ⟲ Revise. **The 3rd draft skips the critic** (`WriteStep.MaxIterations = 3`). | `Process/ProcessAnswerService.cs`, `Process/Steps/*` |
+| Chat model | MEAI `IChatClient` backed by Bedrock; researcher, writer and critic are MAF `ChatClientAgent`s. | `RagAgent.Agents/ServiceCollectionExtensions.cs`, `ResearcherAgent.cs`, `WriterAgent.cs`, `CriticAgent.cs` |
+| Embeddings | MEAI `IEmbeddingGenerator` calling Cohere Embed v3 via `InvokeModel` (1024 dims), with OpenTelemetry instrumentation. | `CohereEmbeddingGenerator.cs`, `EmbeddingService.cs`, `ServiceCollectionExtensions.cs` |
+| Tools | `search_posts` is an MEAI `AIFunction` offered to the researcher; the existing semantic search service remains the retrieval implementation. | `SemanticSearchPlugin.cs`, `ResearcherAgent.cs` |
+| Orchestration | MAF typed Workflow: Research → Write → Critic ⟲ Revise. The third draft routes directly to output. | `Workflow/AgentAnswerWorkflowService.cs`, `Workflow/*Executor.cs` |
 | Streaming | Separate path: research → prose stream (no citations, no critic). `done.grounded` = `sources.Count > 0`. A guardrail violation is **HTTP 200 + a single `error` frame**. | `RagAgent.Api/Services/AgentStreamingService.cs` |
 | Guardrails that actually run | `GuardrailsService.ValidateQuestion` **before** the user message is stored, which maps to 400 or the SSE `error` frame. `SanitiseAnswer` (strips citations to unknown postIds, truncates) runs after the pipeline. | `GuardrailsService.cs`, `AgentOrchestrationService.cs`, `AgentStreamingService.cs` |
 | Guardrails that are **dead code** | `InputGuardrailFilter` (`IPromptRenderFilter`: no prompt functions are rendered) and `ToolInvocationFilter`/`OutputGuardrailFilter` (`IFunctionInvocationFilter`: the plugin isn't invoked through the kernel). Only the static helpers are used, via `GuardrailsService`. | `Filters/*.cs`, `ToolInvocationFilter.cs` |
 | Conversation state | `InMemoryConversationStore`: per task, **30-minute sliding TTL, 40-message cap**, free-text client-supplied `conversationId` | `RagAgent.InMemory` |
-| Observability | OTel → ADOT sidecar (added by `scripts/deploy-ecs.sh`, not Terraform) → X-Ray. `AddSource("Microsoft.SemanticKernel*")`. | `Program.cs`, `infra/otel-collector-config.yaml` |
+| Observability | OTel → ADOT sidecar (added by `scripts/deploy-ecs.sh`, not Terraform) → X-Ray. MEAI, MAF and application agent sources are subscribed; workflow telemetry excludes sensitive payloads. | `Program.cs`, `AgentAnswerWorkflowService.cs`, `infra/otel-collector-config.yaml` |
 | Evaluation | Hit@k, citation validity, **self-reported** groundedness (the writer grades itself), `AverageLatencyMs` only, live HN data | `EvaluationAgent.cs`, `EvaluationReport.cs` |
 | Hosting | ECS Fargate (x86) behind ALB (default 60 s idle timeout). Terraform. GitHub Actions runs `infrastructure` (terraform apply) and then `deploy` on every push. | `infra/main.tf`, `.github/workflows/ci-cd.yml` |
 | IAM | ECS task role grants `bedrock:InvokeModel` only, which is **not** enough for `ConverseStream` (`bedrock:InvokeModelWithResponseStream`) | `infra/main.tf` |
@@ -182,10 +184,10 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 
 ## Phase 2: Model access on Microsoft.Extensions.AI *(~2–3 days)*
 
-**Goal:** remove `IChatCompletionService`/`Kernel`/`AmazonClaudeExecutionSettings` from the agents, **keeping I1–I10**. SK Process still orchestrates.
+**Goal:** remove `IChatCompletionService`/`Kernel`/`AmazonClaudeExecutionSettings` from the agents, **keeping I1–I10**. Orchestration is subsequently migrated in Phase 3.
 
-1. **Rename Core `ChatMessage` → `ConversationMessage`** as its own commit first. It touches every Core interface and `ConversationEvent`, but it removes the naming clash with MEAI's `ChatMessage`.
-2. Add `AWSSDK.Extensions.Bedrock.MEAI` + `Microsoft.Extensions.AI`, and register one pipeline:
+1. [x] **Rename Core `ChatMessage` → `ConversationMessage`** to remove the naming clash with MEAI's `ChatMessage`.
+2. [x] Add `AWSSDK.Extensions.Bedrock.MEAI` + `Microsoft.Extensions.AI`, and register one pipeline:
    ```csharp
    services.AddAWSService<IAmazonBedrockRuntime>();
    services.AddChatClient(sp => sp.GetRequiredService<IAmazonBedrockRuntime>().AsIChatClient(options.ChatModelId))
@@ -195,49 +197,49 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
    ```
    **No guardrail middleware in this pipeline.** Guardrails stay at the request boundary (see Phase 4). The writer and critic send the sources JSON as user content, and the PII regex matches 8-digit HN post IDs and long floats, so a guardrail on every LLM call would reject every request (breaking I1 and I10).
    Optionally register a keyed `IChatClient` for the critic, e.g. Claude Haiku 4.5, using the inference-profile ID from the Bedrock console.
-3. **WriterAgent / CriticAgent:** switch to `GetResponseAsync`/`GetStreamingResponseAsync` with `ChatOptions.MaxOutputTokens`, and **keep the prompt-plus-`AgentJsonHelpers.ExtractJson` approach unchanged** (I5).
+3. [x] **WriterAgent / CriticAgent:** use MEAI `ChatOptions.MaxOutputTokens` and **keep the prompt-plus-`AgentJsonHelpers.ExtractJson` approach unchanged** (I5). These clients were subsequently wrapped in MAF `ChatClientAgent`s in Phase 3.
    - **Don't set `ChatOptions.ResponseFormat` by default.** The Bedrock MEAI adapter implements it as a forced synthetic tool ([aws-sdk-net#4113](https://github.com/aws/aws-sdk-net/pull/4113)). It throws `ArgumentException` when combined with user tools and `NotSupportedException` on streaming, and either would be a 500.
    - *Optional spike:* try `ResponseFormat` **only** on the non-streaming, tool-free writer and critic calls, behind `Agent__UseSchemaOutput=true`. Add a unit test proving it's never set on the researcher (which has tools) or on any streaming call.
-4. **Embeddings:** keep `CohereEmbeddingGenerator`, since it's already MEAI, and wrap it with `EmbeddingGeneratorBuilder.UseOpenTelemetry()`. *Optional:* spike Cohere Embed v4 at `output_dimension = 1024`. If adopted, deploy it **blue/green**: build a new index, re-embed everything, run the eval, then switch `VectorIndexName`. Never re-index in place, because that mixes v3 and v4 vectors.
-5. **Delete the dead SK filters** (`InputGuardrailFilter`, `OutputGuardrailFilter`, `ToolInvocationFilter`). Move the static check helpers into `RegexGuardrails` (used by `GuardrailsService`). There's no behaviour change, because the filters never ran.
-6. `SemanticSearchPlugin`: remove `[KernelFunction]` and keep `[Description]`.
-7. Tests: add `FakeChatClient : IChatClient` (scripted responses) and switch the real-pipeline integration test from Phase 0 over to it.
-8. IAM: add `bedrock:InvokeModelWithResponseStream` (Converse streaming) if Phase 0 didn't already.
+4. [x] **Embeddings:** keep `CohereEmbeddingGenerator` and wrap it with `EmbeddingGeneratorBuilder.UseOpenTelemetry()`. Cohere Embed v4 remains an optional, separate blue/green migration.
+5. [x] **Delete the dead SK filters** (`InputGuardrailFilter`, `OutputGuardrailFilter`, `ToolInvocationFilter`); static check helpers remain in `RegexGuardrails`/`GuardrailsService`.
+6. [x] `SemanticSearchPlugin`: remove `[KernelFunction]` and keep `[Description]`.
+7. [x] Tests use `FakeChatClient : IChatClient` with scripted responses.
+8. [x] IAM includes `bedrock:InvokeModelWithResponseStream`.
 
-**Done when:** no `Microsoft.SemanticKernel*` usings remain outside `Process/`, the invariant tests pass, and the eval is within the baseline CI.
+**Implementation evidence:** MEAI model and embedding access is in place, including embedding telemetry. The former SK orchestration was removed in Phase 3. Unit, formatting and integration validation for the current worktree must pass before this phase can be marked complete.
 **Rollback:** revert the commit. This phase has no infrastructure or data changes.
 
 ---
 
 ## Phase 3: Orchestration on Microsoft Agent Framework *(~3–5 days)*
 
-**Goal:** replace SK Process with a MAF Workflow and remove SK completely, with the **same topology and the same streaming contract**.
+**Goal:** replace SK Process with a MAF Workflow and remove SK packages completely, with the **same topology and the same streaming contract**.
 
-1. Add `Microsoft.Agents.AI` + `Microsoft.Agents.AI.Workflows` (1.x), pinned via CPM.
+1. [x] Add `Microsoft.Agents.AI` + `Microsoft.Agents.AI.Workflows` (1.x), pinned via CPM.
 2. **Agents:**
-   - **Researcher** is a `ChatClientAgent` with the `search_posts` tool (`AIFunctionFactory.Create`). The model chooses the search query, which removes the SK#9750 workaround. Guard rails for the tool:
+   - [x] **Researcher** is a `ChatClientAgent` with the `search_posts` tool (`AIFunctionFactory.Create`). The model chooses the search query, which removes the SK#9750 workaround. Guard rails for the tool:
      - **I7:** the tool clamps its `topK` argument to the client's normalised `topK`, which is captured in the tool closure. The model can ask for fewer results, never more.
      - **Multiple searches:** merge results by `PostId`, keep the lowest distance, order by distance, and cap at `topK`.
      - **Fallback:** if the model makes no tool call, call search directly with the original question, so there's never an answer without retrieval.
      - **Never set `ResponseFormat`** on the researcher (see Phase 2).
-   - **Writer** and **critic** are `ChatClientAgent`s with instructions only. The deterministic citation check stays in C# before the critic's LLM call.
-   - Keep `IResearcherAgent`/`IWriterAgent`/`ICriticAgent` in Core. The MAF types are implementation details.
+   - [x] **Writer** and **critic** are `ChatClientAgent`s. The deterministic citation check stays in C# before the critic's LLM call.
+   - [x] Keep `IResearcherAgent`/`IWriterAgent`/`ICriticAgent` in Core. The MAF types are implementation details.
 3. **Workflow with the same topology (I4):**
    ```
    Research ─▶ Write(1) ─▶ Critic ─approved─▶ Output
                   ▲           │
                   └─revise────┘   (Write(n) with n = 3 routes directly to Output, skipping the critic)
    ```
-   `WorkflowBuilder` with executors per step. The conditional edge on `CriticResult.Approved` and the iteration counter live in executor state. Run it with `InProcessExecution` and delete `ProcessResultHolder`. The Phase 0 loop tests must pass **unchanged**.
-4. **Streaming: the existing contract stays exactly the same (I3).** `/ask/stream` keeps the research → prose-stream path with no critic. `WriterAgent.StreamAsync` produces prose without citations, so the critic's citation check has nothing to check, and streaming structured drafts isn't supported by the adapter.
+   [x] `WorkflowBuilder` with executors per step. The conditional edge on `CriticResult.Approved` and the iteration counter live in immutable workflow state. Run it with `InProcessExecution` and remove `ProcessResultHolder`. The loop behaviour is covered by workflow unit tests.
+4. [x] **Streaming: the existing contract stays exactly the same (I3).** `/ask/stream` keeps the research → prose-stream path with no critic. `WriterAgent.StreamAsync` produces prose without citations, so the critic's citation check has nothing to check, and streaming structured drafts isn't supported by the adapter.
    - *Optional, opt-in only:* a new route `/api/agent/ask/stream/reviewed` (or `?mode=reviewed`) that runs the full workflow and streams **status events during drafting and critique, then only the approved final answer's tokens**. It adds new event types (`draft`, `critique`) that only exist on that route. The approved final answer is the one persisted, and `done.grounded` there means "critic approved and sources > 0". Existing clients never see new events.
-5. **MAF event names (1.0):** consume `AgentResponseUpdateEvent` / executor events. Keep the MAF event → Core `AgentStreamEvent` mapping in one adapter class with unit tests.
-6. **Conversation state:** keep passing `IConversationStore` history in as messages for each run. Don't adopt `AgentSession` persistence, because the API owns history (see Ownership rule).
-7. Middleware: agent-run middleware for span tags and `rag.*` attributes only. **No guardrails in middleware.**
-8. Remove all `Microsoft.SemanticKernel*` packages and `Process/`. Change the OTel sources to `"Microsoft.Extensions.AI"`, `"Microsoft.Agents.AI*"` and `AgentActivitySource.Name`.
-9. Update `CLAUDE.md`, `RagAgent.Core/CLAUDE.md`, `README.md` and `Best next integrations.md` so they refer to MAF.
+5. **MAF events:** deferred while the existing stream route remains independent of the batch workflow. No MAF event-to-Core stream adapter is needed unless the optional reviewed-stream route is implemented; the current SSE contract remains unchanged.
+6. [x] **Conversation state:** keep passing `IConversationStore` history in as messages for each run. Don't adopt `AgentSession` persistence, because the API owns history (see Ownership rule).
+7. [x] **Telemetry:** subscribe to MEAI, MAF and application agent sources; enable workflow telemetry with sensitive payload capture disabled. **No guardrails in middleware.**
+8. [x] Remove all `Microsoft.SemanticKernel*` packages and `Process/`. Change the OTel sources to `"Microsoft.Extensions.AI"`, `"Microsoft.Agents.AI*"` and `AgentActivitySource.Name`.
+9. [x] Update `CLAUDE.md`, `RagAgent.Core/CLAUDE.md`, `README.md` and `Best next integrations.md` so they refer to MAF.
 
-**Done when:** there are zero SK references, the Phase 0 loop tests and invariant tests pass unchanged, new tests cover the `topK` clamp, source merging and the no-tool-call fallback, and the eval is within the baseline CI.
+**Implementation evidence:** no Semantic Kernel packages or runtime references remain. Workflow tests cover approval, revision, critic-skip on the third draft and `topK` normalisation; researcher tests cover bounded multi-search merging and no-tool-call fallback. Current repository-level validation is pending.
 **Rollback:** revert the commit. There's no infrastructure or data change. Keep the Phase 2 commit as a known-good point.
 
 ---

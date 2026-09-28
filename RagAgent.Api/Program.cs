@@ -54,6 +54,7 @@ public class Program
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddSource("Microsoft.Extensions.AI")
+                    .AddSource("Microsoft.Agents.AI*")
                     .AddSource(AgentActivitySource.Name);
 
                 if (!string.IsNullOrWhiteSpace(otlpEndpoint))
