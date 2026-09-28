@@ -1,27 +1,18 @@
 using FluentAssertions;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel;
-using RagAgent.Agents.Process;
+using RagAgent.Agents.Workflow;
 using RagAgent.Core;
 using RagAgent.Core.Models;
 
 namespace RagAgent.UnitTests;
 
-[CollectionDefinition("SK process tests", DisableParallelization = true)]
-public sealed class ProcessAnswerServiceCollection
-{
-}
-
-[Collection("SK process tests")]
-public sealed class ProcessAnswerServiceTests
+public sealed class AgentAnswerWorkflowServiceTests
 {
     [Fact]
     public async Task AnswerAsync_WhenCriticApprovesFirstDraft_ReportsOneIterationAsync()
     {
-        using var provider = Build([true], out var writer, out var critic);
-        using var scope = provider.CreateScope();
-        var sut = CreateService(scope);
+        var writer = new StubWriter();
+        var critic = new StubCritic([true]);
+        var sut = CreateService(writer, critic);
 
         var result = await sut.AnswerAsync("Question", 5, []);
 
@@ -33,9 +24,9 @@ public sealed class ProcessAnswerServiceTests
     [Fact]
     public async Task AnswerAsync_WhenCriticRequestsOneRevision_ReportsTwoIterationsAsync()
     {
-        using var provider = Build([false, true], out var writer, out var critic);
-        using var scope = provider.CreateScope();
-        var sut = CreateService(scope);
+        var writer = new StubWriter();
+        var critic = new StubCritic([false, true]);
+        var sut = CreateService(writer, critic);
 
         var result = await sut.AnswerAsync("Question", 5, []);
 
@@ -48,9 +39,9 @@ public sealed class ProcessAnswerServiceTests
     [Fact]
     public async Task AnswerAsync_OnThirdRejectedDraft_SkipsCriticAndReturnsThirdDraftAsync()
     {
-        using var provider = Build([false, false, true], out var writer, out var critic);
-        using var scope = provider.CreateScope();
-        var sut = CreateService(scope);
+        var writer = new StubWriter();
+        var critic = new StubCritic([false, false]);
+        var sut = CreateService(writer, critic);
 
         var result = await sut.AnswerAsync("Question", 5, []);
 
@@ -60,33 +51,32 @@ public sealed class ProcessAnswerServiceTests
         critic.CallCount.Should().Be(2);
     }
 
-    private static ServiceProvider Build(
-        IReadOnlyList<bool> verdicts,
-        out StubWriter writer,
-        out StubCritic critic)
+    [Fact]
+    public async Task AnswerAsync_NormalisesTopKBeforeResearchAsync()
     {
-        writer = new StubWriter();
-        critic = new StubCritic(verdicts);
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddSingleton<IResearcherAgent, StubResearcher>();
-        services.AddSingleton<IWriterAgent>(writer);
-        services.AddSingleton<ICriticAgent>(critic);
-        services.AddTransient(serviceProvider => new Kernel(serviceProvider));
-        services.AddScoped<ProcessResultHolder>();
+        var researcher = new StubResearcher();
+        var sut = CreateService(new StubWriter(), new StubCritic([true]), researcher);
 
-        return services.BuildServiceProvider();
+        await sut.AnswerAsync("Question", 100, []);
+
+        researcher.TopK.Should().Be(TopKNormaliser.Max);
     }
 
-    private static ProcessAnswerService CreateService(IServiceScope scope) =>
-        new(
-            scope.ServiceProvider.GetRequiredService<Kernel>(),
-            scope.ServiceProvider.GetRequiredService<ProcessResultHolder>());
+    private static AgentAnswerWorkflowService CreateService(
+        StubWriter writer,
+        StubCritic critic,
+        StubResearcher? researcher = null) =>
+        new(researcher ?? new StubResearcher(), writer, critic);
 
     private sealed class StubResearcher : IResearcherAgent
     {
-        public Task<ResearchResult> ResearchAsync(string question, int topK) =>
-            Task.FromResult(new ResearchResult());
+        public int TopK { get; private set; }
+
+        public Task<ResearchResult> ResearchAsync(string question, int topK)
+        {
+            TopK = topK;
+            return Task.FromResult(new ResearchResult());
+        }
     }
 
     private sealed class StubWriter : IWriterAgent

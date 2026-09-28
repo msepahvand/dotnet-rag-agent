@@ -10,10 +10,10 @@ This project is the provider-agnostic heart of the solution. Everything here mus
 
 ## What belongs here
 - Interfaces (`IEmbeddingService`, `IVectorService`, `IConversationStore`, `IPostService`, `IAgentAnswerService`)
-- Shared models (`Post`, `ChatMessage`, `AgentAnswerResult`, `ConversationEvent`, etc.)
+- Shared models (`Post`, `ConversationMessage`, `AgentAnswerResult`, `ConversationEvent`, etc.)
 - Provider-agnostic utilities
 
 ## What does NOT belong here
-- Any `using` for AWS SDK, Redis, Qdrant, or Semantic Kernel infrastructure
+- Any `using` for AWS SDK, Redis, Qdrant, Semantic Kernel, or Agent Framework infrastructure
 - Concrete service implementations
 - HTTP or ASP.NET types

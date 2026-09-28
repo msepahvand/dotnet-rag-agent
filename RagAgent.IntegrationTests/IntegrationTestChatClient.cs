@@ -4,9 +4,9 @@ using Microsoft.Extensions.AI;
 
 namespace RagAgent.IntegrationTests;
 
-internal sealed class IntegrationTestChatClient(IEnumerable<string> responses) : IChatClient
+internal sealed class IntegrationTestChatClient(IEnumerable<ChatResponse> responses) : IChatClient
 {
-    private readonly ConcurrentQueue<string> _responses = new(responses);
+    private readonly ConcurrentQueue<ChatResponse> _responses = new(responses);
 
     public ChatClientMetadata Metadata { get; } = new("IntegrationTestChatClient");
 
@@ -21,7 +21,7 @@ internal sealed class IntegrationTestChatClient(IEnumerable<string> responses) :
             throw new InvalidOperationException("No scripted chat response remains for this integration test.");
         }
 
-        return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, response)));
+        return Task.FromResult(response);
     }
 
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
