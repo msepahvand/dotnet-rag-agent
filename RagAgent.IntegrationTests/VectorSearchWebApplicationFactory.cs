@@ -107,6 +107,7 @@ public class VectorSearchWebApplicationFactory : WebApplicationFactory<Program>,
                                 ["topK"] = 5,
                             }),
                     ])),
+                    new ChatResponse(new ChatMessage(ChatRole.Assistant, "Research complete.")),
                     new ChatResponse(new ChatMessage(
                         ChatRole.Assistant,
                         """{"answer":"Post 1 is about a test story.","citations":[{"postId":1,"quote":"This is deterministic content for post 1"}],"grounded":true}""")),
