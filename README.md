@@ -7,7 +7,7 @@ See the [documentation index](docs/README.md) for project guidance and modernisa
 Retrieval-augmented generation (RAG) API using Microsoft.Extensions.AI for Bedrock chat and embeddings, Microsoft Agent Framework for model-directed retrieval and workflow orchestration, and pluggable vector store backends. Built on ASP.NET Core 10.0.
 
 ```
-POST /api/agent/ask          (batch — higher quality, ~10 s)
+POST /api/agent/ask          (batch — reviewed answer, ~10 s)
   → AgentOrchestrationService
     → AgentAnswerWorkflowService (MAF Workflow)
       → ResearchExecutor (Researcher ChatClientAgent → search_posts tool)
@@ -41,16 +41,17 @@ RagAgent.Agents/                    # Model agents and orchestration
 ├── EvaluationAgent.cs              # Runs question set and computes evaluation metrics
 ├── EmbeddingService.cs             # Cohere embed-english-v3 via IEmbeddingGenerator (Channel-based streaming)
 ├── SemanticSearchPlugin.cs         # embed query → vector search → enrich snippets
-├── S3VectorStore.cs, S3VectorService.cs, QdrantVectorStore.cs
 ├── HackerNewsService.cs
 └── VectorSearchOptionsValidator.cs
 
+RagAgent.InMemory/                  # In-memory conversation store (30-minute TTL, 40-message cap)
 RagAgent.Redis/                     # RedisVectorStore.cs
+RagAgent.Qdrant/                    # QdrantVectorStore.cs
+RagAgent.S3Vectors/                 # S3VectorStore.cs and S3VectorService.cs
 RagAgent.Api/                       # Controllers + thin services
 ├── Controllers/                    # Agent, Conversations, Evaluation, Index, Posts, Search
 ├── Services/
 │   ├── AgentOrchestrationService.cs    # Loads history, calls IAgentAnswerService, persists messages
-│   ├── InMemoryConversationStore.cs    # Singleton; exposes Subscribe() → IAsyncEnumerable<ConversationEvent>
 │   ├── IngestionBackgroundService.cs   # Polls HackerNews, indexes new posts automatically
 │   ├── IngestionTracker.cs             # Tracks which post IDs have been indexed this process lifetime
 │   ├── IndexingStartupService.cs       # Seeds IngestionTracker on startup
@@ -65,19 +66,20 @@ RagAgent.IntegrationTests/          # Integration tests (end-to-end API via Test
 
 ## Quick Start
 
-**Prerequisites**: .NET 10 SDK (version pinned in `global.json`), Docker Desktop, AWS account (S3 Vectors only)
+**Prerequisites**: .NET 10 SDK (version pinned in `global.json`), Docker for local vector stores and integration tests, and AWS credentials with Bedrock model access for chat and embeddings. S3 Vectors permissions are also required when using that provider.
 
 ```powershell
 docker-compose up          # starts Redis, Qdrant, and API
 ```
 
 ```powershell
-curl http://localhost:5000/api/posts                          # fetch posts
-curl -X POST http://localhost:5000/api/index/all              # index all posts
-curl "http://localhost:5000/api/search?query=test&topK=5"     # semantic search
-curl -X POST http://localhost:5000/api/agent/ask \
-  -H "Content-Type: application/json" \
-  -d '{"question":"What are the top posts about?","topK":5}'  # RAG agent ask
+Invoke-RestMethod http://localhost:5000/api/posts
+Invoke-RestMethod -Method Post http://localhost:5000/api/index/all
+Invoke-RestMethod "http://localhost:5000/api/search?query=test&topK=5"
+Invoke-RestMethod -Method Post `
+  -Uri http://localhost:5000/api/agent/ask `
+  -ContentType "application/json" `
+  -Body '{"question":"What are the top posts about?","topK":5}'
 ```
 
 ```powershell
@@ -114,13 +116,13 @@ flowchart LR
 
 | Capability | Implementation |
 |---|---|
-| **Chat** | `WriterAgent` and `CriticAgent` — Bedrock Converse through `Microsoft.Extensions.AI.IChatClient` |
+| **Chat** | Researcher, writer and critic use MAF `ChatClientAgent` over Bedrock Converse via MEAI `IChatClient` |
 | **Embeddings** | `EmbeddingService` — Cohere embed-english-v3 via `IEmbeddingGenerator`, Channel-based streaming with backpressure |
 | **Research** | `ResearcherAgent` — MAF `ChatClientAgent` calls a bounded `search_posts` function; multiple searches are merged and direct search is the no-tool fallback |
-| **Answer synthesis** | `WriterAgent` — Bedrock Claude via `IChatClient`, structured JSON output (answer + citations + grounded flag) |
-| **Critique** | `CriticAgent` — Bedrock Claude via `IChatClient` reviews draft; approves or triggers a revision loop |
-| **Evaluation** | `EvaluationAgent` — runs a question set, scores hit@k, groundedness, and citation validity |
-| **Orchestration** | `AgentAnswerWorkflowService` (MAF Workflow) → `AgentOrchestrationService` (history load/persist); third draft bypasses the critic |
+| **Answer synthesis** | `WriterAgent` — MAF `ChatClientAgent` over MEAI, structured JSON output (answer + citations + grounded flag) |
+| **Critique** | `CriticAgent` — MAF `ChatClientAgent` reviews each draft; approves or requests a revision |
+| **Evaluation** | `EvaluationAgent` — scores hit@k, citation validity, latency and writer-reported groundedness; optional independent groundedness/relevance judges |
+| **Orchestration** | `AgentOrchestrationService` loads/persists history around `AgentAnswerWorkflowService` (MAF Workflow); third draft bypasses the critic |
 | **Search/indexing services** | `SemanticSearchPlugin` (retrieval), `PostIndexingService` (indexing) |
 
 Chat and embedding model access use Microsoft.Extensions.AI. Researcher, writer and critic are Microsoft Agent Framework `ChatClientAgent`s, and the batch answer pipeline is a typed MAF Workflow. Guardrails run in `GuardrailsService` at the request boundary.
@@ -189,7 +191,7 @@ Or via env vars: `$env:VectorStore__Provider="Qdrant"`, etc.
 | POST | `/api/index/all` | Index all posts with embeddings |
 | POST | `/api/index/{id}` | Index a single post |
 | GET | `/api/search?query=<text>&topK=<n>` | Semantic search (default topK=10) |
-| POST | `/api/agent/ask` | RAG agent ask — full Researcher → Critic → Writer pipeline, structured JSON response with citations |
+| POST | `/api/agent/ask` | RAG agent ask — Research → Write → Critic/revise workflow, structured response with citations |
 | POST | `/api/agent/ask/stream` | Streaming RAG ask — Server-Sent Events (SSE); skips critic loop for lower latency. Event types: `status`, `sources`, `token`, `done`, `error` |
 | POST | `/api/agent/evaluate` | Run evaluation question set, returns hit@k / groundedness / citation metrics |
 | GET | `/api/agent/conversations` | List all conversation IDs |
@@ -205,7 +207,7 @@ Post titles and bodies are embedded as overlapping chunks of up to 2,048 charact
 | | `POST /ask` | `POST /ask/stream` |
 |---|---|---|
 | **Latency** | ~10 s total | ~1 s to first token |
-| **LLM calls** | 2–3 (writer + critic + optional rewrite) | 1 (writer only) |
+| **Model work** | Research tool selection + writer + critic (and optional rewrite) | Research tool selection + streaming writer; no critic |
 | **Output format** | JSON with citations and grounded flag | SSE token stream, sources in `done` event |
 | **Use when** | Citation quality matters | Chat UI, real-time feedback |
 
@@ -224,26 +226,23 @@ docker run -p 8080:8080 rag-agent-api
 
 ### CI/CD (GitHub Actions)
 
-`.github/workflows/ci-cd.yml` runs on push/PR to `main`/`master`:
+`.github/workflows/ci-cd.yml` runs build, format verification and unit/integration tests on pull requests and pushes to `main`/`master`. Infrastructure and deployment run only on pushes to those branches when the commit includes non-Markdown changes:
 
 1. **Build & Test** — builds solution, runs all tests
-2. **Infrastructure** — Terraform apply (`infra/`) → S3 Vectors, ECR, App Runner
-3. **Deploy** — Docker build → ECR push → App Runner update
+2. **Deploy infrastructure** — Terraform apply (`infra/`) provisions ECS, ECR, ALB and S3 Vectors
+3. **Deploy to ECS** — builds and pushes an `amd64`/`arm64` image, then updates the ECS service
 
-Auth: **OIDC role assumption** (no static keys). Images tagged `<sha>-<run>-<attempt>`.
+Auth: **OIDC role assumption** (no static keys). Images are tagged `<sha>-<run>-<attempt>`.
 
-**Required secrets**:
+**GitHub Actions secrets**:
 
 | Secret | Required | Notes |
 |--------|----------|-------|
-| `AWS_INFRA_ROLE_ARN` | Yes | OIDC role for Terraform + deploy |
-| `AWS_ACCOUNT_ID` | Yes | For ECR URI |
+| `AWS_INFRA_ROLE_ARN` | Yes | OIDC role assumed by infrastructure and deployment jobs |
 | `AWS_REGION` | No | Defaults to `us-east-1` |
 | `ECR_REPOSITORY` | No | Defaults to `dotnet-rag-agent` |
-| `APP_RUNNER_SERVICE_NAME` | No | Defaults to `dotnet-rag-agent` |
-| `APP_RUNNER_SERVICE_ARN` | No | Auto-resolved from name |
-| `APP_RUNNER_ECR_ACCESS_ROLE_ARN` | New service only | ECR pull role |
-| `APP_RUNNER_INSTANCE_ROLE_ARN` | New service only | Bedrock/S3 Vectors access |
+| `ECS_CLUSTER_NAME` | No | Defaults to `dotnet-rag-agent` |
+| `ECS_SERVICE_NAME` | No | Defaults to `dotnet-rag-agent` |
 
 ### Destroy
 
@@ -327,4 +326,4 @@ The ADOT collector config lives in [infra/otel-collector-config.yaml](infra/otel
 
 ## Resources
 
-- [Semantic Kernel](https://learn.microsoft.com/en-us/semantic-kernel/) · [AWS S3 Vectors](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-vectors.html) · [Amazon Bedrock](https://docs.aws.amazon.com/bedrock/) · [Redis Vector Search](https://redis.io/docs/interact/search-and-query/advanced-concepts/vectors/) · [Qdrant](https://qdrant.tech/documentation/) · [Testcontainers .NET](https://dotnet.testcontainers.org/)
+- [Microsoft.Extensions.AI](https://learn.microsoft.com/en-us/dotnet/ai/microsoft-extensions-ai) · [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/overview/) · [AWS S3 Vectors](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-vectors.html) · [Amazon Bedrock](https://docs.aws.amazon.com/bedrock/) · [Redis Vector Search](https://redis.io/docs/interact/search-and-query/advanced-concepts/vectors/) · [Qdrant](https://qdrant.tech/documentation/) · [Testcontainers .NET](https://dotnet.testcontainers.org/)

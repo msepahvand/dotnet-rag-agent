@@ -2,6 +2,8 @@
 
 A progressive roadmap for building agentic AI skills using this repository as a working lab. The current application architecture uses Microsoft.Extensions.AI and Microsoft Agent Framework; historical Semantic Kernel exercises below describe earlier implementation steps, not current runtime dependencies.
 
+> **Current-code note:** completed entries preserve the learning history, not a guarantee that the named classes, APIs, or integrations still exist. Some early Semantic Kernel implementations were intentionally replaced during modernisation. For the maintained architecture and live API/deployment guidance, use the [README](README.md) and [documentation index](docs/README.md).
+
 ## What you've already built
 
 - Single-tool-calling researcher (question → semantic search → grounded answer)
@@ -77,18 +79,18 @@ This is a strong foundation. Everything below builds directly on it.
 - ~~**Researcher agent**: has access to `SemanticSearchPlugin`. Retrieves and ranks sources.~~
 - ~~**Writer agent**: receives sources from researcher. Produces the final grounded answer.~~
 - ~~Orchestrate with SK's `AgentGroupChat` or a simple sequential handoff in code~~
-- **Done**: `ResearcherAgent` → `WriterAgent` sequential handoff in `MultiAgentAnswerService`. Plugins called directly due to Bedrock caveat below.
+- **Current implementation**: `ResearcherAgent` retrieves through the `search_posts` tool and hands merged sources to `WriterAgent`; the batch flow is orchestrated by `AgentAnswerWorkflowService`.
 
-> ⚠️ **Bedrock caveat:** The SK Bedrock connector does not support `FunctionChoiceBehavior` for Claude models (microsoft/semantic-kernel#9750 — closed but not fixed in SK directly; maintainers deferred to the AWS SDK's `IChatClient`). Do **not** rely on `FunctionChoiceBehavior.Auto/Required` to dispatch tools at runtime — it silently does nothing and the agent returns a plain-text response with empty sources. Call plugins directly in code, inject results into chat history, then invoke the LLM for synthesis.
+> **Historical Bedrock caveat — resolved by the migration:** the old SK Bedrock connector did not support `FunctionChoiceBehavior` for Claude models (microsoft/semantic-kernel#9750). The current researcher uses a MAF `ChatClientAgent` with MEAI `AIFunction` function invocation and a direct-search fallback; the old SK advice to call plugins directly is not the current implementation.
 
 ### ~~3.2 Agent with a Critic / Self-Reflection~~ ✅
 
 ~~Add a review loop where a second agent scores the first agent's output.~~
 
 - ~~Critic agent checks: Are citations real? Is the answer grounded? Is it relevant?~~
-- ~~If the critic rejects, loop back to the researcher with feedback~~
+- ~~If the critic rejects, pass its feedback to the writer for a revision~~
 - ~~Cap at 2-3 iterations to avoid runaway loops~~
-- **Done**: `CriticAgent` evaluates citation validity deterministically (postId existence check) then uses the LLM for relevance and groundedness. `MultiAgentAnswerService` runs up to 3 writer passes, passing critic feedback into each retry. `AgentAnswerResult.Iterations` (and `AskResponseDto.Iterations`) exposes how many passes were needed.
+- **Current implementation**: `CriticAgent` checks citation validity deterministically, then uses the LLM for relevance and groundedness. The MAF workflow runs up to three writer passes and passes critic feedback into revisions; `AgentAnswerResult.Iterations` exposes the pass count.
 
 ### ~~3.3 Microsoft Agent Framework Workflows~~ ✅
 
@@ -176,6 +178,6 @@ This is a strong foundation. Everything below builds directly on it.
 | 9 | Guardrails (5.1) | Existing filters |
 | 10 | Observability (5.2) | All phases |
 | 11 | Streaming (5.3) | All phases |
-| 12 | Process framework (3.3) | Phase 3 |
+| 12 | Microsoft Agent Framework workflow (3.3) | Phase 3 |
 
 Start at the top, ship each one, then move on. Every item is implementable in this repo.

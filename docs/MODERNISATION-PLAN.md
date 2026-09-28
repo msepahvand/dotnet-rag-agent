@@ -1,6 +1,6 @@
 # Modernisation Plan: .NET 10, Microsoft.Extensions.AI, Agent Framework and Bedrock AgentCore
 
-**Status:** Phases 0 and 1 complete; Phases 2 and 3 are implemented locally and awaiting repository-level validation · **Date:** 2026-09-26
+**Status:** Phases 0–3 complete; Phases 4–10 remain planned · **Date:** 2026-09-28
 
 ### Authoritative phase status
 
@@ -8,45 +8,44 @@
 |---|---|---|---|
 | 0 — Baseline and safety net | **Complete** | Implementation and local validation merged in PR #7; snapshot tooling, evaluation metrics, characterisation tests and dead-code removal are in place. | Run the five-pass live Bedrock baseline and verify production IAM when AWS access is available. |
 | 1 — Platform refresh: .NET 10 LTS | **Complete** | Implementation and local validation merged in PR #7; .NET 10, central package management, OpenAPI/Scalar and multi-architecture Docker/CI changes are in place. | Verify the deployed ECS service, API/OpenAPI endpoints and remote ECR manifests in the target environment. |
-| 2 — Model access on Microsoft.Extensions.AI | **Implementation complete locally; validation pending** | Writer, critic and embeddings use MEAI; embedding telemetry is enabled. | Run required unit, format and integration validation; the integration suite currently requires Docker. |
-| 3 — Orchestration on Microsoft Agent Framework | **Implementation complete locally; validation pending** | Typed MAF Workflow, three ChatClientAgents, bounded researcher tool, workflow telemetry, and updated implementation guidance are in the worktree. | Run required unit, format and integration validation; the integration suite currently requires Docker. |
+| 2 — Model access on Microsoft.Extensions.AI | **Complete** | MEAI chat and embedding access, with embedding telemetry, merged and validated in PR #24. | No phase-specific operational follow-up. |
+| 3 — Orchestration on Microsoft Agent Framework | **Complete** | MAF workflow and `ChatClientAgent`s merged in PR #24; CI Build & Test passed, including format verification, unit tests and container-backed integration tests. | Existing `/ask/stream` intentionally remains a separate research-to-prose path without the critic. |
 
 **Status convention:** a phase is complete when its planned implementation is merged and its repository-level validation passes. Live AWS evaluation, deployed-service checks and other environment-dependent verification are tracked explicitly as follow-up; they do not change the implementation status above.
 
-## Summary
+## Decisions and intended direction
 
-**Can we do it? Yes, for all three.** Each one also removes a workaround we have today:
+MEAI model access and MAF orchestration are implemented. Amazon Bedrock AgentCore remains a future, phased direction rather than part of the current deployment.
 
 | Question | Answer | Why it's worth it here |
 |---|---|---|
-| Replace Semantic Kernel with **Microsoft.Extensions.AI (MEAI)**? | Yes. We already use MEAI for embeddings (`CohereEmbeddingGenerator` implements `IEmbeddingGenerator`). | The SK Bedrock connector is still `-alpha` (`1.72.0-alpha`) and doesn't support tool calling for Claude ([SK#9750](https://github.com/microsoft/semantic-kernel/issues/9750)), which is why `ResearcherAgent` calls the plugin directly. `AWSSDK.Extensions.Bedrock.MEAI` uses the Converse API and supports tool calling. |
-| Replace SK Agents/Process with **Microsoft Agent Framework (MAF)**? | Yes. MAF 1.0 has been GA since 3 April 2026 and replaces SK and AutoGen. Its graph Workflows are stable. | `Microsoft.SemanticKernel.Process.*` is still alpha. MAF Workflows do the same Research → Write → Critic loop and add checkpointing, streaming events and human-in-the-loop. |
-| Use **Amazon Bedrock AgentCore**? | Yes, one piece at a time. Runtime, Memory, Gateway, Identity, Observability, Policy (GA March 2026) and Evaluations (GA March 2026) all work with any framework, and there's a .NET SDK (`AWSSDK.BedrockAgentCore`, `AWSSDK.BedrockAgentCoreControl`) and Terraform support (`aws_bedrockagentcore_*`). | It replaces the in-memory conversation store (not shared across ECS tasks and lost on restart) and the home-grown evaluation, and it gives each agent session its own isolated microVM. |
+| Replace Semantic Kernel with **Microsoft.Extensions.AI (MEAI)**? | **Implemented.** Bedrock chat and Cohere embeddings use MEAI abstractions. | MEAI provides provider-oriented `IChatClient` and `IEmbeddingGenerator` APIs; see Phase 2 for migration rationale. |
+| Replace SK Agents/Process with **Microsoft Agent Framework (MAF)**? | **Implemented.** Researcher, writer and critic use `ChatClientAgent`; batch orchestration uses a typed MAF Workflow. | Research uses MEAI `AIFunction` function invocation; the workflow preserves the bounded critic/revision loop. |
+| Use **Amazon Bedrock AgentCore**? | **Planned, not implemented.** | Later phases describe evaluating managed memory, runtime hosting, gateway/identity, observability and online evaluation. The current API still uses in-process agents and in-memory conversation storage. |
 
-**What we're aiming for:** a thin ECS API that owns the HTTP contract, guardrails and conversation history. It calls a **stateless** MAF Workflow hosted on AgentCore Runtime. Models are reached through MEAI `IChatClient`/`IEmbeddingGenerator` on Bedrock. History lives in AgentCore Memory. Bedrock Guardrails act at the request boundary. Traces go to AgentCore Observability, and quality is measured with M.E.AI.Evaluation and AgentCore Evaluations. S3 Vectors stays as the vector store.
+**Longer-term target:** a thin ECS API that owns the HTTP contract, guardrails and conversation history, calling a stateless MAF Workflow hosted on AgentCore Runtime. Models use MEAI on Bedrock; AgentCore Memory, Guardrails, Observability and Evaluations are options described in later phases, not current runtime dependencies.
 
 The rules in `CLAUDE.md` still apply: **Core stays provider-agnostic**, controllers stay thin, and each phase is committed on its own with all tests passing.
 
 ---
 
-## Current state (what we're migrating from)
+## Current implementation after Phases 0–3
 
-| Concern | Today | File(s) |
+| Concern | Current implementation | File(s) |
 |---|---|---|
-| Runtime | .NET 10 with SDK `10.0.400` pinned in `global.json`; target framework and shared compiler settings are centralised; package versions use Central Package Management. The Dockerfile still uses `aspnet:8.0` / `sdk:8.0` and its restore layer copies only four project files. | `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `*/*.csproj`, `RagAgent.Api/Dockerfile` |
-| Chat model | MEAI `IChatClient` backed by Bedrock; researcher, writer and critic are MAF `ChatClientAgent`s. | `RagAgent.Agents/ServiceCollectionExtensions.cs`, `ResearcherAgent.cs`, `WriterAgent.cs`, `CriticAgent.cs` |
-| Embeddings | MEAI `IEmbeddingGenerator` calling Cohere Embed v3 via `InvokeModel` (1024 dims), with OpenTelemetry instrumentation. | `CohereEmbeddingGenerator.cs`, `EmbeddingService.cs`, `ServiceCollectionExtensions.cs` |
-| Tools | `search_posts` is an MEAI `AIFunction` offered to the researcher; the existing semantic search service remains the retrieval implementation. | `SemanticSearchPlugin.cs`, `ResearcherAgent.cs` |
-| Orchestration | MAF typed Workflow: Research → Write → Critic ⟲ Revise. The third draft routes directly to output. | `Workflow/AgentAnswerWorkflowService.cs`, `Workflow/*Executor.cs` |
-| Streaming | Separate path: research → prose stream (no citations, no critic). `done.grounded` = `sources.Count > 0`. A guardrail violation is **HTTP 200 + a single `error` frame**. | `RagAgent.Api/Services/AgentStreamingService.cs` |
-| Guardrails that actually run | `GuardrailsService.ValidateQuestion` **before** the user message is stored, which maps to 400 or the SSE `error` frame. `SanitiseAnswer` (strips citations to unknown postIds, truncates) runs after the pipeline. | `GuardrailsService.cs`, `AgentOrchestrationService.cs`, `AgentStreamingService.cs` |
-| Guardrails that are **dead code** | `InputGuardrailFilter` (`IPromptRenderFilter`: no prompt functions are rendered) and `ToolInvocationFilter`/`OutputGuardrailFilter` (`IFunctionInvocationFilter`: the plugin isn't invoked through the kernel). Only the static helpers are used, via `GuardrailsService`. | `Filters/*.cs`, `ToolInvocationFilter.cs` |
-| Conversation state | `InMemoryConversationStore`: per task, **30-minute sliding TTL, 40-message cap**, free-text client-supplied `conversationId` | `RagAgent.InMemory` |
-| Observability | OTel → ADOT sidecar (added by `scripts/deploy-ecs.sh`, not Terraform) → X-Ray. MEAI, MAF and application agent sources are subscribed; workflow telemetry excludes sensitive payloads. | `Program.cs`, `AgentAnswerWorkflowService.cs`, `infra/otel-collector-config.yaml` |
-| Evaluation | Hit@k, citation validity, **self-reported** groundedness (the writer grades itself), `AverageLatencyMs` only, live HN data | `EvaluationAgent.cs`, `EvaluationReport.cs` |
-| Hosting | ECS Fargate (x86) behind ALB (default 60 s idle timeout). Terraform. GitHub Actions runs `infrastructure` (terraform apply) and then `deploy` on every push. | `infra/main.tf`, `.github/workflows/ci-cd.yml` |
-| IAM | ECS task role grants `bedrock:InvokeModel` only, which is **not** enough for `ConverseStream` (`bedrock:InvokeModelWithResponseStream`) | `infra/main.tf` |
-| Tests | The integration factory replaces `IAgentAnswerService` and `IAgentStreamingService` with stubs, so **no integration test runs the real agent pipeline**. Unit tests already cover SSE event order, critic parse fallback, citation stripping, writer raw-output fallback and the 40-message cap. | `RagAgent.IntegrationTests/VectorSearchWebApplicationFactory.cs`, `RagAgent.UnitTests/*` |
+| Runtime | .NET 10 with SDK pinned in `global.json`, central package management and multi-architecture .NET 10 container builds. | `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `RagAgent.Api/Dockerfile` |
+| Chat model | Bedrock Converse exposed through MEAI `IChatClient`; researcher, writer and critic are MAF `ChatClientAgent`s. | `RagAgent.Agents/ServiceCollectionExtensions.cs`, `ResearcherAgent.cs`, `WriterAgent.cs`, `CriticAgent.cs` |
+| Embeddings | MEAI `IEmbeddingGenerator` calls Cohere Embed v3 through `InvokeModel` (1024 dimensions), with OpenTelemetry instrumentation. | `CohereEmbeddingGenerator.cs`, `EmbeddingService.cs`, `ServiceCollectionExtensions.cs` |
+| Tools | `search_posts` is an MEAI `AIFunction` offered to the researcher; results are bounded, merged by post ID, and direct search is the no-tool fallback. | `ResearcherAgent.cs`, `SemanticSearchPlugin.cs` |
+| Orchestration | Typed MAF Workflow: Research → Write → Critic → revise; the third draft routes directly to output. | `Workflow/AgentAnswerWorkflowService.cs`, `Workflow/*Executor.cs` |
+| Streaming | Separate research → prose-stream path without critic or structured citations. Guardrail violations yield one SSE `error` event; `done.grounded` reflects whether sources were retrieved. | `RagAgent.Api/Services/AgentStreamingService.cs` |
+| Guardrails | `GuardrailsService` validates questions at the request boundary. Batch answers are sanitised for invalid citations and length; streaming answers are length-limited. No SK filter pipeline remains. | `RagAgent.Agents/GuardrailsService.cs`, `RagAgent.Api/Services/AgentOrchestrationService.cs`, `AgentStreamingService.cs` |
+| Conversation state | `InMemoryConversationStore`: 30-minute sliding TTL, 40-message cap and client-supplied conversation IDs. | `RagAgent.InMemory/InMemoryConversationStore.cs` |
+| Observability | OpenTelemetry subscribes to ASP.NET Core, HTTP client, MEAI, MAF and application agent sources. Agent/workflow/model instrumentation disables sensitive payload capture; ECS ADOT forwards traces to X-Ray. | `RagAgent.Api/Program.cs`, `RagAgent.Agents/Workflow/AgentAnswerWorkflowService.cs`, `infra/otel-collector-config.yaml` |
+| Evaluation | Hit@k, citation validity, writer-reported groundedness, average/P50/P95 latency, and optional independent groundedness/relevance judges. Snapshot-backed evaluation is available. | `RagAgent.Agents/EvaluationAgent.cs`, `RagAgent.Core/Models/EvaluationReport.cs`, `RagAgent.HackerNews/SnapshotPostService.cs` |
+| Hosting | ECS Fargate behind an ALB, provisioned with Terraform. PRs run build, format, unit and integration checks; pushes to `main`/`master` deploy only for non-Markdown changes. | `infra/main.tf`, `.github/workflows/ci-cd.yml` |
+| IAM | ECS task role grants `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream`. | `infra/main.tf` |
+| Tests | Unit tests cover workflow routing and researcher tool behaviour. Integration tests include the real `IAgentAnswerService` with a scripted chat client and Testcontainers vector providers. | `RagAgent.UnitTests/*`, `RagAgent.IntegrationTests/VectorSearchWebApplicationFactory.cs` |
 
 ---
 
@@ -69,7 +68,7 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 
 ---
 
-## Target architecture
+## Long-term target architecture (future phases)
 
 ```
                  ┌─────────────────────────── ECS Fargate (API: owns contract, guardrails, history) ─┐
@@ -144,7 +143,7 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 6. [x] **Remove dead code** (no behaviour change, because none of it runs today):
    - [x] `GroundedAnswer.yaml` is absent.
    - [x] Remove `IndexingPlugin` and its tests; indexing is covered at the service boundary.
-   - [x] No direct Handlebars or SK YAML package references remain. `YamlDotNet` remains transitive through SK Process dependencies and must be revisited when Process is removed.
+   - [x] No direct Handlebars or SK YAML package references remain. Review any remaining transitive YAML dependency against its current parent package before removing it.
 7. [x] **Check the streaming IAM action in Terraform:** `bedrock:InvokeModelWithResponseStream` is present in the task-role policy.
 
 **Completion evidence:** Phase 0 implementation and local validation are complete and merged in PR #7. The local snapshot contains 199 stories and 50 questions, and remains ignored. Unit and integration tests passed.
@@ -203,10 +202,10 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 4. [x] **Embeddings:** keep `CohereEmbeddingGenerator` and wrap it with `EmbeddingGeneratorBuilder.UseOpenTelemetry()`. Cohere Embed v4 remains an optional, separate blue/green migration.
 5. [x] **Delete the dead SK filters** (`InputGuardrailFilter`, `OutputGuardrailFilter`, `ToolInvocationFilter`); static check helpers remain in `RegexGuardrails`/`GuardrailsService`.
 6. [x] `SemanticSearchPlugin`: remove `[KernelFunction]` and keep `[Description]`.
-7. [x] Tests use `FakeChatClient : IChatClient` with scripted responses.
+7. [x] Tests use scripted `IChatClient` fakes with deterministic responses in unit and integration tests.
 8. [x] IAM includes `bedrock:InvokeModelWithResponseStream`.
 
-**Implementation evidence:** MEAI model and embedding access is in place, including embedding telemetry. The former SK orchestration was removed in Phase 3. Unit, formatting and integration validation for the current worktree must pass before this phase can be marked complete.
+**Completion evidence:** Phase 2 is complete and merged with Phase 3 in PR #24. CI's Build & Test job passed, including formatting verification, unit tests and integration tests.
 **Rollback:** revert the commit. This phase has no infrastructure or data changes.
 
 ---
@@ -239,7 +238,7 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 8. [x] Remove all `Microsoft.SemanticKernel*` packages and `Process/`. Change the OTel sources to `"Microsoft.Extensions.AI"`, `"Microsoft.Agents.AI*"` and `AgentActivitySource.Name`.
 9. [x] Update `CLAUDE.md`, `RagAgent.Core/CLAUDE.md`, `README.md` and `Best next integrations.md` so they refer to MAF.
 
-**Implementation evidence:** no Semantic Kernel packages or runtime references remain. Workflow tests cover approval, revision, critic-skip on the third draft and `topK` normalisation; researcher tests cover bounded multi-search merging and no-tool-call fallback. Current repository-level validation is pending.
+**Completion evidence:** Phase 3 is complete and merged in PR #24. No Semantic Kernel packages or runtime references remain. Workflow tests cover approval, revision, critic-skip on the third draft and `topK` normalisation; researcher tests cover bounded multi-search merging and no-tool-call fallback. CI's Build & Test job passed, including formatting verification, unit tests and the real-pipeline integration test with both vector-store providers.
 **Rollback:** revert the commit. There's no infrastructure or data change. Keep the Phase 2 commit as a known-good point.
 
 ---
