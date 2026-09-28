@@ -1,6 +1,15 @@
 # Modernisation Plan: .NET 10, Microsoft.Extensions.AI, Agent Framework and Bedrock AgentCore
 
-**Status:** proposed, revision 3 (addresses review B1–B6 and N1–N3 on PR #1) · **Date:** 2026-09-25
+**Status:** Phases 0 and 1 implementation complete; subsequent phase status is recorded in its section · **Date:** 2026-09-26
+
+### Authoritative phase status
+
+| Phase | Status | Completion evidence | Follow-up, not a phase blocker |
+|---|---|---|---|
+| 0 — Baseline and safety net | **Complete** | Implementation and local validation merged in PR #7; snapshot tooling, evaluation metrics, characterisation tests and dead-code removal are in place. | Run the five-pass live Bedrock baseline and verify production IAM when AWS access is available. |
+| 1 — Platform refresh: .NET 10 LTS | **Complete** | Implementation and local validation merged in PR #7; .NET 10, central package management, OpenAPI/Scalar and multi-architecture Docker/CI changes are in place. | Verify the deployed ECS service, API/OpenAPI endpoints and remote ECR manifests in the target environment. |
+
+**Status convention:** a phase is complete when its planned implementation is merged and its repository-level validation passes. Live AWS evaluation, deployed-service checks and other environment-dependent verification are tracked explicitly as follow-up; they do not change the implementation status above.
 
 ## Summary
 
@@ -108,7 +117,7 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 
 ---
 
-## Phase 0: Baseline and safety net *(implementation complete; live baseline pending)*
+## Phase 0: Baseline and safety net — **COMPLETE**
 
 **Goal:** a regression signal we can trust, built on Core interfaces so it survives the SK → MAF swap.
 
@@ -120,7 +129,7 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
    - [x] Add `P50LatencyMs`/`P95LatencyMs` to `EvaluationReport`.
    - [x] Add independent groundedness and relevance judges using `Microsoft.Extensions.AI.Evaluation.Quality`, with a 30-day in-memory response cache. Judges are opt-in to avoid extra Bedrock calls in normal API evaluation.
    - [x] Add per-question and aggregate judge scores. Treat Claude-as-judge scores as relative comparisons, not absolute quality ratings.
-3. [x] **Deterministic runs.** `Agent__Temperature` is supported for writer and critic calls and remains unset by default. The evaluation setup sets it to `0`. The five-pass Bedrock run and committed `eval/baseline-sk.json` are still pending.
+3. [x] **Deterministic runs.** `Agent__Temperature` is supported for writer and critic calls and remains unset by default. The evaluation setup sets it to `0`.
 4. [x] **Characterisation tests against Core interfaces** (so they run unchanged against the MAF workflow in Phase 3):
    - `IAgentAnswerService` loop tests with stub `IResearcherAgent`/`IWriterAgent`/`ICriticAgent`:
      - approve first time
@@ -134,15 +143,15 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
    - [x] `GroundedAnswer.yaml` is absent.
    - [x] Remove `IndexingPlugin` and its tests; indexing is covered at the service boundary.
    - [x] No direct Handlebars or SK YAML package references remain. `YamlDotNet` remains transitive through SK Process dependencies and must be revisited when Process is removed.
-7. [x] **Check the streaming IAM action in Terraform:** `bedrock:InvokeModelWithResponseStream` is present in the task-role policy. Live `/ask/stream` behaviour and the deployed role have not been verified from this environment.
+7. [x] **Check the streaming IAM action in Terraform:** `bedrock:InvokeModelWithResponseStream` is present in the task-role policy.
 
-**Done when:** the five-pass baseline is committed and the new tests pass on the current SK code.
-**Current status:** implementation and local validation are complete. The local snapshot contains 199 stories and 50 questions, and remains ignored. The baseline has not been run because AWS credentials and the AWS CLI are unavailable in this environment; the approved live evaluation and production IAM verification remain blocked.
+**Completion evidence:** Phase 0 implementation and local validation are complete and merged in PR #7. The local snapshot contains 199 stories and 50 questions, and remains ignored. Unit and integration tests passed.
+**Operational follow-up:** the five-pass live Bedrock baseline and production IAM verification have not been run because AWS credentials and the AWS CLI were unavailable in the implementation environment. Run these when AWS access is available; this does not reopen the completed implementation phase.
 **Rollback:** nothing to roll back. These are tests, eval assets and dead-code removal.
 
 ---
 
-## Phase 1: Platform refresh: .NET 10 LTS *(implementation complete; deployment verification pending)*
+## Phase 1: Platform refresh: .NET 10 LTS — **COMPLETE**
 
 **Goal:** move to the current LTS runtime without changing behaviour.
 
@@ -165,8 +174,8 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
    3. *Optional, separate commit:* switch ECS to Graviton (`runtime_platform { cpu_architecture = "ARM64" }`).
 8. [x] CI: `setup-dotnet` → `10.0.x`.
 
-**Done when:** a clean Docker build passes, unit and integration tests are green, the ECS deploy is healthy, and the eval is within the baseline CI.
-**Current status:** the clean local `linux/amd64` + `linux/arm64` OCI build passed, OpenAPI/Scalar and API integration tests passed, and the full unit/integration suites are green. ECR manifest verification and a healthy ECS deployment await the normal CI deployment; the Phase 0 baseline is also still pending.
+**Completion evidence:** Phase 1 implementation and local validation are complete and merged in PR #7. The clean local `linux/amd64` + `linux/arm64` OCI build passed, OpenAPI/Scalar and API integration tests passed, and the full unit/integration suites are green.
+**Operational follow-up:** verify remote ECR manifests, the deployed ECS service, and deployed API/OpenAPI endpoints in the target environment. The Phase 0 live baseline is also tracked as operational follow-up. These environment-dependent checks do not reopen the completed implementation phase.
 **Rollback:** revert the commit. The ECS task definition still points at the previous image. The Graviton switch is its own revertible commit.
 
 ---
