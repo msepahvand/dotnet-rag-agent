@@ -59,7 +59,7 @@ jobs:
           aws-region: ${{ github.event.inputs.aws_region || 'us-east-1' }}
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "1.5.0"
           terraform_wrapper: false
