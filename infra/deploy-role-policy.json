@@ -5,6 +5,7 @@
       "Sid": "ECR",
       "Effect": "Allow",
       "Action": [
+        "ecr:BatchGetImage",
         "ecr:BatchCheckLayerAvailability",
         "ecr:BatchDeleteImage",
         "ecr:CompleteLayerUpload",

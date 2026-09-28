@@ -3,8 +3,7 @@
 #   1. Create the Terraform remote-state S3 bucket (idempotent).
 #   2. Update the GitHubActionsDeployRole inline policy.
 #
-# This is NOT executed by CI; it exists so all one-time setup is
-# version-controlled and reproducible.
+# CI runs this before Terraform to keep the deploy-role policy in sync.
 #
 # Usage:
 #   cd infra
