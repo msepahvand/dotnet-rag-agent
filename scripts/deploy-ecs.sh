@@ -54,6 +54,19 @@ NEW_TASK_DEF=$(echo "$CURRENT_TASK_DEF" | jq \
     [{name: "OpenTelemetry__OtlpEndpoint", value: "http://localhost:4317"}]
   ) |
 
+  # Keep existing rollout settings; use the safe shadow defaults for first deploys.
+  .containerDefinitions[0].environment = (
+    .containerDefinitions[0].environment +
+    (if ([.containerDefinitions[0].environment[] | select(.name == "Guardrails__Provider")] | length) == 0
+     then [{name: "Guardrails__Provider", value: "Bedrock"}]
+     else []
+     end) +
+    (if ([.containerDefinitions[0].environment[] | select(.name == "Guardrails__Mode")] | length) == 0
+     then [{name: "Guardrails__Mode", value: "Shadow"}]
+     else []
+     end)
+  ) |
+
   # Add the ADOT sidecar only if it is not already present (idempotent).
   if (.containerDefinitions | map(select(.name == "aws-otel-collector")) | length) == 0
   then .containerDefinitions += [$SIDECAR]

@@ -189,6 +189,79 @@ resource "aws_iam_role" "ecs_task" {
   assume_role_policy = data.aws_iam_policy_document.ecs_task_assume.json
 }
 
+resource "aws_bedrock_guardrail" "api_safety" {
+  name                      = "${substr(var.ecs_service_name, 0, 30)}-managed-safety"
+  description               = "Request-boundary safety policies for the RAG API"
+  blocked_input_messaging   = "The question was blocked by safety policies."
+  blocked_outputs_messaging = "The answer did not pass the safety policies."
+
+  content_policy_config {
+    filters_config {
+      type            = "PROMPT_ATTACK"
+      input_strength  = "HIGH"
+      output_strength = "NONE"
+      input_enabled   = true
+      output_enabled  = false
+      input_action    = "BLOCK"
+      output_action   = "NONE"
+    }
+  }
+
+  sensitive_information_policy_config {
+    dynamic "pii_entities_config" {
+      for_each = ["EMAIL", "PHONE", "CREDIT_DEBIT_CARD_NUMBER"]
+
+      content {
+        type           = pii_entities_config.value
+        action         = "BLOCK"
+        input_action   = "BLOCK"
+        output_action  = "ANONYMIZE"
+        input_enabled  = true
+        output_enabled = true
+      }
+    }
+  }
+
+  word_policy_config {
+    dynamic "words_config" {
+      for_each = [
+        "legal advice",
+        "medical diagnosis",
+        "financial advice",
+        "stock tips",
+        "investment advice",
+        "tax advice"
+      ]
+
+      content {
+        text           = words_config.value
+        input_action   = "BLOCK"
+        output_action  = "NONE"
+        input_enabled  = true
+        output_enabled = false
+      }
+    }
+  }
+
+  contextual_grounding_policy_config {
+    filters_config {
+      type      = "GROUNDING"
+      threshold = 0.7
+    }
+
+    filters_config {
+      type      = "RELEVANCE"
+      threshold = 0.7
+    }
+  }
+}
+
+resource "aws_bedrock_guardrail_version" "api_safety" {
+  guardrail_arn = aws_bedrock_guardrail.api_safety.guardrail_arn
+  description   = "Version deployed with the RAG API"
+  skip_destroy  = true
+}
+
 data "aws_iam_policy_document" "ecs_task_runtime" {
   statement {
     sid    = "AllowBedrockInvokeModel"
@@ -201,6 +274,13 @@ data "aws_iam_policy_document" "ecs_task_runtime" {
       "arn:aws:bedrock:*::foundation-model/*",
       "arn:aws:bedrock:${local.effective_aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/*"
     ]
+  }
+
+  statement {
+    sid       = "AllowBedrockApplyGuardrail"
+    effect    = "Allow"
+    actions   = ["bedrock:ApplyGuardrail"]
+    resources = [aws_bedrock_guardrail.api_safety.guardrail_arn]
   }
 
   statement {
@@ -232,6 +312,19 @@ data "aws_iam_policy_document" "ecs_task_runtime" {
       "xray:GetSamplingTargets",
     ]
     resources = ["*"]
+  }
+
+  statement {
+    sid    = "AllowGuardrailMetricExport"
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents"
+    ]
+    resources = [
+      "arn:aws:logs:${local.effective_aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/metrics/rag-agent:*"
+    ]
   }
 }
 
@@ -313,6 +406,25 @@ resource "aws_ecs_task_definition" "api" {
         "awslogs-stream-prefix" = "ecs"
       }
     }
+
+    environment = [
+      {
+        name  = "Guardrails__Provider"
+        value = "Bedrock"
+      },
+      {
+        name  = "Guardrails__Mode"
+        value = "Shadow"
+      },
+      {
+        name  = "Guardrails__Bedrock__GuardrailIdentifier"
+        value = aws_bedrock_guardrail.api_safety.guardrail_id
+      },
+      {
+        name  = "Guardrails__Bedrock__GuardrailVersion"
+        value = aws_bedrock_guardrail_version.api_safety.version
+      }
+    ]
   }])
 
   lifecycle {

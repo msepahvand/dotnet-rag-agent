@@ -26,7 +26,8 @@ public class GuardrailTests
         var act = () => RegexGuardrails.CheckForInjection(input);
 
         act.Should().Throw<GuardrailException>()
-            .WithMessage("*Prompt injection detected*");
+            .WithMessage("*Prompt injection detected*")
+            .Which.Category.Should().Be(GuardrailCategory.Injection);
     }
 
     [Fact]
@@ -46,7 +47,8 @@ public class GuardrailTests
         var act = () => RegexGuardrails.CheckForPii(input);
 
         act.Should().Throw<GuardrailException>()
-            .WithMessage("*email address*");
+            .WithMessage("*email address*")
+            .Which.Category.Should().Be(GuardrailCategory.Pii);
     }
 
     [Theory]
@@ -93,7 +95,8 @@ public class GuardrailTests
         var act = () => RegexGuardrails.CheckTopicScope(input);
 
         act.Should().Throw<GuardrailException>()
-            .WithMessage("*topic scope*");
+            .WithMessage("*topic scope*")
+            .Which.Category.Should().Be(GuardrailCategory.Topic);
     }
 
     [Fact]

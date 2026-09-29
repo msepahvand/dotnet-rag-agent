@@ -137,6 +137,30 @@ public class AgentStreamingServiceTests
         events.Single(e => e.Type == "done").Grounded.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task StreamAsync_StoresAnonymisedOutputWithoutChangingAlreadyStreamedTokensAsync()
+    {
+        var store = new InMemoryConversationStore(new MemoryCache(new MemoryCacheOptions()));
+        var source = new AgentSource { PostId = 1, Title = "T", Snippet = "S", Distance = 0.1f };
+        var guardrails = new AnonymisingGuardrailsService();
+        var sut = new AgentStreamingService(
+            new StubResearcherAgent([source]),
+            new StubWriterAgent(["Contact alice@example.com"]),
+            store,
+            guardrails);
+
+        var events = await sut.StreamAsync(new AgentAskRequest
+        {
+            Question = "How does this work?",
+            ConversationId = "stream-anonymised"
+        }).ToListAsync();
+
+        events.Single(e => e.Type == "token").Content.Should().Be("Contact alice@example.com");
+        var history = await store.GetHistoryAsync("stream-anonymised");
+        history.Last().Content.Should().Be("Contact [EMAIL]");
+        guardrails.CheckedSources.Should().ContainSingle().Which.PostId.Should().Be(1);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
     private static AgentStreamingService BuildSut(
         IEnumerable<string> tokens,
@@ -148,6 +172,23 @@ public class AgentStreamingServiceTests
         var writer = new StubWriterAgent(tokens);
         var store = new InMemoryConversationStore(new MemoryCache(new MemoryCacheOptions()));
         return new AgentStreamingService(researcher, writer, store, guardrailsService ?? new GuardrailsService());
+    }
+
+    private sealed class AnonymisingGuardrailsService : IGuardrailsService
+    {
+        public IReadOnlyList<AgentSource>? CheckedSources { get; private set; }
+
+        public Task ValidateQuestionAsync(string question, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<GuardrailEvaluation> ValidateAnswerAsync(
+            string answer,
+            IReadOnlyList<AgentSource> sources,
+            CancellationToken cancellationToken = default)
+        {
+            CheckedSources = sources;
+            return Task.FromResult(new GuardrailEvaluation { SanitisedOutput = "Contact [EMAIL]" });
+        }
     }
 
     // ── Stubs ─────────────────────────────────────────────────────────────────

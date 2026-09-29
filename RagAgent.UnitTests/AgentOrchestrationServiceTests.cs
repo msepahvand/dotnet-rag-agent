@@ -165,6 +165,59 @@ public class AgentOrchestrationServiceTests
     }
 
     [Fact]
+    public async Task AskAsync_WhenOutputGuardrailIntervenesInEnforceMode_ReturnsAndStoresSafeFallbackAsync()
+    {
+        var store = CreateStore();
+        var guardrails = new OutputGuardrailsService(new GuardrailEvaluation
+        {
+            Intervened = true,
+            Enforced = true
+        });
+        var agent = new StubAgentAnswerService(new AgentAnswerResult
+        {
+            Answer = "Unsafe draft",
+            Grounded = true,
+            Sources = [new AgentSource { PostId = 1, Title = "Source", Snippet = "Evidence", Distance = 0.1f }],
+            Citations = [new Citation { PostId = 1, Quote = "Unsafe claim" }]
+        });
+        var sut = new AgentOrchestrationService(agent, store, guardrails);
+
+        var response = await sut.AskAsync(new AgentAskRequest { Question = "What is this post about?", TopK = 5 });
+
+        response.Answer.Should().Be("I couldn't produce a well-grounded answer from the sources.");
+        response.Grounded.Should().BeFalse();
+        response.Citations.Should().BeEmpty();
+        response.Sources.Should().ContainSingle();
+        (await store.GetHistoryAsync(response.ConversationId))
+            .Last().Content.Should().Be(response.Answer);
+        guardrails.CheckedAnswer.Should().Be("Unsafe draft");
+    }
+
+    [Fact]
+    public async Task AskAsync_WhenShadowGuardrailReturnsSanitisedOutput_LeavesAnswerUnchangedAsync()
+    {
+        var store = CreateStore();
+        var guardrails = new OutputGuardrailsService(new GuardrailEvaluation
+        {
+            Intervened = true,
+            Enforced = false,
+            SanitisedOutput = "Contact [EMAIL]"
+        });
+        var agent = new StubAgentAnswerService(new AgentAnswerResult
+        {
+            Answer = "Contact alice@example.com",
+            Grounded = true
+        });
+        var sut = new AgentOrchestrationService(agent, store, guardrails);
+
+        var response = await sut.AskAsync(new AgentAskRequest { Question = "What is in the post?", TopK = 5 });
+
+        response.Answer.Should().Be("Contact alice@example.com");
+        (await store.GetHistoryAsync(response.ConversationId))
+            .Last().Content.Should().Be("Contact alice@example.com");
+    }
+
+    [Fact]
     public async Task AskAsync_TwoSeparateConversations_DoNotShareHistoryAsync()
     {
         var stub = new StubAgentAnswerService(new AgentAnswerResult { Answer = "ok", Grounded = true });
@@ -185,7 +238,31 @@ public class AgentOrchestrationServiceTests
 
     private sealed class NoopGuardrailsService : IGuardrailsService
     {
-        public void ValidateQuestion(string question) { }
+        public Task ValidateQuestionAsync(string question, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<GuardrailEvaluation> ValidateAnswerAsync(
+            string answer,
+            IReadOnlyList<AgentSource> sources,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new GuardrailEvaluation());
+    }
+
+    private sealed class OutputGuardrailsService(GuardrailEvaluation evaluation) : IGuardrailsService
+    {
+        public string? CheckedAnswer { get; private set; }
+
+        public Task ValidateQuestionAsync(string question, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<GuardrailEvaluation> ValidateAnswerAsync(
+            string answer,
+            IReadOnlyList<AgentSource> sources,
+            CancellationToken cancellationToken = default)
+        {
+            CheckedAnswer = answer;
+            return Task.FromResult(evaluation);
+        }
     }
 
     // ── Stubs ───────────────────────────────────────────────────────────────
