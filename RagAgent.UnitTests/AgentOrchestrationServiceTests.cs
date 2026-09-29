@@ -194,7 +194,7 @@ public class AgentOrchestrationServiceTests
     }
 
     [Fact]
-    public async Task AskAsync_WhenOutputGuardrailReturnsSanitisedOutput_ReturnsAndStoresItAsync()
+    public async Task AskAsync_WhenShadowGuardrailReturnsSanitisedOutput_LeavesAnswerUnchangedAsync()
     {
         var store = CreateStore();
         var guardrails = new OutputGuardrailsService(new GuardrailEvaluation
@@ -212,9 +212,9 @@ public class AgentOrchestrationServiceTests
 
         var response = await sut.AskAsync(new AgentAskRequest { Question = "What is in the post?", TopK = 5 });
 
-        response.Answer.Should().Be("Contact [EMAIL]");
+        response.Answer.Should().Be("Contact alice@example.com");
         (await store.GetHistoryAsync(response.ConversationId))
-            .Last().Content.Should().Be("Contact [EMAIL]");
+            .Last().Content.Should().Be("Contact alice@example.com");
     }
 
     [Fact]
