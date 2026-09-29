@@ -41,6 +41,21 @@
       "Resource": "*"
     },
     {
+      "Sid": "BedrockGuardrails",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:CreateGuardrail",
+        "bedrock:CreateGuardrailVersion",
+        "bedrock:DeleteGuardrail",
+        "bedrock:GetGuardrail",
+        "bedrock:ListTagsForResource",
+        "bedrock:TagResource",
+        "bedrock:UntagResource",
+        "bedrock:UpdateGuardrail"
+      ],
+      "Resource": "arn:aws:bedrock:__AWS_REGION__:__AWS_ACCOUNT_ID__:guardrail/*"
+    },
+    {
       "Sid": "EC2Networking",
       "Effect": "Allow",
       "Action": [
