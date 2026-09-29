@@ -37,6 +37,11 @@ public sealed class AgentOrchestrationService(
             // Output guardrails: sanitise the answer before returning to the caller.
             result = SanitiseAnswer(result);
             var guardrailEvaluation = await guardrailsService.ValidateAnswerAsync(result.Answer, result.Sources);
+            if (guardrailEvaluation.SanitisedOutput is not null)
+            {
+                result = result with { Answer = guardrailEvaluation.SanitisedOutput };
+            }
+
             if (guardrailEvaluation.Enforced && guardrailEvaluation.Intervened)
             {
                 result = result with

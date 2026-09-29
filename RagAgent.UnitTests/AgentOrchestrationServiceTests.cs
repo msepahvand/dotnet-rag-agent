@@ -194,6 +194,30 @@ public class AgentOrchestrationServiceTests
     }
 
     [Fact]
+    public async Task AskAsync_WhenOutputGuardrailReturnsSanitisedOutput_ReturnsAndStoresItAsync()
+    {
+        var store = CreateStore();
+        var guardrails = new OutputGuardrailsService(new GuardrailEvaluation
+        {
+            Intervened = true,
+            Enforced = false,
+            SanitisedOutput = "Contact [EMAIL]"
+        });
+        var agent = new StubAgentAnswerService(new AgentAnswerResult
+        {
+            Answer = "Contact alice@example.com",
+            Grounded = true
+        });
+        var sut = new AgentOrchestrationService(agent, store, guardrails);
+
+        var response = await sut.AskAsync(new AgentAskRequest { Question = "What is in the post?", TopK = 5 });
+
+        response.Answer.Should().Be("Contact [EMAIL]");
+        (await store.GetHistoryAsync(response.ConversationId))
+            .Last().Content.Should().Be("Contact [EMAIL]");
+    }
+
+    [Fact]
     public async Task AskAsync_TwoSeparateConversations_DoNotShareHistoryAsync()
     {
         var stub = new StubAgentAnswerService(new AgentAnswerResult { Answer = "ok", Grounded = true });
