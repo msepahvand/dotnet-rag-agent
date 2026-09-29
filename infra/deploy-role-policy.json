@@ -56,6 +56,12 @@
       "Resource": "arn:aws:bedrock:__AWS_REGION__:__AWS_ACCOUNT_ID__:guardrail/*"
     },
     {
+      "Sid": "BedrockListGuardrails",
+      "Effect": "Allow",
+      "Action": "bedrock:ListGuardrails",
+      "Resource": "*"
+    },
+    {
       "Sid": "EC2Networking",
       "Effect": "Allow",
       "Action": [

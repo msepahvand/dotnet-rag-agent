@@ -84,6 +84,7 @@ jobs:
           ECR_ADDRESS="aws_ecr_repository.api"
           ECS_CLUSTER_ADDRESS="aws_ecs_cluster.api"
           ECS_SERVICE_ADDRESS="aws_ecs_service.api"
+          GUARDRAIL_ADDRESS="aws_bedrock_guardrail.api_safety"
           SG_ALB_ADDRESS="aws_security_group.alb"
           SG_TASKS_ADDRESS="aws_security_group.ecs_tasks"
           ALB_ADDRESS="aws_lb.api"
@@ -108,6 +109,17 @@ jobs:
             fi
           else
             VECTOR_BUCKET_EXISTS="true"
+          fi
+
+          if ! terraform state show "$GUARDRAIL_ADDRESS" >/dev/null 2>&1; then
+            GUARDRAIL_NAME="${ECS_SERVICE_NAME:0:30}-managed-safety"
+            GUARDRAIL_ID=$(aws bedrock list-guardrails \
+              --region "$AWS_REGION" \
+              --query "guardrails[?name=='$GUARDRAIL_NAME'].id | [0]" \
+              --output text)
+            if [ "$GUARDRAIL_ID" != "None" ] && [ -n "$GUARDRAIL_ID" ]; then
+              terraform import "$GUARDRAIL_ADDRESS" "$GUARDRAIL_ID,DRAFT"
+            fi
           fi
 
           if ! terraform state show "$INDEX_ADDRESS" >/dev/null 2>&1; then
