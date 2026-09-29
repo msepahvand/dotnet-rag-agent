@@ -44,7 +44,6 @@ public static class ServiceCollectionExtensions
                 configure: client => client.EnableSensitiveData = false)
             .UseFunctionInvocation();
 
-        services.AddScoped<IGuardrailsService, GuardrailsService>();
         services.AddScoped<IEmbeddingService, EmbeddingService>();
         services.AddScoped<SemanticSearchPlugin>();
 

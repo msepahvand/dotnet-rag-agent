@@ -47,7 +47,8 @@ public static class RegexGuardrails
             if (lower.Contains(phrase))
             {
                 throw new GuardrailException(
-                    $"Prompt injection detected: input contains the disallowed phrase \"{phrase}\".");
+                    $"Prompt injection detected: input contains the disallowed phrase \"{phrase}\".",
+                    GuardrailCategory.Injection);
             }
         }
     }
@@ -57,19 +58,22 @@ public static class RegexGuardrails
         if (EmailPattern.IsMatch(text))
         {
             throw new GuardrailException(
-                "Input contains a detected email address. Please remove personal information before submitting.");
+                "Input contains a detected email address. Please remove personal information before submitting.",
+                GuardrailCategory.Pii);
         }
 
         if (CreditCardPattern.IsMatch(text))
         {
             throw new GuardrailException(
-                "Input appears to contain a credit card number. Please remove personal information before submitting.");
+                "Input appears to contain a credit card number. Please remove personal information before submitting.",
+                GuardrailCategory.Pii);
         }
 
         if (PhonePattern.IsMatch(text))
         {
             throw new GuardrailException(
-                "Input contains a detected phone number. Please remove personal information before submitting.");
+                "Input contains a detected phone number. Please remove personal information before submitting.",
+                GuardrailCategory.Pii);
         }
     }
 
@@ -82,7 +86,8 @@ public static class RegexGuardrails
             {
                 throw new GuardrailException(
                     $"Query is outside the supported topic scope (matched: \"{phrase}\"). " +
-                    "This assistant answers questions about posts and articles only.");
+                    "This assistant answers questions about posts and articles only.",
+                    GuardrailCategory.Topic);
             }
         }
     }

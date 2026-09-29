@@ -17,7 +17,7 @@ public sealed class AgentOrchestrationService(
         try
         {
             // Input guardrails: validate the user question before invoking the agent pipeline.
-            guardrailsService.ValidateQuestion(request.Question);
+            await guardrailsService.ValidateQuestionAsync(request.Question);
 
             var conversationId = string.IsNullOrWhiteSpace(request.ConversationId)
                 ? Guid.NewGuid().ToString()
@@ -36,6 +36,16 @@ public sealed class AgentOrchestrationService(
 
             // Output guardrails: sanitise the answer before returning to the caller.
             result = SanitiseAnswer(result);
+            var guardrailEvaluation = await guardrailsService.ValidateAnswerAsync(result.Answer, result.Sources);
+            if (guardrailEvaluation.Enforced && guardrailEvaluation.Intervened)
+            {
+                result = result with
+                {
+                    Answer = "I couldn't produce a well-grounded answer from the sources.",
+                    Grounded = false,
+                    Citations = []
+                };
+            }
 
             activity?.SetTag("rag.grounded", result.Grounded);
             activity?.SetTag("rag.iterations", result.Iterations);

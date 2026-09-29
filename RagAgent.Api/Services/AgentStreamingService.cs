@@ -24,7 +24,7 @@ public sealed class AgentStreamingService(
         using var activity = AgentActivitySource.Source.StartActivity("agent.stream");
 
         // Input guardrails — store any violation outside try/catch so we can yield after.
-        var guardrailViolation = CaptureGuardrailViolation(request.Question);
+        var guardrailViolation = await CaptureGuardrailViolationAsync(request.Question, ct);
         if (guardrailViolation is not null)
         {
             activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, guardrailViolation);
@@ -72,7 +72,9 @@ public sealed class AgentStreamingService(
             answer = answer[..AgentPipelineConstants.MaxAnswerLength] + " … [response truncated]";
         }
 
-        await conversationStore.AppendAsync(conversationId, new ConversationMessage("assistant", answer));
+        var outputEvaluation = await guardrailsService.ValidateAnswerAsync(answer, research.Sources, ct);
+        var persistedAnswer = outputEvaluation.SanitisedOutput ?? answer;
+        await conversationStore.AppendAsync(conversationId, new ConversationMessage("assistant", persistedAnswer));
 
         activity?.SetTag("rag.grounded", research.Sources.Count > 0);
 
@@ -88,11 +90,11 @@ public sealed class AgentStreamingService(
     /// Runs input guardrail checks and returns the violation reason, or null if clean.
     /// Cannot throw inside an async iterator, so we capture the result here instead.
     /// </summary>
-    private string? CaptureGuardrailViolation(string question)
+    private async Task<string?> CaptureGuardrailViolationAsync(string question, CancellationToken cancellationToken)
     {
         try
         {
-            guardrailsService.ValidateQuestion(question);
+            await guardrailsService.ValidateQuestionAsync(question, cancellationToken);
             return null;
         }
         catch (GuardrailException ex)

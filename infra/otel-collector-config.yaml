@@ -1,7 +1,7 @@
 # ADOT Collector configuration for the ECS sidecar.
-# Receives OTLP traces from the API container (localhost:4317/4318) and
-# exports them to AWS X-Ray. The collector inherits the AWS region from the
-# ECS task's IAM role — no region field needed in the exporter.
+# Receives OTLP traces and metrics from the API container (localhost:4317/4318).
+# Traces go to X-Ray; metrics use CloudWatch Embedded Metric Format. The
+# collector inherits the AWS region from the ECS task's IAM role.
 receivers:
   otlp:
     protocols:
@@ -15,6 +15,10 @@ processors:
 
 exporters:
   awsxray:
+  awsemf:
+    namespace: RagAgent
+    log_group_name: /aws/metrics/rag-agent
+    log_stream_name: ecs
 
 service:
   pipelines:
@@ -22,3 +26,7 @@ service:
       receivers: [otlp]
       processors: [batch]
       exporters: [awsxray]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [awsemf]

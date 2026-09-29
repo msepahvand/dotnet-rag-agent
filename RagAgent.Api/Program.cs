@@ -1,5 +1,6 @@
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
@@ -24,6 +25,7 @@ public class Program
         builder.Services.AddValidatorsFromAssemblyContaining<Program>();
         builder.Services.AddHackerNewsDataSource(builder.Configuration);
         builder.Services.AddVectorSearch(builder.Configuration);
+        builder.Services.AddGuardrails(builder.Configuration);
         builder.Services.AddVectorStoreProvider(builder.Configuration);
         builder.Services.AddScoped<IPostIndexingService, PostIndexingService>();
         builder.Services.AddScoped<ISemanticSearchService, SemanticSearchService>();
@@ -60,6 +62,16 @@ public class Program
                 if (!string.IsNullOrWhiteSpace(otlpEndpoint))
                 {
                     tracing.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
+                }
+            });
+
+        builder.Services.AddOpenTelemetry()
+            .WithMetrics(metrics =>
+            {
+                metrics.AddMeter(BedrockGuardrailsService.MeterName);
+                if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+                {
+                    metrics.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
                 }
             });
 
