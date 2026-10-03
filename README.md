@@ -181,7 +181,7 @@ Switch providers via `appsettings.json` or environment variables:
 
 Or via env vars: `$env:VectorStore__Provider="Qdrant"`, etc.
 
-Conversation history uses the in-memory store by default. Production can opt into AgentCore Memory with `ConversationStore__Provider=AgentCore` and `ConversationStore__AgentCore__MemoryId=<memory-id>`; Terraform provisions the resource and configures the ECS task. Keep `Conversations__ListEnabled=false` until conversation listing is scoped to authenticated users.
+Conversation history uses the in-memory store by default. Production can opt into AgentCore Memory with `ConversationStore__Provider=AgentCore` and `ConversationStore__AgentCore__MemoryId=<memory-id>`; Terraform provisions the resource and configures the ECS task. AgentCore conversations retain the existing 30-minute logical expiry and 40-message cap; a 15-minute background sweep deletes expired events even when the unauthenticated listing endpoint is disabled. Keep `Conversations__ListEnabled=false` until conversation listing is scoped to authenticated users.
 
 ---
 

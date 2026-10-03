@@ -56,6 +56,20 @@ public class AgentCoreMemoryConversationStoreTests
     }
 
     [Fact]
+    public async Task AppendAsync_WhenManyRequestsRunConcurrently_EnforcesFortyMessageStorageCapAsync()
+    {
+        var client = new FakeAgentCoreMemoryClient();
+        var sut = CreateStore(client);
+
+        await Task.WhenAll(Enumerable.Range(0, 60)
+            .Select(index => sut.AppendAsync("concurrent-conversation", new ConversationMessage("user", $"message-{index}"))));
+
+        client.Events.Count(evt => evt.Payload?.Any(payload => payload.Conversational is not null) == true)
+            .Should().Be(40);
+        (await sut.GetHistoryAsync("concurrent-conversation")).Should().HaveCount(40);
+    }
+
+    [Fact]
     public async Task GetHistoryAsync_RenewsSlidingExpirationWithoutStoringActivityAsMessagesAsync()
     {
         var client = new FakeAgentCoreMemoryClient();
@@ -140,6 +154,10 @@ public class AgentCoreMemoryConversationStoreTests
 
         conversationIds.Should().Equal("recent #1");
         client.LastListSessionsRequest!.MaxResults.Should().Be(100);
+        client.Events.Where(evt => evt.SessionId == AgentCoreMemoryConversationStore.GetSessionId("stale"))
+            .Should()
+            .BeEmpty();
+        client.DeleteRequests.Should().ContainSingle();
     }
 
     [Fact]

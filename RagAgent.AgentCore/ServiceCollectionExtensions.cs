@@ -23,6 +23,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(new AgentCoreMemoryOptions(memoryId));
         services.AddScoped<IAgentCoreMemoryClient, AgentCoreMemoryClient>();
         services.AddScoped<IConversationStore, AgentCoreMemoryConversationStore>();
+        services.AddHostedService<AgentCoreMemoryCleanupService>();
         return services;
     }
 }

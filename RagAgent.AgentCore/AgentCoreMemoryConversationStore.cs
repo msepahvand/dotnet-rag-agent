@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using Amazon.BedrockAgentCore.Model;
@@ -17,9 +18,12 @@ public sealed class AgentCoreMemoryConversationStore(
     private const int PageSize = 100;
     private const int MaxMessagesPerConversation = 40;
     private static readonly TimeSpan ConversationTtl = TimeSpan.FromMinutes(30);
+    private static readonly ConcurrentDictionary<string, SessionLockEntry> SessionLocks = new(StringComparer.Ordinal);
+
     public async Task<IReadOnlyList<ConversationMessage>> GetHistoryAsync(string conversationId)
     {
         var sessionId = GetSessionId(conversationId);
+        using var sessionLock = await AcquireSessionLockAsync(sessionId);
         var events = await GetEventsAsync(sessionId, includePayloads: true, CancellationToken.None);
         if (IsExpired(events))
         {
@@ -51,6 +55,7 @@ public sealed class AgentCoreMemoryConversationStore(
         ArgumentNullException.ThrowIfNull(message);
 
         var sessionId = GetSessionId(conversationId);
+        using var sessionLock = await AcquireSessionLockAsync(sessionId);
         var events = await GetEventsAsync(sessionId, includePayloads: true, CancellationToken.None);
         if (IsExpired(events))
         {
@@ -98,6 +103,7 @@ public sealed class AgentCoreMemoryConversationStore(
     public async Task DeleteAsync(string conversationId)
     {
         var sessionId = GetSessionId(conversationId);
+        using var sessionLock = await AcquireSessionLockAsync(sessionId);
         var events = await GetEventsAsync(sessionId, includePayloads: false, CancellationToken.None);
         await DeleteEventsAsync(sessionId, events, CancellationToken.None);
     }
@@ -126,9 +132,12 @@ public sealed class AgentCoreMemoryConversationStore(
                     continue;
                 }
 
+                using var sessionLock = await AcquireSessionLockAsync(session.SessionId);
                 var events = await GetEventsAsync(session.SessionId, includePayloads: true, CancellationToken.None);
                 if (IsExpired(events))
                 {
+                    await DeleteEventsAsync(session.SessionId, events, CancellationToken.None);
+                    logger.LogDebug("Expired conversation was removed from AgentCore Memory.");
                     continue;
                 }
 
@@ -153,6 +162,46 @@ public sealed class AgentCoreMemoryConversationStore(
     {
         ArgumentNullException.ThrowIfNull(conversationId);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(conversationId))).ToLowerInvariant();
+    }
+
+    private static async Task<IDisposable> AcquireSessionLockAsync(string sessionId)
+    {
+        while (true)
+        {
+            var entry = SessionLocks.GetOrAdd(sessionId, static _ => new SessionLockEntry());
+            if (!entry.TryAddReference())
+            {
+                continue;
+            }
+
+            if (!SessionLocks.TryGetValue(sessionId, out var current) || !ReferenceEquals(entry, current))
+            {
+                ReleaseSessionLockReference(sessionId, entry);
+                continue;
+            }
+
+            try
+            {
+                await entry.Semaphore.WaitAsync();
+                return new SessionLockReleaser(sessionId, entry);
+            }
+            catch
+            {
+                ReleaseSessionLockReference(sessionId, entry);
+                throw;
+            }
+        }
+    }
+
+    private static void ReleaseSessionLockReference(string sessionId, SessionLockEntry entry)
+    {
+        if (!entry.ReleaseReference())
+        {
+            return;
+        }
+
+        ((ICollection<KeyValuePair<string, SessionLockEntry>>)SessionLocks)
+            .Remove(new KeyValuePair<string, SessionLockEntry>(sessionId, entry));
     }
 
     private async Task CreateActivityEventAsync(string conversationId, string sessionId)
@@ -310,6 +359,53 @@ public sealed class AgentCoreMemoryConversationStore(
                 Content = Document.FromObject(new ConversationIdentity(conversationId, activity))
             }
         };
+
+    private sealed class SessionLockEntry
+    {
+        private readonly object sync = new();
+        private int references;
+        private bool retired;
+
+        public SemaphoreSlim Semaphore { get; } = new(1, 1);
+
+        public bool TryAddReference()
+        {
+            lock (sync)
+            {
+                if (retired)
+                {
+                    return false;
+                }
+
+                references++;
+                return true;
+            }
+        }
+
+        public bool ReleaseReference()
+        {
+            lock (sync)
+            {
+                references--;
+                if (references != 0)
+                {
+                    return false;
+                }
+
+                retired = true;
+                return true;
+            }
+        }
+    }
+
+    private sealed class SessionLockReleaser(string sessionId, SessionLockEntry entry) : IDisposable
+    {
+        public void Dispose()
+        {
+            entry.Semaphore.Release();
+            ReleaseSessionLockReference(sessionId, entry);
+        }
+    }
 
     private sealed record ConversationIdentity(string ConversationId, bool Activity);
 }
