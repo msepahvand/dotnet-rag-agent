@@ -41,6 +41,28 @@
       "Resource": "*"
     },
     {
+      "Sid": "BedrockAgentCoreMemoryManagement",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock-agentcore:CreateMemory",
+        "bedrock-agentcore:ListMemories"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "BedrockAgentCoreMemoryResources",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock-agentcore:DeleteMemory",
+        "bedrock-agentcore:GetMemory",
+        "bedrock-agentcore:ListTagsForResource",
+        "bedrock-agentcore:TagResource",
+        "bedrock-agentcore:UntagResource",
+        "bedrock-agentcore:UpdateMemory"
+      ],
+      "Resource": "arn:aws:bedrock-agentcore:__AWS_REGION__:__AWS_ACCOUNT_ID__:memory/*"
+    },
+    {
       "Sid": "BedrockGuardrails",
       "Effect": "Allow",
       "Action": [
@@ -220,6 +242,20 @@
         "arn:aws:s3:::dotnet-rag-agent-tf-state",
         "arn:aws:s3:::dotnet-rag-agent-tf-state/*"
       ]
+    },
+    {
+      "Sid": "DynamoDBConversationLocks",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:CreateTable",
+        "dynamodb:DeleteTable",
+        "dynamodb:DescribeTable",
+        "dynamodb:ListTagsOfResource",
+        "dynamodb:TagResource",
+        "dynamodb:UntagResource",
+        "dynamodb:UpdateTable"
+      ],
+      "Resource": "arn:aws:dynamodb:__AWS_REGION__:__AWS_ACCOUNT_ID__:table/*-conversation-locks"
     }
   ]
 }
