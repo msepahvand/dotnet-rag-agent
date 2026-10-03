@@ -8,7 +8,7 @@
     <PackageVersion Include="AWSSDK.BedrockAgentCore" Version="4.0.112.2" />
     <PackageVersion Include="AWSSDK.DynamoDBv2" Version="4.0.107" />
     <PackageVersion Include="AWSSDK.Extensions.Bedrock.MEAI" Version="4.0.101.8" />
-    <PackageVersion Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.101.4" />
+    <PackageVersion Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.102.1" />
     <PackageVersion Include="AWSSDK.S3Vectors" Version="4.0.100.14" />
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />
     <PackageVersion Include="FluentAssertions" Version="8.11.0" />
