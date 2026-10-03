@@ -1,29 +1,43 @@
 # Modernisation Plan: .NET 10, Microsoft.Extensions.AI, Agent Framework and Bedrock AgentCore
 
-**Status:** Phases 0–3 complete; Phases 4–10 remain planned · **Date:** 2026-09-28
+**Status:** Phases 0–3 complete; Phase 4 implementation is present and awaiting live shadow review; Phase 5 implementation is in progress; Phases 6, 8 and 9 remain planned; Phase 7 and Phase 10 are optional · **Updated:** 2026-10-03
 
 ### Authoritative phase status
 
-| Phase | Status | Completion evidence | Follow-up, not a phase blocker |
+| Phase | Status | Repository implementation | Remaining work |
 |---|---|---|---|
-| 0 — Baseline and safety net | **Complete** | Implementation and local validation merged in PR #7; snapshot tooling, evaluation metrics, characterisation tests and dead-code removal are in place. | Run the five-pass live Bedrock baseline and verify production IAM when AWS access is available. |
-| 1 — Platform refresh: .NET 10 LTS | **Complete** | Implementation and local validation merged in PR #7; .NET 10, central package management, OpenAPI/Scalar and multi-architecture Docker/CI changes are in place. | Verify the deployed ECS service, API/OpenAPI endpoints and remote ECR manifests in the target environment. |
-| 2 — Model access on Microsoft.Extensions.AI | **Complete** | MEAI chat and embedding access, with embedding telemetry, merged and validated in PR #24. | No phase-specific operational follow-up. |
-| 3 — Orchestration on Microsoft Agent Framework | **Complete** | MAF workflow and `ChatClientAgent`s merged in PR #24; CI Build & Test passed, including format verification, unit tests and container-backed integration tests. | Existing `/ask/stream` intentionally remains a separate research-to-prose path without the critic. |
+| 0 — Baseline and safety net | **Complete** | Merged in PR #7; snapshot tooling, evaluation metrics, characterisation tests and dead-code removal are in place. | Run the five-pass live Bedrock baseline and verify production IAM when AWS access is available. |
+| 1 — Platform refresh: .NET 10 LTS | **Complete** | Merged in PR #7; .NET 10, central package management, OpenAPI/Scalar and multi-architecture Docker/CI changes are in place. | Verify the deployed ECS service, API/OpenAPI endpoints and remote ECR manifests in the target environment. |
+| 2 — Model access on Microsoft.Extensions.AI | **Complete** | MEAI chat and embedding access, with embedding telemetry, merged and validated in PR #24. | None. |
+| 3 — Orchestration on Microsoft Agent Framework | **Complete** | MAF workflow and `ChatClientAgent`s merged in PR #24; CI Build & Test passed. | `/ask/stream` intentionally remains a separate research-to-prose path without the critic. |
+| 4 — Managed Bedrock Guardrails | **Implemented; live verification pending** | Regex + Bedrock dual-run, shadow metrics, Terraform guardrail and IAM are present. | Review production shadow agreement/disagreement and output grounding results; decide whether to enable enforcement. No AWS evidence is recorded yet. |
+| 5 — AgentCore Memory | **In progress** | Provider implementation, Terraform resource/IAM wiring, list-endpoint gate and unit coverage are present; formatting verification and all 170 unit tests pass. | Re-run integration tests and Terraform fmt/validate when Docker is available, deploy the memory resource, then verify persistence, expiry, deletion and listing behaviour in AWS. |
+| 6 — AgentCore Runtime | **Planned** | Not implemented. | Build the stateless host, runtime client, deployment pipeline and production load/rollback checks. |
+| 7 — Gateway, identity and policy | **Optional / deferred** | Not implemented. | Only start when a second tool consumer justifies it; identity is a separately announced breaking API change. |
+| 8 — AgentCore Observability | **Planned; partly overlaps current OTel** | Base OTel and ECS ADOT are present; AgentCore trace continuity is not. | Add runtime trace propagation and CloudWatch metrics/alarms alongside Phase 6. |
+| 9 — Evaluation automation | **Planned; evaluation building blocks exist** | Snapshot evaluation and optional quality judges are present. | Add the CI regression gate and sampled online AgentCore evaluations. |
+| 10 — Optional extras | **Deferred** | Not implemented. | Aspire/vector-data/A2A/ingestion-agent work is not required to finish the core migration. |
 
-**Status convention:** a phase is complete when its planned implementation is merged and its repository-level validation passes. Live AWS evaluation, deployed-service checks and other environment-dependent verification are tracked explicitly as follow-up; they do not change the implementation status above.
+**Status convention:** “Implemented” describes repository code and tests; production rollout and AWS-only acceptance are tracked separately and are not claimed complete without evidence. The table is the quick status summary; the detailed phase sections below define acceptance and rollback.
+
+### What remains to finish the core modernisation
+
+1. Complete Phase 5 integration/Terraform validation (currently blocked because Docker is unavailable), deploy it, then verify durable conversation history with the 30-minute application expiry and the 40-message cap.
+2. Review Phase 4's live shadow metrics and grounding evaluation; only then decide whether managed output checks should be enforced.
+3. Implement and roll out Phase 6 AgentCore Runtime, with Phase 8 trace continuity and Phase 9 evaluation gates completed alongside it.
+4. Leave Phase 7 and Phase 10 deferred unless a product requirement makes them necessary.
 
 ## Decisions and intended direction
 
-MEAI model access and MAF orchestration are implemented. Amazon Bedrock AgentCore remains a future, phased direction rather than part of the current deployment.
+MEAI model access and MAF orchestration are implemented. AgentCore Memory is being added as an optional conversation-store provider; AgentCore Runtime remains a later phase.
 
 | Question | Answer | Why it's worth it here |
 |---|---|---|
 | Replace Semantic Kernel with **Microsoft.Extensions.AI (MEAI)**? | **Implemented.** Bedrock chat and Cohere embeddings use MEAI abstractions. | MEAI provides provider-oriented `IChatClient` and `IEmbeddingGenerator` APIs; see Phase 2 for migration rationale. |
 | Replace SK Agents/Process with **Microsoft Agent Framework (MAF)**? | **Implemented.** Researcher, writer and critic use `ChatClientAgent`; batch orchestration uses a typed MAF Workflow. | Research uses MEAI `AIFunction` function invocation; the workflow preserves the bounded critic/revision loop. |
-| Use **Amazon Bedrock AgentCore**? | **Planned, not implemented.** | Later phases describe evaluating managed memory, runtime hosting, gateway/identity, observability and online evaluation. The current API still uses in-process agents and in-memory conversation storage. |
+| Use **Amazon Bedrock AgentCore**? | **Memory implementation in progress; Runtime planned.** | Memory makes API conversation state durable while preserving the current API contract. Runtime hosting, Gateway/identity, observability and online evaluation remain separate phases. |
 
-**Longer-term target:** a thin ECS API that owns the HTTP contract, guardrails and conversation history, calling a stateless MAF Workflow hosted on AgentCore Runtime. Models use MEAI on Bedrock; AgentCore Memory, Guardrails, Observability and Evaluations are options described in later phases, not current runtime dependencies.
+**Longer-term target:** a thin ECS API that owns the HTTP contract, guardrails and conversation history, calling a stateless MAF Workflow hosted on AgentCore Runtime. Models use MEAI on Bedrock. AgentCore Memory is the planned durable store; Runtime, Observability and Evaluations remain follow-on work.
 
 The rules in `CLAUDE.md` still apply: **Core stays provider-agnostic**, controllers stay thin, and each phase is committed on its own with all tests passing.
 
@@ -40,11 +54,11 @@ The rules in `CLAUDE.md` still apply: **Core stays provider-agnostic**, controll
 | Orchestration | Typed MAF Workflow: Research → Write → Critic → revise; the third draft routes directly to output. | `Workflow/AgentAnswerWorkflowService.cs`, `Workflow/*Executor.cs` |
 | Streaming | Separate research → prose-stream path without critic or structured citations. Guardrail violations yield one SSE `error` event; `done.grounded` reflects whether sources were retrieved. | `RagAgent.Api/Services/AgentStreamingService.cs` |
 | Guardrails | `GuardrailsService` validates questions at the request boundary. Batch answers are sanitised for invalid citations and length; streaming answers are length-limited. No SK filter pipeline remains. | `RagAgent.Agents/GuardrailsService.cs`, `RagAgent.Api/Services/AgentOrchestrationService.cs`, `AgentStreamingService.cs` |
-| Conversation state | `InMemoryConversationStore`: 30-minute sliding TTL, 40-message cap and client-supplied conversation IDs. | `RagAgent.InMemory/InMemoryConversationStore.cs` |
+| Conversation state | `InMemoryConversationStore` remains the default/local provider. The opt-in AgentCore Memory provider is being implemented to preserve 30-minute expiry, 40-message history and free-text client IDs. | `RagAgent.InMemory/InMemoryConversationStore.cs`, `RagAgent.AgentCore/AgentCoreMemoryConversationStore.cs` |
 | Observability | OpenTelemetry subscribes to ASP.NET Core, HTTP client, MEAI, MAF and application agent sources. Agent/workflow/model instrumentation disables sensitive payload capture; ECS ADOT forwards traces to X-Ray. | `RagAgent.Api/Program.cs`, `RagAgent.Agents/Workflow/AgentAnswerWorkflowService.cs`, `infra/otel-collector-config.yaml` |
 | Evaluation | Hit@k, citation validity, writer-reported groundedness, average/P50/P95 latency, and optional independent groundedness/relevance judges. Snapshot-backed evaluation is available. | `RagAgent.Agents/EvaluationAgent.cs`, `RagAgent.Core/Models/EvaluationReport.cs`, `RagAgent.HackerNews/SnapshotPostService.cs` |
 | Hosting | ECS Fargate behind an ALB, provisioned with Terraform. PRs run build, format, unit and integration checks; pushes to `main`/`master` deploy only for non-Markdown changes. | `infra/main.tf`, `.github/workflows/ci-cd.yml` |
-| IAM | ECS task role grants `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream`. | `infra/main.tf` |
+| IAM | ECS task role grants Bedrock model/guardrail access; AgentCore Memory access is added in Phase 5. | `infra/main.tf` |
 | Tests | Unit tests cover workflow routing and researcher tool behaviour. Integration tests include the real `IAgentAnswerService` with a scripted chat client and Testcontainers vector providers. | `RagAgent.UnitTests/*`, `RagAgent.IntegrationTests/VectorSearchWebApplicationFactory.cs` |
 
 ---
@@ -97,14 +111,14 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 
 | Project | Change |
 |---|---|
-| `RagAgent.Core` | Adds `AgentAnswerRequest` (question, topK, history, sessionId) and `AgentStreamEvent` models, renames `ChatMessage` → `ConversationMessage`, splits `Subscribe` out of `IConversationStore` into `IConversationEventStream`. No AWS/MAF/SK references. |
+| `RagAgent.Core` | Adds `AgentAnswerRequest` and `AgentStreamEvent` in Phase 6, keeps `ConversationMessage`, and splits `Subscribe` out of `IConversationStore` into `IConversationEventStream` in Phase 5. No AWS/MAF/SK references. |
 | `RagAgent.Agents` | SK removed. MEAI + MAF: agents, `AIFunction` tools, workflow. Provider-neutral and unit-tested against `FakeChatClient`. |
 | `RagAgent.Bedrock` *(new)* | Bedrock wiring: `IChatClient`/`IEmbeddingGenerator` registration, `BedrockGuardrailsService : IGuardrailsService`. |
-| `RagAgent.AgentCore` *(new)* | `AgentCoreMemoryConversationStore : IConversationStore`, `AgentCoreRuntimeAnswerService : IAgentAnswerService` (runtime client). |
+| `RagAgent.AgentCore` | `AgentCoreMemoryConversationStore : IConversationStore` in Phase 5; runtime client remains Phase 6 work. |
 | `RagAgent.AgentHost` *(new)* | Minimal ASP.NET Core host for AgentCore Runtime (`/invocations`, `/ping`, port 8080, `linux/arm64`). |
 | `RagAgent.Api` | Agent endpoints unchanged. Picks in-process or runtime `IAgentAnswerService` via `Agent__Host`. |
 | `RagAgent.InMemory`, `RagAgent.Qdrant`, `RagAgent.Redis` | Kept for local dev / integration tests. |
-| Tests | `RagAgent.UnitTests` covers every new provider project with faked SDK clients (`IAmazonBedrockAgentCore`, `IAmazonBedrockRuntime`), which keeps the ~70/30 unit/integration ratio. Integration tests add **one real-pipeline test** (real `IAgentAnswerService` + `FakeChatClient`) and one AgentHost `/invocations` contract test. |
+| Tests | `RagAgent.UnitTests` tests provider behaviour through narrow client adapters, with no live AWS credentials. Integration tests add **one real-pipeline test** (real `IAgentAnswerService` + `FakeChatClient`) and one AgentHost `/invocations` contract test in Phase 6. |
 
 ---
 
@@ -272,33 +286,34 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 
 ---
 
-## Phase 5: Durable conversations: AgentCore Memory *(~3 days)*
+## Phase 5: Durable conversations: AgentCore Memory *(~3 days; implementation in progress)*
 
 **Goal:** history is shared across tasks and survives restarts, **with the same retention, cap, ID and privacy semantics as today** (I8, I9).
 
 1. **Agree the Core contract change first** (separate commit): move `Subscribe` out of `IConversationStore` into `IConversationEventStream`. Only `InMemoryConversationStore` implements it, and only tests use it.
-2. Terraform: `aws_bedrockagentcore_memory` with `event_expiry_duration = 3` (the service minimum, in days) and **no long-term strategies**. Summary/semantic/user-preference strategies are **explicitly deferred to Phase 7**. With no real identity, every request would share one actor, and long-term memory would leak one user's extracted facts into another user's answers.
+2. Terraform: `aws_bedrockagentcore_memory` with `event_expiry_duration = 7` days (the current AWS Terraform provider minimum) and **no long-term strategies**. The app enforces the existing 30-minute expiry and deletes expired events; the longer service TTL is only a storage backstop. Summary/semantic/user-preference strategies are **explicitly deferred to Phase 7**. With no real identity, every request would share one actor, and long-term memory would leak one user's extracted facts into another user's answers.
 3. `AgentCoreMemoryConversationStore : IConversationStore` (in `RagAgent.AgentCore`):
    - **IDs (I9):** `sessionId = hex(SHA-256(conversationId))`. That's 64 characters matching `[a-zA-Z0-9][a-zA-Z0-9-_]*`, and it also meets AgentCore Runtime's ≥33-character `runtimeSessionId` rule for Phase 6.
-     - Store the original `conversationId` **in the event payload**: a blob payload item next to the conversational message, e.g. `{"conversationId": "..."}`. **Don't put it in event metadata.** Metadata values are limited to 256 characters from `[a-zA-Z0-9\s._:/=+@-]`, so IDs containing `#`, `,` or non-ASCII characters, or longer IDs, would get a 400 where they get a 200 today.
+     - Store the original `conversationId` **in the event payload** next to the conversational message, e.g. a JSON payload item containing `{"conversationId": "..."}`. **Don't put it in event metadata.** Metadata values are limited to 256 characters from `[a-zA-Z0-9\s._:/=+@-]`, so IDs containing `#`, `,` or non-ASCII characters, or longer IDs, would get a 400 where they get a 200 today.
      - Clients keep sending any free-text ID. The tests must include IDs with `#`, `,`, emoji, and one over 256 characters, as well as `conv-xyz` and IDs with spaces and colons.
-   - **Retention (I8): same semantics as today's sliding TTL.** Today a conversation idle for more than 30 minutes is **gone completely**, and the next message starts from empty history. To match that, `GetHistoryAsync` and `AppendAsync` first read the session's latest event timestamp. If it's older than 30 minutes, they **delete all the session's events** (paged `DeleteEvent`, as for `DeleteAsync`) before returning empty history or appending. That way expired messages can never come back into a prompt or `GET /conversations/{id}` after a new append. `ListConversationIdsAsync` leaves out stale sessions.
-     - The service expiry is only a storage backstop. It's set in days, with a minimum of **3** (CreateMemory allows 3–365).
+   - **Retention (I8): same semantics as today's sliding TTL.** Today a conversation idle for more than 30 minutes is **gone completely**, and the next message starts from empty history. `GetHistoryAsync` writes a JSON-only activity event when history exists so reads renew the sliding expiry without adding a chat message; it removes the prior activity event and appends remove activity markers. `GetHistoryAsync` and `AppendAsync` first read the session's latest event timestamp. If it's older than 30 minutes, they **delete all the session's events** (paged `DeleteEvent`, as for `DeleteAsync`) before returning empty history or appending. That way expired messages can never come back into a prompt or `GET /conversations/{id}` after a new append. `ListConversationIdsAsync` leaves out stale sessions.
+     - The service expiry is only a storage backstop. It's set in days; Terraform currently validates **7–365** days. Verify the deployed provider/API limit before changing this setting.
      - Changing retention needs an explicit product/privacy sign-off and is out of scope here.
-   - **Cap (I8):** page `ListEvents` explicitly (max 100 per page), sort by event timestamp, and return the last 40 messages. Don't rely on the API's default page size or ordering.
+   - **Cap (I8):** page `ListEvents` explicitly (max 100 per page), sort by event timestamp, return the last 40 messages, and delete older message events on append so active conversations do not grow without bound. Activity events are excluded from the message cap. Don't rely on the API's default page size or ordering.
    - **Delete:** page `ListEvents` → `DeleteEvent` for each event. There's no delete-session API. With no long-term strategies, there are no memory records to purge.
    - **Actor:** fixed `actorId = "anonymous"` until Phase 7.
    - **Listing cost:** `ListSessions` returns only `sessionId`/`createdAt`. `ListConversationIdsAsync` therefore needs one `ListSessions` pass plus one `ListEvents` per session to read the original ID and the last-event time. That's acceptable behind `Conversations__ListEnabled=false` (below), but don't call it on a hot path.
-4. **Exposure:** `GET /api/agent/conversations` already lists every conversation without auth. That's unchanged in scope, but it now spans tasks. Either keep the 30-minute window (above) so exposure matches today, or gate the list endpoint behind `Conversations__ListEnabled` (default `false` in production) until Phase 7.
+4. **Exposure:** `GET /api/agent/conversations` already lists every conversation without auth. With AgentCore Memory it spans tasks, so gate the list endpoint behind `Conversations__ListEnabled` (`false` in the production task definition; defaults to current behaviour otherwise) until Phase 7 identity exists.
 5. Map AgentCore `ValidationException`/`ResourceNotFoundException` to 400/404, never 500 (I10).
 6. Config: `ConversationStore__Provider = InMemory | AgentCore`.
 
 **Done when:**
-- A conversation survives an ECS redeploy.
-- The existing store tests (40-message cap, TTL, list, delete) pass against a faked `IAmazonBedrockAgentCore`.
-- A client ID like `conv-xyz` and one with spaces and colons both work.
+- Repository validation passes: format, unit and integration tests, including fake-client coverage for the 40-message cap, expiry, listing, deletion, paging and arbitrary IDs.
+- After deployment, a conversation survives an ECS redeploy; stale sessions disappear after the 30-minute app TTL; listing remains disabled in production until identity exists.
 
-**Rollback:** `ConversationStore__Provider=InMemory`. Conversations stored in Memory are left behind for up to 3 days (the service expiry). They're unreachable through the API after rollback. The Memory resource can stay.
+**Implementation note:** AWS access is isolated behind `IAgentCoreMemoryClient` so unit tests can exercise request semantics without live credentials. The current SDK client is registered only when `ConversationStore:Provider=AgentCore`.
+
+**Rollback:** `ConversationStore__Provider=InMemory`. Conversations stored in Memory are left behind for up to 7 days (the service expiry backstop). They're unreachable through the API after rollback. The Memory resource can stay.
 
 ---
 

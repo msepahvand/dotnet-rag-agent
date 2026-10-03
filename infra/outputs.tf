@@ -28,6 +28,11 @@ output "vector_data_type" {
   value       = module.s3_vectors.data_type
 }
 
+output "agentcore_memory_id" {
+  description = "AgentCore Memory resource used for durable conversations"
+  value       = aws_bedrockagentcore_memory.conversations.id
+}
+
 output "ecr_repository_name" {
   description = "ECR repository name used by the API"
   value       = aws_ecr_repository.api.name

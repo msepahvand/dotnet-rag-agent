@@ -32,6 +32,14 @@ public sealed class AgentController(
         {
             return BadRequest(new { error = ex.Reason });
         }
+        catch (ConversationStoreValidationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (ConversationStoreNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
     }
 
     // ── Streaming endpoint ────────────────────────────────────────────────────
@@ -60,5 +68,20 @@ public sealed class AgentController(
         {
             // Client disconnected — normal, no action needed.
         }
+        catch (ConversationStoreValidationException ex)
+        {
+            await WriteErrorEventAsync(ex.Message, ct);
+        }
+        catch (ConversationStoreNotFoundException ex)
+        {
+            await WriteErrorEventAsync(ex.Message, ct);
+        }
+    }
+
+    private async Task WriteErrorEventAsync(string message, CancellationToken cancellationToken)
+    {
+        var json = JsonSerializer.Serialize(StreamEventDto.ForError(message), SseJsonOptions);
+        await Response.WriteAsync($"data: {json}\n\n", cancellationToken);
+        await Response.Body.FlushAsync(cancellationToken);
     }
 }

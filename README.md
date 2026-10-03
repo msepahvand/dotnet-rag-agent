@@ -45,6 +45,7 @@ RagAgent.Agents/                    # Model agents and orchestration
 └── VectorSearchOptionsValidator.cs
 
 RagAgent.InMemory/                  # In-memory conversation store (30-minute TTL, 40-message cap)
+RagAgent.AgentCore/                 # Durable AgentCore Memory conversation store (opt-in)
 RagAgent.Redis/                     # RedisVectorStore.cs
 RagAgent.Qdrant/                    # QdrantVectorStore.cs
 RagAgent.S3Vectors/                 # S3VectorStore.cs and S3VectorService.cs
@@ -179,6 +180,8 @@ Switch providers via `appsettings.json` or environment variables:
 ```
 
 Or via env vars: `$env:VectorStore__Provider="Qdrant"`, etc.
+
+Conversation history uses the in-memory store by default. Production can opt into AgentCore Memory with `ConversationStore__Provider=AgentCore` and `ConversationStore__AgentCore__MemoryId=<memory-id>`; Terraform provisions the resource and configures the ECS task. Keep `Conversations__ListEnabled=false` until conversation listing is scoped to authenticated users.
 
 ---
 
