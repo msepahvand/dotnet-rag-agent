@@ -250,6 +250,7 @@
         "dynamodb:CreateTable",
         "dynamodb:DeleteTable",
         "dynamodb:DescribeContinuousBackups",
+        "dynamodb:DescribeTimeToLive",
         "dynamodb:DescribeTable",
         "dynamodb:ListTagsOfResource",
         "dynamodb:TagResource",
