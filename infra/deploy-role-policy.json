@@ -249,6 +249,7 @@
       "Action": [
         "dynamodb:CreateTable",
         "dynamodb:DeleteTable",
+        "dynamodb:DescribeContinuousBackups",
         "dynamodb:DescribeTable",
         "dynamodb:ListTagsOfResource",
         "dynamodb:TagResource",
