@@ -67,7 +67,7 @@ jobs:
             -reports:"coverage/**/coverage.cobertura.xml" \
             -targetdir:"coverage/report" \
             -reporttypes:"TextSummary" \
-            -assemblyfilters:"+RagAgent.Api;+RagAgent.Core;+RagAgent.Agents"
+            -assemblyfilters:"+RagAgent.Api;+RagAgent.Core;+RagAgent.Agents;+RagAgent.AgentCore"
           cat coverage/report/Summary.txt
 
   infrastructure:
@@ -143,6 +143,17 @@ jobs:
 
       - uses: docker/setup-buildx-action@v4
 
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: '1.5.0'
+          terraform_wrapper: false
+
+      - name: Read AgentCore Memory ID
+        run: |
+          terraform -chdir=infra init -reconfigure
+          echo "AGENTCORE_MEMORY_ID=$(terraform -chdir=infra output -raw agentcore_memory_id)" >> "$GITHUB_ENV"
+          echo "CONVERSATION_LOCK_TABLE_NAME=$(terraform -chdir=infra output -raw conversation_lock_table_name)" >> "$GITHUB_ENV"
+
       - name: Build and push Docker image
         run: |
           REGION="${AWS_REGION:-${{ env.AWS_REGION_DEFAULT }}}"
@@ -166,4 +177,4 @@ jobs:
             >/dev/null
 
       - name: Deploy to ECS
-        run: bash scripts/deploy-ecs.sh "$REGION" "$ECS_CLUSTER_NAME" "$ECS_SERVICE_NAME" "$IMAGE_URI"
+        run: bash scripts/deploy-ecs.sh "$REGION" "$ECS_CLUSTER_NAME" "$ECS_SERVICE_NAME" "$IMAGE_URI" "$AGENTCORE_MEMORY_ID" "$CONVERSATION_LOCK_TABLE_NAME"

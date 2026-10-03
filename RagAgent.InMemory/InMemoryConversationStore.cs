@@ -7,7 +7,7 @@ using RagAgent.Core.Models;
 
 namespace RagAgent.InMemory;
 
-public sealed class InMemoryConversationStore(IMemoryCache cache) : IConversationStore
+public sealed class InMemoryConversationStore(IMemoryCache cache) : IConversationStore, IConversationEventStream
 {
     private const int MaxMessagesPerConversation = 40;
     private static readonly TimeSpan ConversationTtl = TimeSpan.FromMinutes(30);

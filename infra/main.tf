@@ -22,8 +22,10 @@ terraform {
 data "aws_caller_identity" "current" {}
 
 locals {
-  effective_aws_region = trimspace(var.aws_region) != "" ? var.aws_region : "us-east-1"
-  ecr_repository_url   = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${local.effective_aws_region}.amazonaws.com/${var.ecr_repository_name}"
+  effective_aws_region         = trimspace(var.aws_region) != "" ? var.aws_region : "us-east-1"
+  ecr_repository_url           = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${local.effective_aws_region}.amazonaws.com/${var.ecr_repository_name}"
+  agentcore_memory_name        = "${replace(substr(var.ecs_service_name, 0, 32), "-", "_")}_conversations"
+  conversation_lock_table_name = "${var.ecs_service_name}-conversation-locks"
 }
 
 # ── Networking ────────────────────────────────────────────────────────────────
@@ -262,7 +264,50 @@ resource "aws_bedrock_guardrail_version" "api_safety" {
   skip_destroy  = true
 }
 
+resource "aws_bedrockagentcore_memory" "conversations" {
+  name                  = local.agentcore_memory_name
+  description           = "Conversation history for the RAG API"
+  event_expiry_duration = 7
+}
+
+resource "aws_dynamodb_table" "conversation_locks" {
+  name         = local.conversation_lock_table_name
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "LockKey"
+
+  attribute {
+    name = "LockKey"
+    type = "S"
+  }
+
+  tags = {
+    Name = local.conversation_lock_table_name
+  }
+}
+
 data "aws_iam_policy_document" "ecs_task_runtime" {
+  statement {
+    sid    = "AllowAgentCoreConversationMemory"
+    effect = "Allow"
+    actions = [
+      "bedrock-agentcore:CreateEvent",
+      "bedrock-agentcore:DeleteEvent",
+      "bedrock-agentcore:ListEvents",
+      "bedrock-agentcore:ListSessions"
+    ]
+    resources = [aws_bedrockagentcore_memory.conversations.arn]
+  }
+
+  statement {
+    sid    = "AllowConversationLockCoordination"
+    effect = "Allow"
+    actions = [
+      "dynamodb:UpdateItem",
+      "dynamodb:DeleteItem"
+    ]
+    resources = [aws_dynamodb_table.conversation_locks.arn]
+  }
+
   statement {
     sid    = "AllowBedrockInvokeModel"
     effect = "Allow"
@@ -423,6 +468,22 @@ resource "aws_ecs_task_definition" "api" {
       {
         name  = "Guardrails__Bedrock__GuardrailVersion"
         value = aws_bedrock_guardrail_version.api_safety.version
+      },
+      {
+        name  = "ConversationStore__Provider"
+        value = "AgentCore"
+      },
+      {
+        name  = "ConversationStore__AgentCore__MemoryId"
+        value = aws_bedrockagentcore_memory.conversations.id
+      },
+      {
+        name  = "ConversationStore__AgentCore__LockTableName"
+        value = aws_dynamodb_table.conversation_locks.name
+      },
+      {
+        name  = "Conversations__ListEnabled"
+        value = "false"
       }
     ]
   }])

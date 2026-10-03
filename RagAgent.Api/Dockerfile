@@ -7,6 +7,7 @@ WORKDIR /src
 
 COPY ["global.json", "NuGet.config", "Directory.Build.props", "Directory.Packages.props", "stylecop.json", "rules.ruleset", "./"]
 COPY ["RagAgent.Api/RagAgent.Api.csproj", "RagAgent.Api/"]
+COPY ["RagAgent.AgentCore/RagAgent.AgentCore.csproj", "RagAgent.AgentCore/"]
 COPY ["RagAgent.Agents/RagAgent.Agents.csproj", "RagAgent.Agents/"]
 COPY ["RagAgent.Core/RagAgent.Core.csproj", "RagAgent.Core/"]
 COPY ["RagAgent.HackerNews/RagAgent.HackerNews.csproj", "RagAgent.HackerNews/"]

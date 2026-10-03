@@ -82,6 +82,8 @@ jobs:
           BUCKET_ADDRESS="module.s3_vectors.aws_s3vectors_vector_bucket.vector_bucket"
           INDEX_ADDRESS="module.s3_vectors.aws_s3vectors_index.vector_index"
           ECR_ADDRESS="aws_ecr_repository.api"
+          AGENTCORE_MEMORY_ADDRESS="aws_bedrockagentcore_memory.conversations"
+          CONVERSATION_LOCK_TABLE_ADDRESS="aws_dynamodb_table.conversation_locks"
           ECS_CLUSTER_ADDRESS="aws_ecs_cluster.api"
           ECS_SERVICE_ADDRESS="aws_ecs_service.api"
           GUARDRAIL_ADDRESS="aws_bedrock_guardrail.api_safety"
@@ -97,6 +99,37 @@ jobs:
           SUBNET_1_ADDRESS="aws_subnet.public[1]"
           IGW_ADDRESS="aws_internet_gateway.main"
           VECTOR_BUCKET_EXISTS="false"
+
+          if ! terraform state show "$AGENTCORE_MEMORY_ADDRESS" >/dev/null 2>&1; then
+            MEMORY_NAME="${ECS_SERVICE_NAME:0:32}"
+            MEMORY_NAME="${MEMORY_NAME//-/_}_conversations"
+            MEMORY_IDS=$(aws bedrock-agentcore-control list-memories \
+              --region "$AWS_REGION" \
+              --query 'memories[].id' \
+              --output text)
+            if [ "$MEMORY_IDS" != "None" ] && [ -n "$MEMORY_IDS" ]; then
+              for MEMORY_ID in $MEMORY_IDS; do
+                EXISTING_MEMORY_NAME=$(aws bedrock-agentcore-control get-memory \
+                  --region "$AWS_REGION" \
+                  --memory-id "$MEMORY_ID" \
+                  --query 'memory.name' \
+                  --output text)
+                if [ "$EXISTING_MEMORY_NAME" = "$MEMORY_NAME" ]; then
+                  terraform import "$AGENTCORE_MEMORY_ADDRESS" "$MEMORY_ID"
+                  break
+                fi
+              done
+            fi
+          fi
+
+          if ! terraform state show "$CONVERSATION_LOCK_TABLE_ADDRESS" >/dev/null 2>&1; then
+            LOCK_TABLE_NAME="${ECS_SERVICE_NAME}-conversation-locks"
+            if aws dynamodb describe-table \
+                --region "$AWS_REGION" \
+                --table-name "$LOCK_TABLE_NAME" >/dev/null 2>&1; then
+              terraform import "$CONVERSATION_LOCK_TABLE_ADDRESS" "$LOCK_TABLE_NAME"
+            fi
+          fi
 
           if ! terraform state show "$BUCKET_ADDRESS" >/dev/null 2>&1; then
             BUCKET_FOUND=$(aws s3vectors list-vector-buckets \

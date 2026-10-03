@@ -5,6 +5,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 using RagAgent.Agents;
+using RagAgent.AgentCore;
 using RagAgent.HackerNews;
 using RagAgent.InMemory;
 using RagAgent.Agents.Telemetry;
@@ -31,7 +32,20 @@ public class Program
         builder.Services.AddScoped<ISemanticSearchService, SemanticSearchService>();
         builder.Services.AddScoped<IAgentOrchestrationService, AgentOrchestrationService>();
         builder.Services.AddScoped<IAgentStreamingService, AgentStreamingService>();
-        builder.Services.AddInMemoryConversationStore();
+        var conversationStoreProvider = builder.Configuration["ConversationStore:Provider"] ?? "InMemory";
+        if (string.Equals(conversationStoreProvider, "InMemory", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.Services.AddInMemoryConversationStore();
+        }
+        else if (string.Equals(conversationStoreProvider, "AgentCore", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.Services.AddAgentCoreMemoryConversationStore(builder.Configuration);
+        }
+        else
+        {
+            throw new InvalidOperationException("ConversationStore:Provider must be InMemory or AgentCore.");
+        }
+
         builder.Services.AddSingleton<IngestionTracker>();
         if (builder.Configuration.GetValue<bool?>("Ingestion:IndexOnStartup") ?? true)
         {

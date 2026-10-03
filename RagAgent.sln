@@ -23,6 +23,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.HackerNews", "RagA
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.InMemory", "RagAgent.InMemory\RagAgent.InMemory.csproj", "{CF675CFA-BDBE-4586-908C-B07AD9AE1C32}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.AgentCore", "RagAgent.AgentCore\RagAgent.AgentCore.csproj", "{C77124F0-9AEF-4A61-A192-9F1DEE33730E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -153,6 +155,18 @@ Global
 		{CF675CFA-BDBE-4586-908C-B07AD9AE1C32}.Release|x64.Build.0 = Release|Any CPU
 		{CF675CFA-BDBE-4586-908C-B07AD9AE1C32}.Release|x86.ActiveCfg = Release|Any CPU
 		{CF675CFA-BDBE-4586-908C-B07AD9AE1C32}.Release|x86.Build.0 = Release|Any CPU
+		{C77124F0-9AEF-4A61-A192-9F1DEE33730E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C77124F0-9AEF-4A61-A192-9F1DEE33730E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C77124F0-9AEF-4A61-A192-9F1DEE33730E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C77124F0-9AEF-4A61-A192-9F1DEE33730E}.Debug|x64.Build.0 = Debug|Any CPU
+		{C77124F0-9AEF-4A61-A192-9F1DEE33730E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C77124F0-9AEF-4A61-A192-9F1DEE33730E}.Debug|x86.Build.0 = Debug|Any CPU
+		{C77124F0-9AEF-4A61-A192-9F1DEE33730E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C77124F0-9AEF-4A61-A192-9F1DEE33730E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C77124F0-9AEF-4A61-A192-9F1DEE33730E}.Release|x64.ActiveCfg = Release|Any CPU
+		{C77124F0-9AEF-4A61-A192-9F1DEE33730E}.Release|x64.Build.0 = Release|Any CPU
+		{C77124F0-9AEF-4A61-A192-9F1DEE33730E}.Release|x86.ActiveCfg = Release|Any CPU
+		{C77124F0-9AEF-4A61-A192-9F1DEE33730E}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

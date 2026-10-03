@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\RagAgent.AgentCore\RagAgent.AgentCore.csproj" />
     <ProjectReference Include="..\RagAgent.Api\RagAgent.Api.csproj" />
     <ProjectReference Include="..\RagAgent.HackerNews\RagAgent.HackerNews.csproj" />
     <ProjectReference Include="..\RagAgent.Agents\RagAgent.Agents.csproj" />

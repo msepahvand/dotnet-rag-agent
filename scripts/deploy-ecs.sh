@@ -2,13 +2,20 @@
 # Registers a new ECS task definition with the given image and triggers a rolling deployment.
 # Also ensures the ADOT Collector sidecar is present for X-Ray tracing (idempotent).
 #
-# Usage: deploy-ecs.sh <REGION> <ECS_CLUSTER> <ECS_SERVICE> <IMAGE_URI>
+# Usage: deploy-ecs.sh <REGION> <ECS_CLUSTER> <ECS_SERVICE> <IMAGE_URI> <AGENTCORE_MEMORY_ID> <CONVERSATION_LOCK_TABLE>
 set -euo pipefail
+
+if [[ $# -ne 6 || -z "$5" || -z "$6" ]]; then
+  echo "Usage: deploy-ecs.sh <REGION> <ECS_CLUSTER> <ECS_SERVICE> <IMAGE_URI> <AGENTCORE_MEMORY_ID> <CONVERSATION_LOCK_TABLE>" >&2
+  exit 2
+fi
 
 REGION="$1"
 ECS_CLUSTER="$2"
 ECS_SERVICE="$3"
 IMAGE_URI="$4"
+AGENTCORE_MEMORY_ID="$5"
+CONVERSATION_LOCK_TABLE="$6"
 
 CURRENT_TASK_DEF=$(aws ecs describe-task-definition \
   --task-definition "$ECS_SERVICE" \
@@ -42,6 +49,8 @@ OTEL_SIDECAR=$(jq -n \
 
 NEW_TASK_DEF=$(echo "$CURRENT_TASK_DEF" | jq \
   --arg IMAGE "$IMAGE_URI" \
+  --arg MEMORY_ID "$AGENTCORE_MEMORY_ID" \
+  --arg LOCK_TABLE "$CONVERSATION_LOCK_TABLE" \
   --argjson SIDECAR "$OTEL_SIDECAR" \
   '
   # Update the API container image.
@@ -65,6 +74,22 @@ NEW_TASK_DEF=$(echo "$CURRENT_TASK_DEF" | jq \
      then [{name: "Guardrails__Mode", value: "Shadow"}]
      else []
      end)
+  ) |
+
+  # Terraform ignores container definition changes so the deployment script owns
+  # the rollout environment, including the durable conversation-store provider.
+  .containerDefinitions[0].environment = (
+    [(.containerDefinitions[0].environment // [])[] |
+      select(.name != "ConversationStore__Provider" and
+             .name != "ConversationStore__AgentCore__MemoryId" and
+             .name != "ConversationStore__AgentCore__LockTableName" and
+             .name != "Conversations__ListEnabled")] +
+    [
+      {name: "ConversationStore__Provider", value: "AgentCore"},
+      {name: "ConversationStore__AgentCore__MemoryId", value: $MEMORY_ID},
+      {name: "ConversationStore__AgentCore__LockTableName", value: $LOCK_TABLE},
+      {name: "Conversations__ListEnabled", value: "false"}
+    ]
   ) |
 
   # Add the ADOT sidecar only if it is not already present (idempotent).

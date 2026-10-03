@@ -5,6 +5,8 @@
 
   <ItemGroup>
     <PackageVersion Include="AWSSDK.BedrockRuntime" Version="4.0.101.7" />
+    <PackageVersion Include="AWSSDK.BedrockAgentCore" Version="4.0.112.2" />
+    <PackageVersion Include="AWSSDK.DynamoDBv2" Version="4.0.107" />
     <PackageVersion Include="AWSSDK.Extensions.Bedrock.MEAI" Version="4.0.101.8" />
     <PackageVersion Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.101.4" />
     <PackageVersion Include="AWSSDK.S3Vectors" Version="4.0.100.14" />
@@ -21,6 +23,7 @@
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageVersion Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
