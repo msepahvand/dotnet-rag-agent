@@ -33,6 +33,11 @@ output "agentcore_memory_id" {
   value       = aws_bedrockagentcore_memory.conversations.id
 }
 
+output "conversation_lock_table_name" {
+  description = "DynamoDB table used to coordinate conversation writes across ECS tasks"
+  value       = aws_dynamodb_table.conversation_locks.name
+}
+
 output "ecr_repository_name" {
   description = "ECR repository name used by the API"
   value       = aws_ecr_repository.api.name

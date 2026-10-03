@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using Amazon.BedrockAgentCore.Model;
@@ -11,6 +10,7 @@ namespace RagAgent.AgentCore;
 
 public sealed class AgentCoreMemoryConversationStore(
     IAgentCoreMemoryClient memoryClient,
+    IDistributedConversationLock conversationLock,
     AgentCoreMemoryOptions options,
     ILogger<AgentCoreMemoryConversationStore> logger) : IConversationStore
 {
@@ -18,17 +18,17 @@ public sealed class AgentCoreMemoryConversationStore(
     private const int PageSize = 100;
     private const int MaxMessagesPerConversation = 40;
     private static readonly TimeSpan ConversationTtl = TimeSpan.FromMinutes(30);
-    private static readonly ConcurrentDictionary<string, SessionLockEntry> SessionLocks = new(StringComparer.Ordinal);
-
     public async Task<IReadOnlyList<ConversationMessage>> GetHistoryAsync(string conversationId)
     {
         var sessionId = GetSessionId(conversationId);
-        using var sessionLock = await AcquireSessionLockAsync(sessionId);
-        var events = await GetEventsAsync(sessionId, includePayloads: true, CancellationToken.None);
+        await using var sessionLease = await conversationLock.AcquireAsync(sessionId);
+        var cancellationToken = sessionLease.CancellationToken;
+        var events = await GetEventsAsync(sessionId, includePayloads: true, cancellationToken);
         if (IsExpired(events))
         {
-            await DeleteEventsAsync(sessionId, events, CancellationToken.None);
+            await DeleteEventsAsync(sessionId, events, cancellationToken);
             logger.LogDebug("Expired conversation was removed from AgentCore Memory.");
+            sessionLease.EnsureValid();
             return [];
         }
 
@@ -43,10 +43,11 @@ public sealed class AgentCoreMemoryConversationStore(
 
         if (history.Count > 0)
         {
-            await CreateActivityEventAsync(conversationId, sessionId);
-            await DeleteEventsAsync(sessionId, events.Where(IsActivityEvent).ToList(), CancellationToken.None);
+            await CreateActivityEventAsync(conversationId, sessionId, cancellationToken);
+            await DeleteEventsAsync(sessionId, events.Where(IsActivityEvent).ToList(), cancellationToken);
         }
 
+        sessionLease.EnsureValid();
         return history;
     }
 
@@ -55,11 +56,12 @@ public sealed class AgentCoreMemoryConversationStore(
         ArgumentNullException.ThrowIfNull(message);
 
         var sessionId = GetSessionId(conversationId);
-        using var sessionLock = await AcquireSessionLockAsync(sessionId);
-        var events = await GetEventsAsync(sessionId, includePayloads: true, CancellationToken.None);
+        await using var sessionLease = await conversationLock.AcquireAsync(sessionId);
+        var cancellationToken = sessionLease.CancellationToken;
+        var events = await GetEventsAsync(sessionId, includePayloads: true, cancellationToken);
         if (IsExpired(events))
         {
-            await DeleteEventsAsync(sessionId, events, CancellationToken.None);
+            await DeleteEventsAsync(sessionId, events, cancellationToken);
             events.Clear();
         }
 
@@ -84,28 +86,31 @@ public sealed class AgentCoreMemoryConversationStore(
                         CreateIdentityPayload(conversationId)
                     ]
                 },
-                CancellationToken.None));
+                cancellationToken));
         if (createdEvent.Event is null)
         {
             throw new InvalidOperationException("AgentCore Memory did not return the created conversation event.");
         }
 
         events.Add(createdEvent.Event);
-        await DeleteEventsAsync(sessionId, events.Where(IsActivityEvent).ToList(), CancellationToken.None);
+        await DeleteEventsAsync(sessionId, events.Where(IsActivityEvent).ToList(), cancellationToken);
         var conversationEvents = events.Where(evt => GetMessage(evt) is not null).ToList();
         var excessEvents = conversationEvents
             .OrderBy(evt => evt.EventTimestamp)
             .Take(Math.Max(0, conversationEvents.Count - MaxMessagesPerConversation))
             .ToList();
-        await DeleteEventsAsync(sessionId, excessEvents, CancellationToken.None);
+        await DeleteEventsAsync(sessionId, excessEvents, cancellationToken);
+        sessionLease.EnsureValid();
     }
 
     public async Task DeleteAsync(string conversationId)
     {
         var sessionId = GetSessionId(conversationId);
-        using var sessionLock = await AcquireSessionLockAsync(sessionId);
-        var events = await GetEventsAsync(sessionId, includePayloads: false, CancellationToken.None);
-        await DeleteEventsAsync(sessionId, events, CancellationToken.None);
+        await using var sessionLease = await conversationLock.AcquireAsync(sessionId);
+        var cancellationToken = sessionLease.CancellationToken;
+        var events = await GetEventsAsync(sessionId, includePayloads: false, cancellationToken);
+        await DeleteEventsAsync(sessionId, events, cancellationToken);
+        sessionLease.EnsureValid();
     }
 
     public async Task<IReadOnlyList<string>> ListConversationIdsAsync()
@@ -132,12 +137,14 @@ public sealed class AgentCoreMemoryConversationStore(
                     continue;
                 }
 
-                using var sessionLock = await AcquireSessionLockAsync(session.SessionId);
-                var events = await GetEventsAsync(session.SessionId, includePayloads: true, CancellationToken.None);
+                await using var sessionLease = await conversationLock.AcquireAsync(session.SessionId);
+                var cancellationToken = sessionLease.CancellationToken;
+                var events = await GetEventsAsync(session.SessionId, includePayloads: true, cancellationToken);
                 if (IsExpired(events))
                 {
-                    await DeleteEventsAsync(session.SessionId, events, CancellationToken.None);
+                    await DeleteEventsAsync(session.SessionId, events, cancellationToken);
                     logger.LogDebug("Expired conversation was removed from AgentCore Memory.");
+                    sessionLease.EnsureValid();
                     continue;
                 }
 
@@ -149,6 +156,8 @@ public sealed class AgentCoreMemoryConversationStore(
                         ids.Add(id);
                     }
                 }
+
+                sessionLease.EnsureValid();
             }
 
             nextToken = response.NextToken;
@@ -164,47 +173,10 @@ public sealed class AgentCoreMemoryConversationStore(
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(conversationId))).ToLowerInvariant();
     }
 
-    private static async Task<IDisposable> AcquireSessionLockAsync(string sessionId)
-    {
-        while (true)
-        {
-            var entry = SessionLocks.GetOrAdd(sessionId, static _ => new SessionLockEntry());
-            if (!entry.TryAddReference())
-            {
-                continue;
-            }
-
-            if (!SessionLocks.TryGetValue(sessionId, out var current) || !ReferenceEquals(entry, current))
-            {
-                ReleaseSessionLockReference(sessionId, entry);
-                continue;
-            }
-
-            try
-            {
-                await entry.Semaphore.WaitAsync();
-                return new SessionLockReleaser(sessionId, entry);
-            }
-            catch
-            {
-                ReleaseSessionLockReference(sessionId, entry);
-                throw;
-            }
-        }
-    }
-
-    private static void ReleaseSessionLockReference(string sessionId, SessionLockEntry entry)
-    {
-        if (!entry.ReleaseReference())
-        {
-            return;
-        }
-
-        ((ICollection<KeyValuePair<string, SessionLockEntry>>)SessionLocks)
-            .Remove(new KeyValuePair<string, SessionLockEntry>(sessionId, entry));
-    }
-
-    private async Task CreateActivityEventAsync(string conversationId, string sessionId)
+    private async Task CreateActivityEventAsync(
+        string conversationId,
+        string sessionId,
+        CancellationToken cancellationToken)
     {
         var response = await ExecuteMemoryRequestAsync(
             () => memoryClient.CreateEventAsync(
@@ -216,7 +188,7 @@ public sealed class AgentCoreMemoryConversationStore(
                     EventTimestamp = DateTime.UtcNow,
                     Payload = [CreateIdentityPayload(conversationId, activity: true)]
                 },
-                CancellationToken.None));
+                cancellationToken));
 
         if (response.Event is null)
         {
@@ -359,53 +331,6 @@ public sealed class AgentCoreMemoryConversationStore(
                 Content = Document.FromObject(new ConversationIdentity(conversationId, activity))
             }
         };
-
-    private sealed class SessionLockEntry
-    {
-        private readonly object sync = new();
-        private int references;
-        private bool retired;
-
-        public SemaphoreSlim Semaphore { get; } = new(1, 1);
-
-        public bool TryAddReference()
-        {
-            lock (sync)
-            {
-                if (retired)
-                {
-                    return false;
-                }
-
-                references++;
-                return true;
-            }
-        }
-
-        public bool ReleaseReference()
-        {
-            lock (sync)
-            {
-                references--;
-                if (references != 0)
-                {
-                    return false;
-                }
-
-                retired = true;
-                return true;
-            }
-        }
-    }
-
-    private sealed class SessionLockReleaser(string sessionId, SessionLockEntry entry) : IDisposable
-    {
-        public void Dispose()
-        {
-            entry.Semaphore.Release();
-            ReleaseSessionLockReference(sessionId, entry);
-        }
-    }
 
     private sealed record ConversationIdentity(string ConversationId, bool Activity);
 }

@@ -1,3 +1,3 @@
 namespace RagAgent.AgentCore;
 
-public sealed record AgentCoreMemoryOptions(string MemoryId);
+public sealed record AgentCoreMemoryOptions(string MemoryId, string LockTableName);

@@ -152,6 +152,7 @@ jobs:
         run: |
           terraform -chdir=infra init -reconfigure
           echo "AGENTCORE_MEMORY_ID=$(terraform -chdir=infra output -raw agentcore_memory_id)" >> "$GITHUB_ENV"
+          echo "CONVERSATION_LOCK_TABLE_NAME=$(terraform -chdir=infra output -raw conversation_lock_table_name)" >> "$GITHUB_ENV"
 
       - name: Build and push Docker image
         run: |
@@ -176,4 +177,4 @@ jobs:
             >/dev/null
 
       - name: Deploy to ECS
-        run: bash scripts/deploy-ecs.sh "$REGION" "$ECS_CLUSTER_NAME" "$ECS_SERVICE_NAME" "$IMAGE_URI" "$AGENTCORE_MEMORY_ID"
+        run: bash scripts/deploy-ecs.sh "$REGION" "$ECS_CLUSTER_NAME" "$ECS_SERVICE_NAME" "$IMAGE_URI" "$AGENTCORE_MEMORY_ID" "$CONVERSATION_LOCK_TABLE_NAME"

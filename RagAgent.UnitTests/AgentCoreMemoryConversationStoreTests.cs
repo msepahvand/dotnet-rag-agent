@@ -59,14 +59,20 @@ public class AgentCoreMemoryConversationStoreTests
     public async Task AppendAsync_WhenManyRequestsRunConcurrently_EnforcesFortyMessageStorageCapAsync()
     {
         var client = new FakeAgentCoreMemoryClient();
-        var sut = CreateStore(client);
+        var lockClient = new FakeDynamoDbConversationLockClient();
+        var stores = new[]
+        {
+            CreateStore(client, lockClient),
+            CreateStore(client, lockClient)
+        };
 
         await Task.WhenAll(Enumerable.Range(0, 60)
-            .Select(index => sut.AppendAsync("concurrent-conversation", new ConversationMessage("user", $"message-{index}"))));
+            .Select(index => stores[index % stores.Length]
+                .AppendAsync("concurrent-conversation", new ConversationMessage("user", $"message-{index}"))));
 
         client.Events.Count(evt => evt.Payload?.Any(payload => payload.Conversational is not null) == true)
             .Should().Be(40);
-        (await sut.GetHistoryAsync("concurrent-conversation")).Should().HaveCount(40);
+        (await stores[0].GetHistoryAsync("concurrent-conversation")).Should().HaveCount(40);
     }
 
     [Fact]
@@ -217,8 +223,79 @@ public class AgentCoreMemoryConversationStoreTests
         history.Should().BeEmpty();
     }
 
-    private static AgentCoreMemoryConversationStore CreateStore(FakeAgentCoreMemoryClient client) =>
-        new(client, new AgentCoreMemoryOptions("memory-id"), NullLogger<AgentCoreMemoryConversationStore>.Instance);
+    private static AgentCoreMemoryConversationStore CreateStore(
+        FakeAgentCoreMemoryClient client,
+        FakeDynamoDbConversationLockClient? lockClient = null)
+    {
+        lockClient ??= new FakeDynamoDbConversationLockClient();
+        var lockProvider = new DynamoDbConversationLockProvider(
+            lockClient,
+            NullLogger<DynamoDbConversationLockProvider>.Instance);
+        return new AgentCoreMemoryConversationStore(
+            client,
+            lockProvider,
+            new AgentCoreMemoryOptions("memory-id", "lock-table"),
+            NullLogger<AgentCoreMemoryConversationStore>.Instance);
+    }
+
+    private sealed class FakeDynamoDbConversationLockClient : IDynamoDbConversationLockClient
+    {
+        private readonly object sync = new();
+        private readonly Dictionary<string, (string Owner, long ExpiresAt)> locks = new(StringComparer.Ordinal);
+
+        public Task<bool> TryAcquireAsync(
+            string conversationKey,
+            string ownerToken,
+            long nowUnixSeconds,
+            long leaseExpiresUnixSeconds,
+            CancellationToken cancellationToken)
+        {
+            lock (sync)
+            {
+                if (locks.TryGetValue(conversationKey, out var current) && current.ExpiresAt > nowUnixSeconds)
+                {
+                    return Task.FromResult(false);
+                }
+
+                locks[conversationKey] = (ownerToken, leaseExpiresUnixSeconds);
+                return Task.FromResult(true);
+            }
+        }
+
+        public Task<bool> RenewAsync(
+            string conversationKey,
+            string ownerToken,
+            long nowUnixSeconds,
+            long leaseExpiresUnixSeconds,
+            CancellationToken cancellationToken)
+        {
+            lock (sync)
+            {
+                if (!locks.TryGetValue(conversationKey, out var current) ||
+                    current.Owner != ownerToken ||
+                    current.ExpiresAt <= nowUnixSeconds)
+                {
+                    return Task.FromResult(false);
+                }
+
+                locks[conversationKey] = (ownerToken, leaseExpiresUnixSeconds);
+                return Task.FromResult(true);
+            }
+        }
+
+        public Task ReleaseAsync(string conversationKey, string ownerToken, CancellationToken cancellationToken)
+        {
+            lock (sync)
+            {
+                if (locks.TryGetValue(conversationKey, out var current) && current.Owner == ownerToken)
+                {
+                    locks.Remove(conversationKey);
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+    }
 
     private sealed class FakeAgentCoreMemoryClient : IAgentCoreMemoryClient
     {
