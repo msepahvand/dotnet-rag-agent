@@ -1,13 +1,13 @@
 # Modernisation Plan: .NET 10, Microsoft.Extensions.AI, Agent Framework and Bedrock AgentCore
 
-**Status:** Phases 0–3 complete; Phase 4 implementation is awaiting live shadow review; Phase 5 is implemented and deployed, with AWS acceptance pending; Phases 6, 8 and 9 remain planned; Phase 7 and Phase 10 are deferred · **Updated:** 2026-10-04
+**Status:** Phases 0–3 complete; Phase 4 implementation is awaiting live shadow review; Phase 5 is implemented and deployed, with AWS acceptance pending; Phases 6, 8 and 9 remain planned; Phase 7 and Phase 10 are deferred · **Updated:** 2026-10-16
 
 ### Authoritative phase status
 
 | Phase | Status | Repository implementation | Remaining work |
 |---|---|---|---|
 | 0 — Baseline and safety net | **Complete** | Merged in PR #7; snapshot tooling, evaluation metrics, characterisation tests and dead-code removal are in place. | Run the five-pass live Bedrock baseline and verify production IAM when AWS access is available. |
-| 1 — Platform refresh: .NET 10 LTS | **Complete** | Merged in PR #7; .NET 10, central package management, OpenAPI/Scalar and multi-architecture Docker/CI changes are in place. | Verify the deployed ECS service, API/OpenAPI endpoints and remote ECR manifests in the target environment. |
+| 1 — Platform refresh: .NET 10 LTS | **Complete** | Merged in PR #7; .NET 10, central package management, OpenAPI/Scalar and multi-architecture Docker/CI changes are in place. | Verify the deployed API/OpenAPI endpoints in the target environment. ECS deployment and the multi-architecture ECR manifest check passed in CI run [37127333792](https://github.com/msepahvand/dotnet-rag-agent/actions/runs/37127333792). |
 | 2 — Model access on Microsoft.Extensions.AI | **Complete** | MEAI chat and embedding access, with embedding telemetry, merged and validated in PR #24. | None. |
 | 3 — Orchestration on Microsoft Agent Framework | **Complete** | MAF workflow and `ChatClientAgent`s merged in PR #24; CI Build & Test passed. | `/ask/stream` intentionally remains a separate research-to-prose path without the critic. |
 | 4 — Managed Bedrock Guardrails | **Implemented; live verification pending** | Regex + Bedrock dual-run, shadow metrics, Terraform guardrail and IAM are present. | Review production shadow agreement/disagreement and output grounding results; decide whether to enable enforcement. No live shadow-review or grounding evidence is recorded yet. |
@@ -53,7 +53,7 @@ The rules in `CLAUDE.md` still apply: **Core stays provider-agnostic**, controll
 | Tools | `search_posts` is an MEAI `AIFunction` offered to the researcher; results are bounded, merged by post ID, and direct search is the no-tool fallback. | `ResearcherAgent.cs`, `SemanticSearchPlugin.cs` |
 | Orchestration | Typed MAF Workflow: Research → Write → Critic → revise; the third draft routes directly to output. | `Workflow/AgentAnswerWorkflowService.cs`, `Workflow/*Executor.cs` |
 | Streaming | Separate research → prose-stream path without critic or structured citations. Guardrail violations yield one SSE `error` event; `done.grounded` reflects whether sources were retrieved. | `RagAgent.Api/Services/AgentStreamingService.cs` |
-| Guardrails | `GuardrailsService` validates questions at the request boundary. Batch answers are sanitised for invalid citations and length; streaming answers are length-limited. No SK filter pipeline remains. | `RagAgent.Agents/GuardrailsService.cs`, `RagAgent.Api/Services/AgentOrchestrationService.cs`, `AgentStreamingService.cs` |
+| Guardrails | `Guardrails__Provider` selects the regex `GuardrailsService` (local default) or `BedrockGuardrailsService`; production runs `Bedrock` in `Shadow` mode, where regex keeps enforcing and Bedrock `ApplyGuardrail` runs alongside it, emitting `guardrail.shadow.{agree,disagree}` metrics. Questions are checked at the request boundary; final answers are sanitised for invalid citations and length, then checked by `ValidateAnswerAsync` (batch and streaming). No SK filter pipeline remains. | `RagAgent.Agents/GuardrailsService.cs`, `BedrockGuardrailsService.cs`, `GuardrailsRegistrationExtensions.cs`, `RagAgent.Api/Services/AgentOrchestrationService.cs`, `AgentStreamingService.cs`, `infra/main.tf` |
 | Conversation state | `InMemoryConversationStore` remains the default/local provider. The deployed opt-in AgentCore Memory provider preserves the 30-minute logical expiry, 40-message history and free-text client IDs; AWS acceptance is pending. | `RagAgent.InMemory/InMemoryConversationStore.cs`, `RagAgent.AgentCore/AgentCoreMemoryConversationStore.cs` |
 | Observability | OpenTelemetry subscribes to ASP.NET Core, HTTP client, MEAI, MAF and application agent sources. Agent/workflow/model instrumentation disables sensitive payload capture; ECS ADOT forwards traces to X-Ray. | `RagAgent.Api/Program.cs`, `RagAgent.Agents/Workflow/AgentAnswerWorkflowService.cs`, `infra/otel-collector-config.yaml` |
 | Evaluation | Hit@k, citation validity, writer-reported groundedness, average/P50/P95 latency, and optional independent groundedness/relevance judges. Snapshot-backed evaluation is available. | `RagAgent.Agents/EvaluationAgent.cs`, `RagAgent.Core/Models/EvaluationReport.cs`, `RagAgent.HackerNews/SnapshotPostService.cs` |
@@ -113,7 +113,7 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 |---|---|
 | `RagAgent.Core` | Adds `AgentAnswerRequest` and `AgentStreamEvent` in Phase 6, keeps `ConversationMessage`, and splits `Subscribe` out of `IConversationStore` into `IConversationEventStream` in Phase 5. No AWS/MAF/SK references. |
 | `RagAgent.Agents` | SK removed. MEAI + MAF: agents, `AIFunction` tools, workflow. Provider-neutral and unit-tested against `FakeChatClient`. |
-| `RagAgent.Bedrock` *(new)* | Bedrock wiring: `IChatClient`/`IEmbeddingGenerator` registration, `BedrockGuardrailsService : IGuardrailsService`. |
+| `RagAgent.Bedrock` *(optional, not yet created)* | Bedrock wiring: `IChatClient`/`IEmbeddingGenerator` registration, `BedrockGuardrailsService : IGuardrailsService`. These currently live in `RagAgent.Agents` (`ServiceCollectionExtensions.cs`, `CohereEmbeddingGenerator.cs`, `BedrockGuardrailsService.cs`); extracting them is a tidy-up, not a blocker for later phases. |
 | `RagAgent.AgentCore` | `AgentCoreMemoryConversationStore : IConversationStore` is implemented and deployed in Phase 5; runtime client remains Phase 6 work. |
 | `RagAgent.AgentHost` *(new)* | Minimal ASP.NET Core host for AgentCore Runtime (`/invocations`, `/ping`, port 8080, `linux/arm64`). |
 | `RagAgent.Api` | Agent endpoints unchanged. Picks in-process or runtime `IAgentAnswerService` via `Agent__Host`. |
@@ -190,12 +190,12 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 8. [x] CI: `setup-dotnet` → `10.0.x`.
 
 **Completion evidence:** Phase 1 implementation and local validation are complete and merged in PR #7. The clean local `linux/amd64` + `linux/arm64` OCI build passed, OpenAPI/Scalar and API integration tests passed, and the full unit/integration suites are green.
-**Operational follow-up:** verify remote ECR manifests, the deployed ECS service, and deployed API/OpenAPI endpoints in the target environment. The Phase 0 live baseline is also tracked as operational follow-up. These environment-dependent checks do not reopen the completed implementation phase.
+**Operational follow-up:** the remote ECR multi-architecture manifest check and ECS deployment have since passed in master CI run [37127333792](https://github.com/msepahvand/dotnet-rag-agent/actions/runs/37127333792). Verifying the deployed API/OpenAPI endpoints in the target environment remains outstanding. The Phase 0 live baseline is also tracked as operational follow-up. These environment-dependent checks do not reopen the completed implementation phase.
 **Rollback:** revert the commit. The ECS task definition still points at the previous image. The Graviton switch is its own revertible commit.
 
 ---
 
-## Phase 2: Model access on Microsoft.Extensions.AI *(~2–3 days)*
+## Phase 2: Model access on Microsoft.Extensions.AI — **COMPLETE**
 
 **Goal:** remove `IChatCompletionService`/`Kernel`/`AmazonClaudeExecutionSettings` from the agents, **keeping I1–I10**. Orchestration is subsequently migrated in Phase 3.
 
@@ -224,7 +224,7 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 
 ---
 
-## Phase 3: Orchestration on Microsoft Agent Framework *(~3–5 days)*
+## Phase 3: Orchestration on Microsoft Agent Framework — **COMPLETE**
 
 **Goal:** replace SK Process with a MAF Workflow and remove SK packages completely, with the **same topology and the same streaming contract**.
 
@@ -257,36 +257,39 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 
 ---
 
-## Phase 4: Managed safety: Amazon Bedrock Guardrails *(~2–3 days)*
+## Phase 4: Managed safety: Amazon Bedrock Guardrails — **IMPLEMENTED; live verification pending**
 
 **Goal:** add a managed guardrail **at the request boundary only**, first in shadow mode, and keep I1, I2 and I10.
 
-1. **Where it runs** (and nowhere else):
+1. [x] **Where it runs** (and nowhere else):
    - **Input:** `IGuardrailsService.ValidateQuestion(question)`. Only the user's question is checked, before anything is stored (I2).
    - **Output:** a new `IGuardrailsService.ValidateAnswerAsync(answer, sources)`, called in `AgentOrchestrationService` after `SanitiseAnswer`, on the **final answer text only**, with the sources passed as the grounding source for the contextual grounding check.
    - That's **2 `ApplyGuardrail` calls per `/ask`**, not one per LLM call. The critic's JSON and intermediate drafts are never checked.
    - For **streaming**, tokens have already gone to the client, so the output check can't redact or block them. On `/ask/stream`, the output check runs on the buffered final text for **logging and metrics only**, and the persisted assistant message is the anonymised version.
-2. **Implementation:** `BedrockGuardrailsService : IGuardrailsService` alongside the existing Bedrock runtime integration. `Guardrails__Provider` selects `Regex` or `Bedrock`; `Guardrails__Mode` selects `Shadow` or `Enforce`. The task definition starts on `Bedrock` + `Shadow`, and local runs default to `Regex`.
+2. [x] **Implementation:** `BedrockGuardrailsService : IGuardrailsService` alongside the existing Bedrock runtime integration (currently in `RagAgent.Agents`). `Guardrails__Provider` selects `Regex` or `Bedrock`; `Guardrails__Mode` selects `Shadow` or `Enforce`. The task definition starts on `Bedrock` + `Shadow`, and local runs default to `Regex`.
    - **Input** violations map to the existing `GuardrailException`, so the 400 and SSE `error` frame behaviour stays the same (I1).
    - **Output** violations (anonymise, grounding/relevance below threshold) **don't** throw. The request was a 200 before and stays a 200, and the user message is already stored. In Enforce mode `/ask` returns 200 with a safe fallback (`Grounded = false`, a fixed "I couldn't produce a well-grounded answer from the sources" message plus the sources). That fallback is what gets stored as the assistant message. Output blocking stays in Shadow mode until its false-positive rate has also been measured.
-3. **Policy configuration** (Terraform `aws_bedrock_guardrail` + `aws_bedrock_guardrail_version`):
+3. [x] **Policy configuration** (Terraform `aws_bedrock_guardrail` + `aws_bedrock_guardrail_version`):
    - Prompt-attack filter.
    - Sensitive-info filters (EMAIL, PHONE, CREDIT_DEBIT_CARD_NUMBER): BLOCK on input, ANONYMIZE on output.
    - **Topic parity, not a broader ML topic filter:** start with the current exact phrases as word filters ("legal advice", "financial advice", "stock tips", …). Don't enable broad denied-topic definitions like "financial advice" at first, because they'd block legitimate HN questions about startups, funding, crypto or fintech. Any topic policy has to be proven on the eval question set with a measured false-positive rate first.
    - Contextual grounding check (output only).
-4. **Shadow mode first:** with `Guardrails__Mode = Shadow`, the regex provider keeps enforcing and Bedrock runs alongside it, logging decisions and emitting `guardrail.shadow.{agree,disagree}` metrics. Contextual grounding and relevance thresholds start at 0.7. After at least one week of production traffic (or an agreed sample) with the false-positive rate below the agreed threshold, switch to `Guardrails__Mode = Enforce`.
-5. **Failure behaviour:** if `ApplyGuardrail` fails (throttling, 5xx, timeout > 2 s):
+4. [x] **Shadow mode first** *(shadow mode deployed; the switch to `Enforce` is pending the live review)*: with `Guardrails__Mode = Shadow`, the regex provider keeps enforcing and Bedrock runs alongside it, logging decisions and emitting `guardrail.shadow.{agree,disagree}` metrics. Contextual grounding and relevance thresholds start at 0.7. After at least one week of production traffic (or an agreed sample) with the false-positive rate below the agreed threshold, switch to `Guardrails__Mode = Enforce`.
+5. [x] **Failure behaviour:** if `ApplyGuardrail` fails (throttling, 5xx, timeout > 2 s):
    - **Input fails closed to the regex provider.** Regex checks still run, so protection never drops below today's.
    - **Output fails open** with a warning log and a metric, because the answer is already sanitised by `SanitiseAnswer`.
-6. **Tests:** provider-agnostic tests assert that a `GuardrailException` is thrown and its **category** (`Injection`, `Pii`, `Topic`), not the message text. The regex-specific message assertions in `GuardrailTests` stay as regex-provider tests.
-7. IAM: `bedrock:ApplyGuardrail` on the task role.
+6. [x] **Tests:** provider-agnostic tests assert that a `GuardrailException` is thrown and its **category** (`Injection`, `Pii`, `Topic`), not the message text. The regex-specific message assertions in `GuardrailTests` stay as regex-provider tests.
+7. [x] IAM: `bedrock:ApplyGuardrail` on the task role.
+
+**Implementation evidence:** the shadow-mode implementation merged in PR [#26](https://github.com/msepahvand/dotnet-rag-agent/pull/26), with deploy-role guardrail permissions and Terraform import handling in PRs [#27](https://github.com/msepahvand/dotnet-rag-agent/pull/27) and [#28](https://github.com/msepahvand/dotnet-rag-agent/pull/28). Input and output checks run in `AgentOrchestrationService` and `AgentStreamingService`; `BedrockGuardrailsService` applies a 2-second timeout, records `guardrail.shadow.agree`/`guardrail.shadow.disagree` and `guardrail.bedrock.failure` metrics (exported through ADOT to CloudWatch EMF), and keeps the regex checks enforcing in Shadow mode. Terraform provisions the guardrail with prompt-attack, PII, word and contextual grounding/relevance (0.7) policies, and `deploy-ecs.sh` sets `Guardrails__Provider=Bedrock` and `Guardrails__Mode=Shadow`. Unit tests assert violation categories for both providers.
+**Still pending:** no production shadow agreement/disagreement review or grounding score has been recorded yet, so the decision to enable `Enforce` has not been made.
 
 **Done when:** shadow metrics are reviewed, the invariant tests pass with both providers, and the grounding score is recorded in the eval report.
 **Rollback:** `Guardrails__Provider=Regex` (re-register the task definition). The Guardrail resource can stay. No data is left behind.
 
 ---
 
-## Phase 5: Durable conversations: AgentCore Memory *(~3 days; implemented and deployed, AWS acceptance pending)*
+## Phase 5: Durable conversations: AgentCore Memory — **IMPLEMENTED AND DEPLOYED; AWS acceptance pending**
 
 **Goal:** history is shared across tasks and survives restarts, **with the same retention, cap, ID and privacy semantics as today** (I8, I9).
 
@@ -298,7 +301,7 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
    - **IDs (I9):** `sessionId = hex(SHA-256(conversationId))`. That's 64 characters matching `[a-zA-Z0-9][a-zA-Z0-9-_]*`, and it also meets AgentCore Runtime's ≥33-character `runtimeSessionId` rule for Phase 6.
      - Store the original `conversationId` **in the event payload** next to the conversational message, e.g. a JSON payload item containing `{"conversationId": "..."}`. **Don't put it in event metadata.** Metadata values are limited to 256 characters from `[a-zA-Z0-9\s._:/=+@-]`, so IDs containing `#`, `,` or non-ASCII characters, or longer IDs, would get a 400 where they get a 200 today.
      - Clients keep sending any free-text ID. The tests must include IDs with `#`, `,`, emoji, and one over 256 characters, as well as `conv-xyz` and IDs with spaces and colons.
-   - **Retention (I8): same logical semantics as today's sliding TTL.** Today a conversation idle for more than 30 minutes is **gone completely**, and the next message starts from empty history. `GetHistoryAsync` writes a JSON-only activity event when history exists so reads renew the sliding expiry without adding a chat message; it removes the prior activity event and appends remove activity markers. `GetHistoryAsync` and `AppendAsync` first read the session's latest event timestamp. If it's older than 30 minutes, they **delete all the session's events** (paged `DeleteEvent`, as for `DeleteAsync`) before returning empty history or appending. That way expired messages can never come back into a prompt or `GET /conversations/{id}` after a new append. A background sweep lists sessions every 15 minutes and deletes expired events, including when the production list endpoint is disabled; inactive data is therefore physically purged on the next sweep, while expired conversations are immediately hidden from history and listing.
+   - **Retention (I8): same logical semantics as today's sliding TTL.** Today a conversation idle for more than 30 minutes is **gone completely**, and the next message starts from empty history. When history exists, `GetHistoryAsync` renews the sliding expiry by writing a JSON-only activity event (which is not a chat message) and deleting the previous activity event, so each session keeps at most one activity marker. `GetHistoryAsync` and `AppendAsync` first read the session's latest event timestamp. If it's older than 30 minutes, they **delete all the session's events** (paged `DeleteEvent`, as for `DeleteAsync`) before returning empty history or appending. That way expired messages can never come back into a prompt or `GET /conversations/{id}` after a new append. A background sweep lists sessions every 15 minutes and deletes expired events, including when the production list endpoint is disabled; inactive data is therefore physically purged on the next sweep, while expired conversations are immediately hidden from history and listing.
    - **Concurrency:** a renewable two-minute DynamoDB lease, refreshed every 40 seconds, is keyed by the hashed AgentCore session ID and held around reads that update activity, appends/pruning, deletion and cleanup. ECS tasks share this lock table, coordinating concurrent appends across replicas and rolling deployments. Lock acquisition times out after 30 seconds; lease renewal failure cancels in-flight AWS calls and fails the operation rather than silently continuing. As with any expiring distributed lease, a process pause longer than the lease can briefly permit overlapping work; AgentCore Memory does not accept fencing tokens.
      - The service expiry is only a storage backstop. It's set in days; Terraform currently validates **7–365** days. Verify the deployed provider/API limit before changing this setting.
      - Changing retention needs an explicit product/privacy sign-off and is out of scope here.

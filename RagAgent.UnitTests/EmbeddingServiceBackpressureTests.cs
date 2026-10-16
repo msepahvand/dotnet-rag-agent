@@ -54,25 +54,49 @@ public class EmbeddingServiceBackpressureTests
     [Fact]
     public async Task StreamEmbeddings_EmitsResultsProgressively_NotAllAtEndAsync()
     {
-        var emitTimestamps = new List<long>();
-        var generator = new FakeEmbeddingGenerator(async _ =>
+        const int postCount = 5;
+        var timeout = TimeSpan.FromSeconds(5);
+        var gates = Enumerable.Range(0, postCount)
+            .Select(_ => new TaskCompletionSource<float[]>(TaskCreationOptions.RunContinuationsAsynchronously))
+            .ToArray();
+        var allStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = 0;
+
+        // Each call blocks on its own gate, so the test controls completion order without relying on timing.
+        var generator = new FakeEmbeddingGenerator(_ =>
         {
-            await Task.Delay(20);
-            return [0.1f];
+            var index = Interlocked.Increment(ref started) - 1;
+            if (index == postCount - 1)
+            {
+                allStarted.TrySetResult();
+            }
+
+            return gates[index].Task;
         });
 
         var service = new EmbeddingService(generator);
+        await using var enumerator = service.StreamEmbeddings(CreatePosts(postCount), maxConcurrency: postCount)
+            .GetAsyncEnumerator();
 
-        await foreach (var item in service.StreamEmbeddings(CreatePosts(5), maxConcurrency: 5))
+        var firstMove = enumerator.MoveNextAsync().AsTask();
+        await allStarted.Task.WaitAsync(timeout);
+
+        gates[0].SetResult([0.1f]);
+        (await firstMove.WaitAsync(timeout)).Should().BeTrue(
+            because: "a completed embedding is emitted while the remaining calls are still in flight");
+
+        foreach (var gate in gates.Skip(1))
         {
-            emitTimestamps.Add(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            gate.SetResult([0.1f]);
         }
 
-        emitTimestamps.Should().HaveCount(5);
-        var spread = emitTimestamps.Max() - emitTimestamps.Min();
-        spread.Should().BeLessThan(
-            80,
-            because: "all 5 embeddings run in parallel so results arrive within the same window");
+        var emitted = 1;
+        while (await enumerator.MoveNextAsync().AsTask().WaitAsync(timeout))
+        {
+            emitted++;
+        }
+
+        emitted.Should().Be(postCount);
     }
 
     [Fact]
