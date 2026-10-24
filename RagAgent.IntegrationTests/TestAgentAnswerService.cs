@@ -7,9 +7,9 @@ internal sealed class TestAgentAnswerService(
     IVectorService vectorService,
     IPostService postService) : IAgentAnswerService
 {
-    public async Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ConversationMessage> history)
+    public async Task<AgentAnswerResult> AnswerAsync(AgentAnswerRequest request)
     {
-        var searchResults = await vectorService.SemanticSearchAsync(question, topK);
+        var searchResults = await vectorService.SemanticSearchAsync(request.Question, request.TopK);
 
         if (searchResults.Count == 0)
         {
@@ -52,11 +52,19 @@ internal sealed class TestAgentAnswerService(
 
         return new AgentAnswerResult
         {
-            Answer = $"Grounded test answer for '{question}' using {citationRefs}.",
+            Answer = $"Grounded test answer for '{request.Question}' using {citationRefs}.",
             Grounded = sources.Count > 0,
             Sources = sources,
             Citations = citationList,
             ToolsUsed = ["search_posts"]
         };
+    }
+
+    public async IAsyncEnumerable<AgentStreamEvent> StreamAsync(
+        AgentAnswerRequest request,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await Task.CompletedTask;
+        yield break;
     }
 }

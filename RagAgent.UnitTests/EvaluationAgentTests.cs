@@ -27,6 +27,20 @@ public class EvaluationAgentTests
     }
 
     [Fact]
+    public async Task EvaluateAsync_UsesAUniqueValidRuntimeSessionForEachQuestionAsync()
+    {
+        var answerService = new StubAnswerService(new AgentAnswerResult());
+        var sut = new EvaluationAgent(answerService);
+
+        await sut.EvaluateAsync([new("Q1", []), new("Q2", [])]);
+
+        answerService.Requests.Should().HaveCount(2);
+        answerService.Requests.Select(request => request.SessionId)
+            .Should().OnlyHaveUniqueItems()
+            .And.AllSatisfy(sessionId => sessionId.Should().HaveLength(64));
+    }
+
+    [Fact]
     public async Task EvaluateAsync_UsesIndependentJudgeScoresAsync()
     {
         var judge = new StubAnswerQualityJudge(new AnswerQualityScores(4.5, 3.5));
@@ -254,9 +268,10 @@ public class EvaluationAgentTests
     private static EvaluationAgent Build(Queue<AgentAnswerResult> answers) =>
         new(new StubAnswerService(answers));
 
-    private sealed class StubAnswerService : IAgentAnswerService
+    private sealed class StubAnswerService : AgentAnswerServiceTestDouble
     {
         private readonly Queue<AgentAnswerResult> _answers;
+        public List<AgentAnswerRequest> Requests { get; } = [];
 
         public StubAnswerService(AgentAnswerResult answer) =>
             _answers = new Queue<AgentAnswerResult>([answer]);
@@ -264,9 +279,15 @@ public class EvaluationAgentTests
         public StubAnswerService(Queue<AgentAnswerResult> answers) =>
             _answers = answers;
 
-        public Task<AgentAnswerResult> AnswerAsync(
-            string question, int topK, IReadOnlyList<ConversationMessage> history) =>
-            Task.FromResult(_answers.Count > 1 ? _answers.Dequeue() : _answers.Peek());
+        public override Task<AgentAnswerResult> AnswerAsync(
+            AgentAnswerRequest request) =>
+            CompleteAsync(request);
+
+        private Task<AgentAnswerResult> CompleteAsync(AgentAnswerRequest request)
+        {
+            Requests.Add(request);
+            return Task.FromResult(_answers.Count > 1 ? _answers.Dequeue() : _answers.Peek());
+        }
     }
 
     private sealed class StubAnswerQualityJudge(AnswerQualityScores scores) : IAnswerQualityJudge

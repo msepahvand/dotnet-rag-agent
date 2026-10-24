@@ -32,7 +32,12 @@ public sealed class AgentOrchestrationService(
 
             await conversationStore.AppendAsync(conversationId, new ConversationMessage("user", request.Question));
 
-            var result = await agentAnswerService.AnswerAsync(request.Question, topK, history);
+            var result = await agentAnswerService.AnswerAsync(
+                new AgentAnswerRequest(
+                    request.Question,
+                    topK,
+                    history,
+                    ConversationSessionId.Create(conversationId)));
 
             // Output guardrails: sanitise the answer before returning to the caller.
             result = SanitiseAnswer(result);

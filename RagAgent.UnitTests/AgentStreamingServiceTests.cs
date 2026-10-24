@@ -33,9 +33,10 @@ public class AgentStreamingServiceTests
     public async Task StreamAsync_WhenQuestionIsRejected_DoesNotAppendItToHistoryAsync()
     {
         var store = new InMemoryConversationStore(new MemoryCache(new MemoryCacheOptions()));
-        var researcher = new StubResearcherAgent([]);
-        var writer = new StubWriterAgent([]);
-        var sut = new AgentStreamingService(researcher, writer, store, new GuardrailsService());
+        var sut = new AgentStreamingService(
+            CreateAgentAnswerService([], []),
+            store,
+            new GuardrailsService());
 
         var events = await sut.StreamAsync(new AgentAskRequest
         {
@@ -144,8 +145,7 @@ public class AgentStreamingServiceTests
         var source = new AgentSource { PostId = 1, Title = "T", Snippet = "S", Distance = 0.1f };
         var guardrails = new AnonymisingGuardrailsService();
         var sut = new AgentStreamingService(
-            new StubResearcherAgent([source]),
-            new StubWriterAgent(["Contact alice@example.com"]),
+            CreateAgentAnswerService(["Contact alice@example.com"], [source]),
             store,
             guardrails);
 
@@ -168,11 +168,17 @@ public class AgentStreamingServiceTests
         IGuardrailsService? guardrailsService = null)
     {
         var sourceList = sources?.ToList() ?? [];
-        var researcher = new StubResearcherAgent(sourceList);
-        var writer = new StubWriterAgent(tokens);
         var store = new InMemoryConversationStore(new MemoryCache(new MemoryCacheOptions()));
-        return new AgentStreamingService(researcher, writer, store, guardrailsService ?? new GuardrailsService());
+        return new AgentStreamingService(
+            CreateAgentAnswerService(tokens, sourceList),
+            store,
+            guardrailsService ?? new GuardrailsService());
     }
+
+    private static StubAgentAnswerService CreateAgentAnswerService(
+        IEnumerable<string> tokens,
+        IEnumerable<AgentSource>? sources = null) =>
+        new(tokens, sources ?? []);
 
     private sealed class AnonymisingGuardrailsService : IGuardrailsService
     {
@@ -192,38 +198,30 @@ public class AgentStreamingServiceTests
     }
 
     // ── Stubs ─────────────────────────────────────────────────────────────────
-    private sealed class StubResearcherAgent(List<AgentSource> sources) : IResearcherAgent
+    private sealed class StubAgentAnswerService(
+        IEnumerable<string> tokens,
+        IEnumerable<AgentSource> sources) : AgentAnswerServiceTestDouble
     {
-        public Task<ResearchResult> ResearchAsync(string question, int topK) =>
-            Task.FromResult(new ResearchResult
-            {
-                Sources = sources,
-                SourcesJson = "[]",
-                ToolsUsed = ["search_posts"],
-            });
-    }
+        private readonly List<AgentStreamEvent> _events =
+        [
+            AgentStreamEvent.ForStatus("Searching for relevant sources…"),
+            AgentStreamEvent.ForSources(sources.ToList()),
+            AgentStreamEvent.ForStatus("Generating answer…"),
+            .. tokens.Select(AgentStreamEvent.ForToken),
+            AgentStreamEvent.ForDone(sources.Any(), sources.ToList())
+        ];
 
-    private sealed class StubWriterAgent(IEnumerable<string> tokens) : IWriterAgent
-    {
-        private readonly List<string> _tokens = tokens.ToList();
+        public override Task<AgentAnswerResult> AnswerAsync(AgentAnswerRequest request) =>
+            throw new NotSupportedException();
 
-        public Task<AgentAnswerResult> WriteAsync(
-            string question,
-            ResearchResult research,
-            IReadOnlyList<ConversationMessage> history,
-            string? criticFeedback = null) =>
-            Task.FromResult(new AgentAnswerResult { Answer = "stub", Grounded = true });
-
-        public async IAsyncEnumerable<string> StreamAsync(
-            string question,
-            ResearchResult research,
-            IReadOnlyList<ConversationMessage> history,
+        public override async IAsyncEnumerable<AgentStreamEvent> StreamAsync(
+            AgentAnswerRequest request,
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
-            foreach (var token in _tokens)
+            foreach (var agentEvent in _events)
             {
                 ct.ThrowIfCancellationRequested();
-                yield return token;
+                yield return agentEvent;
                 await Task.Yield();
             }
         }

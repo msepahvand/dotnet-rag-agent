@@ -1,5 +1,6 @@
 using Microsoft.Agents.AI.Workflows;
 using RagAgent.Core;
+using RagAgent.Core.Models;
 
 namespace RagAgent.Agents.Workflow;
 

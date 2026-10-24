@@ -484,7 +484,6 @@ $RECYCLE.BIN/
 
 # Docker
 docker-compose.override.yml
-.dockerignore
 
 # Environment files
 .env

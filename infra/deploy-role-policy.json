@@ -63,6 +63,29 @@
       "Resource": "arn:aws:bedrock-agentcore:__AWS_REGION__:__AWS_ACCOUNT_ID__:memory/*"
     },
     {
+      "Sid": "BedrockAgentCoreRuntimeManagement",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock-agentcore:CreateAgentRuntime",
+        "bedrock-agentcore:ListAgentRuntimes"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "BedrockAgentCoreRuntime",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock-agentcore:DeleteAgentRuntime",
+        "bedrock-agentcore:GetAgentRuntime",
+        "bedrock-agentcore:ListTagsForResource",
+        "bedrock-agentcore:TagResource",
+        "bedrock-agentcore:UntagResource",
+        "bedrock-agentcore:InvokeAgentRuntime",
+        "bedrock-agentcore:UpdateAgentRuntime"
+      ],
+      "Resource": "arn:aws:bedrock-agentcore:__AWS_REGION__:__AWS_ACCOUNT_ID__:runtime/*"
+    },
+    {
       "Sid": "BedrockGuardrails",
       "Effect": "Allow",
       "Action": [
@@ -197,7 +220,8 @@
       ],
       "Resource": [
         "arn:aws:iam::__AWS_ACCOUNT_ID__:role/EcsTaskExecutionRole",
-        "arn:aws:iam::__AWS_ACCOUNT_ID__:role/EcsTaskRole"
+        "arn:aws:iam::__AWS_ACCOUNT_ID__:role/EcsTaskRole",
+        "arn:aws:iam::__AWS_ACCOUNT_ID__:role/AgentCoreRuntimeExecutionRole"
       ]
     },
     {
