@@ -56,6 +56,11 @@ services:
       - VectorStore__Qdrant__Url=http://qdrant:6333
       - VectorStore__Qdrant__CollectionName=posts
       - VectorStore__Qdrant__VectorSize=1024
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS__Region=${AWS_REGION:-us-east-1}
       - OpenTelemetry__OtlpEndpoint=http://jaeger:4317
     depends_on:
       qdrant:

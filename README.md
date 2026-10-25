@@ -7,7 +7,7 @@ See the [documentation index](docs/README.md) for project guidance and modernisa
 Retrieval-augmented generation (RAG) API using Microsoft.Extensions.AI for Bedrock chat and embeddings, Microsoft Agent Framework for model-directed retrieval and workflow orchestration, and pluggable vector store backends. Built on ASP.NET Core 10.0.
 
 ```
-POST /api/agent/ask          (batch — reviewed answer, ~10 s)
+POST /api/agent/ask          (batch — reviewed answer)
   → AgentOrchestrationService
     → AgentAnswerWorkflowService (MAF Workflow)
       → ResearchExecutor (Researcher ChatClientAgent → search_posts tool)
@@ -16,7 +16,7 @@ POST /api/agent/ask          (batch — reviewed answer, ~10 s)
       → OutputExecutor   (final grounded answer)
   → persisted to InMemoryConversationStore
 
-POST /api/agent/ask/stream   (SSE streaming — lower latency, ~1 s to first token)
+POST /api/agent/ask/stream   (SSE streaming — tokens are returned as they are generated)
   → AgentStreamingService
       → ResearcherAgent  (Researcher ChatClientAgent → search_posts tool → vector store)
       → WriterAgent      (Bedrock Claude → token-by-token prose, no critic loop)
@@ -48,9 +48,21 @@ src/
 
 **Prerequisites**: .NET 10 SDK (version pinned in `global.json`), Docker for local vector stores and integration tests, and AWS credentials with Bedrock model access for chat and embeddings. S3 Vectors permissions are also required when using that provider.
 
-```powershell
-docker-compose up          # starts Redis, Qdrant, and API
+Create a git-ignored `.env` file in the repository root with your AWS credentials (replace the placeholders):
+
+```dotenv
+AWS_ACCESS_KEY_ID=replace-with-access-key
+AWS_SECRET_ACCESS_KEY=replace-with-secret-key
+AWS_REGION=us-east-1
 ```
+
+For temporary credentials, also add `AWS_SESSION_TOKEN=...`. Compose forwards these AWS environment variables to the API container; a host AWS profile is not mounted into it.
+
+```powershell
+docker compose up --build  # starts Redis, Qdrant, Jaeger, and API
+```
+
+The API uses Bedrock for chat and embeddings, so requests can incur AWS charges. On startup, the API indexes posts only if the configured vector store is empty. A background service then checks Hacker News for new posts every 30 minutes by default; neither process is triggered by an agent request. Existing populated indexes are not automatically reindexed.
 
 ```powershell
 Invoke-RestMethod http://localhost:5000/api/posts
@@ -74,22 +86,45 @@ dotnet test src/RagAgent.IntegrationTests                      # run tests
 
 ```mermaid
 flowchart LR
-  A[POST /agent/ask] --> ORC[AgentOrchestrationService]
-  ORC --> PAS[AgentAnswerWorkflowService]
-  PAS --> RS[ResearchExecutor]
-  RS --> RA[Researcher ChatClientAgent]
-  RA --> SP[search_posts AIFunction]
-  SP --> BRT[Cohere Embed]
-  BRT --> VS[(Vector Store)]
-  PAS --> WS[WriteExecutor / Writer ChatClientAgent]
-  WS --> BRC[Bedrock Claude]
-  PAS --> CS2[CriticExecutor / Critic ChatClientAgent]
-  CS2 --> BRC
-  PAS --> OS[OutputExecutor]
-  ORC --> CS[InMemoryConversationStore]
+  ASK[POST /api/agent/ask] --> ORCH[AgentOrchestrationService<br/>input/output guardrails + conversation history]
+  STREAM[POST /api/agent/ask/stream] --> STREAMSVC[AgentStreamingService<br/>SSE events]
+  ORCH --> ANSWER[IAgentAnswerService]
+  STREAMSVC --> ANSWER
 
-  SC[GET /search] --> BRT
-  SC --> VS
+  ANSWER -->|Agent:Host = InProcess| INPROCESS[In-process agent service]
+  ANSWER -->|Agent:Host = AgentCore| RUNTIME[Bedrock AgentCore Runtime<br/>RagAgent.AgentHost]
+  INPROCESS -->|AnswerAsync| WORKFLOW[AgentAnswerWorkflowService<br/>MAF batch workflow]
+  INPROCESS -->|StreamAsync| STREAMPIPE[Research → streaming writer<br/>no critic loop]
+  RUNTIME --> AGENTHOST[RagAgent.AgentHost<br/>batch or streaming invocation]
+  AGENTHOST --> WORKFLOW
+  AGENTHOST --> STREAMPIPE
+  WORKFLOW --> RESEARCH[Researcher ChatClientAgent]
+  RESEARCH -->|search_posts tool| SEARCHPLUGIN[SemanticSearchPlugin]
+  STREAMPIPE --> STREAMRESEARCH[Researcher ChatClientAgent]
+  STREAMRESEARCH -->|search_posts tool| SEARCHPLUGIN
+  SEARCHPLUGIN --> EMBED[Cohere embeddings<br/>via Bedrock]
+  EMBED --> VECTOR[(Configured vector store<br/>Qdrant / Redis / S3 Vectors)]
+  WORKFLOW --> WRITER[Writer ChatClientAgent]
+  WORKFLOW --> CRITIC[Critic ChatClientAgent<br/>batch only]
+  OUTPUT[OutputExecutor<br/>final answer]
+  WRITER --> CRITIC
+  CRITIC -->|request revision| WRITER
+  CRITIC -->|approve| OUTPUT
+  WRITER -->|third draft bypasses critic| OUTPUT
+  STREAMPIPE --> STREAMWRITER[Streaming writer]
+  WRITER --> BEDROCK[Bedrock Converse]
+  CRITIC --> BEDROCK
+  STREAMWRITER --> BEDROCK
+  ORCH --> CONVERSATION[(Conversation store<br/>InMemory or AgentCore Memory)]
+  STREAMSVC --> CONVERSATION
+
+  GETSEARCH[GET /api/search] --> SEARCH[SemanticSearchService]
+  SEARCH --> EMBED
+  SEARCH --> VECTOR
+  HN[Hacker News data source] --> INGESTION[Startup indexing + periodic ingestion]
+  POSTINDEX[POST /api/index/all or /api/index/:id] --> INDEXING[PostIndexingService]
+  INGESTION --> INDEXING
+  INDEXING --> EMBED
 ```
 
 ### Model and process integration
@@ -115,7 +150,7 @@ Chat and embedding model access use Microsoft.Extensions.AI. Researcher, writer 
 |---|---|---|---|
 | **Best for** | Local dev | Testing / dedicated vector DB | Production |
 | **Algorithm** | HNSW | HNSW | Proprietary |
-| **Latency** | Microseconds | Milliseconds | Milliseconds |
+| **Latency** | Depends on workload and deployment | Depends on workload and deployment | Depends on workload and deployment |
 | **Scaling** | Vertical | Horizontal | Auto |
 | **Setup** | Docker | Docker | AWS account |
 | **UI** | RedisInsight (:8001) | Dashboard (:6333) | AWS Console |
@@ -180,7 +215,7 @@ Conversation history uses the in-memory store by default. Production can opt int
 | GET | `/api/agent/conversations/{id}` | Get full message history for a conversation |
 | DELETE | `/api/agent/conversations/{id}` | Delete a conversation |
 
-The agent endpoints auto-index if the vector store is empty and maintain conversation history per `conversationId` for multi-turn context.
+Startup indexing populates an empty vector store, while the background ingestion service checks for new Hacker News posts periodically. Agent requests do not trigger indexing. The endpoints maintain conversation history per `conversationId` for multi-turn context.
 
 Post titles and bodies are embedded as overlapping chunks of up to 2,048 characters, so long posts are indexed in full rather than truncated. Search ranks matching chunks and returns each post only once. Clear or recreate an existing vector index before the first chunked reindex; old post-level vectors are not migrated or removed automatically.
 
@@ -188,7 +223,7 @@ Post titles and bodies are embedded as overlapping chunks of up to 2,048 charact
 
 | | `POST /ask` | `POST /ask/stream` |
 |---|---|---|
-| **Latency** | ~10 s total | ~1 s to first token |
+| **Response** | Returns after the reviewed answer is complete | Streams tokens as they are generated |
 | **Model work** | Research tool selection + writer + critic (and optional rewrite) | Research tool selection + streaming writer; no critic |
 | **Output format** | JSON with citations and grounded flag | SSE token stream, sources in `done` event |
 | **Use when** | Citation quality matters | Chat UI, real-time feedback |
@@ -203,18 +238,20 @@ Post titles and bodies are embedded as overlapping chunks of up to 2,048 charact
 
 ```powershell
 docker build -t rag-agent-api -f src/RagAgent.Api/Dockerfile .
-docker run -p 8080:8080 rag-agent-api
+docker run --env-file .env -p 8080:8080 rag-agent-api
 ```
+
+This standalone image uses the configured S3 Vectors provider by default and requires valid AWS credentials and S3 Vectors resources. Use `docker compose up` above for the local Qdrant configuration.
 
 ### CI/CD (GitHub Actions)
 
 `.github/workflows/ci-cd.yml` runs build, format verification and unit/integration tests on pull requests and pushes to `main`/`master`. Infrastructure and deployment run only on pushes to those branches when the commit includes non-Markdown changes:
 
-1. **Build & Test** — builds solution, runs all tests
-2. **Deploy infrastructure** — Terraform apply (`infra/`) provisions ECS, ECR, ALB and S3 Vectors
-3. **Deploy to ECS** — builds and pushes an `amd64`/`arm64` image, then updates the ECS service
+1. **Build & Test** — builds the solution, verifies formatting, and runs unit and integration tests
+2. **Deploy infrastructure** — Terraform apply (`infra/`) provisions ECS, ECR, ALB, S3 Vectors, and AgentCore resources
+3. **Build and deploy** — builds and pushes a multi-architecture (`amd64`/`arm64`) API image for ECS and an `arm64` AgentCore Runtime image, verifies the runtime, then updates the ECS service
 
-Auth: **OIDC role assumption** (no static keys). Images are tagged `<sha>-<run>-<attempt>`.
+Deploy jobs run only on pushes to `main` or `master` that include non-Markdown changes; pull requests run Build & Test only. AWS authentication uses **OIDC role assumption** (no static keys). Images are tagged `<sha>-<run>-<attempt>`.
 
 **GitHub Actions secrets**:
 
@@ -246,8 +283,6 @@ Auth: **OIDC role assumption** (no static keys). Images are tagged `<sha>-<run>-
    curl -X POST http://localhost:5000/api/agent/ask -H "Content-Type: application/json" \
      -d '{"question":"What are people saying about AI?","topK":5}'
    ```
-
-**Cost**: ~$0.01 to index 100 posts (Bedrock embeddings + S3 Vectors storage).
 
 ---
 
