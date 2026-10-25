@@ -83,6 +83,7 @@ jobs:
           INDEX_ADDRESS="module.s3_vectors.aws_s3vectors_index.vector_index"
           ECR_ADDRESS="aws_ecr_repository.api"
           AGENTCORE_MEMORY_ADDRESS="aws_bedrockagentcore_memory.conversations"
+          AGENTCORE_RUNTIME_ADDRESS="aws_bedrockagentcore_agent_runtime.agent"
           CONVERSATION_LOCK_TABLE_ADDRESS="aws_dynamodb_table.conversation_locks"
           ECS_CLUSTER_ADDRESS="aws_ecs_cluster.api"
           ECS_SERVICE_ADDRESS="aws_ecs_service.api"
@@ -116,6 +117,28 @@ jobs:
                   --output text)
                 if [ "$EXISTING_MEMORY_NAME" = "$MEMORY_NAME" ]; then
                   terraform import "$AGENTCORE_MEMORY_ADDRESS" "$MEMORY_ID"
+                  break
+                fi
+              done
+            fi
+          fi
+
+          if ! terraform state show "$AGENTCORE_RUNTIME_ADDRESS" >/dev/null 2>&1; then
+            RUNTIME_NAME="rag_${ECS_SERVICE_NAME:0:30}"
+            RUNTIME_NAME="${RUNTIME_NAME//-/_}_runtime"
+            RUNTIME_IDS=$(aws bedrock-agentcore-control list-agent-runtimes \
+              --region "$AWS_REGION" \
+              --query 'agentRuntimes[].agentRuntimeId' \
+              --output text)
+            if [ "$RUNTIME_IDS" != "None" ] && [ -n "$RUNTIME_IDS" ]; then
+              for RUNTIME_ID in $RUNTIME_IDS; do
+                EXISTING_RUNTIME_NAME=$(aws bedrock-agentcore-control get-agent-runtime \
+                  --region "$AWS_REGION" \
+                  --agent-runtime-id "$RUNTIME_ID" \
+                  --query 'agentRuntimeName' \
+                  --output text)
+                if [ "$EXISTING_RUNTIME_NAME" = "$RUNTIME_NAME" ]; then
+                  terraform import "$AGENTCORE_RUNTIME_ADDRESS" "$RUNTIME_ID"
                   break
                 fi
               done
