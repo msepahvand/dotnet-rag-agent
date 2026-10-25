@@ -101,12 +101,38 @@ jobs:
       - uses: docker/setup-buildx-action@v4
 
       - name: Provision infrastructure
+        env:
+          ECS_SERVICE_NAME: ${{ secrets.ECS_SERVICE_NAME || env.ECS_SERVICE_DEFAULT }}
         run: |
           export TF_VAR_github_repo="${{ github.repository }}"
           export TF_VAR_github_branch="${{ github.ref }}"
           export TF_VAR_aws_region="$REGION"
 
           terraform -chdir=infra init -reconfigure
+
+          AGENTCORE_RUNTIME_ADDRESS="aws_bedrockagentcore_agent_runtime.agent"
+          if ! terraform -chdir=infra state show "$AGENTCORE_RUNTIME_ADDRESS" >/dev/null 2>&1; then
+            RUNTIME_NAME="rag_${ECS_SERVICE_NAME:0:30}"
+            RUNTIME_NAME="${RUNTIME_NAME//-/_}_runtime"
+            RUNTIME_IDS=$(aws bedrock-agentcore-control list-agent-runtimes \
+              --region "$REGION" \
+              --query 'agentRuntimes[].agentRuntimeId' \
+              --output text)
+            if [ "$RUNTIME_IDS" != "None" ] && [ -n "$RUNTIME_IDS" ]; then
+              for RUNTIME_ID in $RUNTIME_IDS; do
+                EXISTING_RUNTIME_NAME=$(aws bedrock-agentcore-control get-agent-runtime \
+                  --region "$REGION" \
+                  --agent-runtime-id "$RUNTIME_ID" \
+                  --query 'agentRuntimeName' \
+                  --output text)
+                if [ "$EXISTING_RUNTIME_NAME" = "$RUNTIME_NAME" ]; then
+                  echo "Importing existing AgentCore runtime $RUNTIME_NAME ($RUNTIME_ID) into Terraform state."
+                  terraform -chdir=infra import "$AGENTCORE_RUNTIME_ADDRESS" "$RUNTIME_ID"
+                  break
+                fi
+              done
+            fi
+          fi
 
           # Ensure ECR repository exists before pushing any image
           terraform -chdir=infra apply -auto-approve \
