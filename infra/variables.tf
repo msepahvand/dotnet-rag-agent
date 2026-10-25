@@ -57,6 +57,12 @@ variable "embedding_model_id" {
   default     = "cohere.embed-english-v3"
 }
 
+variable "chat_model_id" {
+  description = "Bedrock chat model ID used by the AgentCore Runtime"
+  type        = string
+  default     = "us.anthropic.claude-sonnet-4-6"
+}
+
 variable "vector_bucket_name" {
   description = "S3 Vectors bucket name used by the application"
   type        = string
@@ -91,6 +97,12 @@ variable "ecr_repository_name" {
   description = "ECR repository name used for the API container image"
   type        = string
   default     = "dotnet-rag-agent"
+}
+
+variable "agentcore_ecr_repository_name" {
+  description = "ECR repository name used for the AgentCore Runtime host container"
+  type        = string
+  default     = "dotnet-rag-agent-agentcore"
 }
 
 variable "ecs_cluster_name" {

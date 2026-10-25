@@ -22,10 +22,12 @@ terraform {
 data "aws_caller_identity" "current" {}
 
 locals {
-  effective_aws_region         = trimspace(var.aws_region) != "" ? var.aws_region : "us-east-1"
-  ecr_repository_url           = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${local.effective_aws_region}.amazonaws.com/${var.ecr_repository_name}"
-  agentcore_memory_name        = "${replace(substr(var.ecs_service_name, 0, 32), "-", "_")}_conversations"
-  conversation_lock_table_name = "${var.ecs_service_name}-conversation-locks"
+  effective_aws_region          = trimspace(var.aws_region) != "" ? var.aws_region : "us-east-1"
+  ecr_repository_url            = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${local.effective_aws_region}.amazonaws.com/${var.ecr_repository_name}"
+  agentcore_ecr_repository_name = var.agentcore_ecr_repository_name
+  agentcore_runtime_name        = "rag_${replace(substr(var.ecs_service_name, 0, 30), "-", "_")}_runtime"
+  agentcore_memory_name         = "${replace(substr(var.ecs_service_name, 0, 32), "-", "_")}_conversations"
+  conversation_lock_table_name  = "${var.ecs_service_name}-conversation-locks"
 }
 
 # ── Networking ────────────────────────────────────────────────────────────────
@@ -131,6 +133,7 @@ resource "aws_lb" "api" {
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
   subnets            = aws_subnet.public[*].id
+  idle_timeout       = 180
 }
 
 resource "aws_lb_target_group" "api" {
@@ -287,6 +290,13 @@ resource "aws_dynamodb_table" "conversation_locks" {
 
 data "aws_iam_policy_document" "ecs_task_runtime" {
   statement {
+    sid       = "AllowAgentCoreRuntimeInvocation"
+    effect    = "Allow"
+    actions   = ["bedrock-agentcore:InvokeAgentRuntime"]
+    resources = [aws_bedrockagentcore_agent_runtime.agent.agent_runtime_arn]
+  }
+
+  statement {
     sid    = "AllowAgentCoreConversationMemory"
     effect = "Allow"
     actions = [
@@ -379,6 +389,114 @@ resource "aws_iam_role_policy" "ecs_task_runtime" {
   policy = data.aws_iam_policy_document.ecs_task_runtime.json
 }
 
+# ── IAM — AgentCore Runtime execution role ────────────────────────────────────
+
+data "aws_iam_policy_document" "agentcore_runtime_assume" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["bedrock-agentcore.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:bedrock-agentcore:${local.effective_aws_region}:${data.aws_caller_identity.current.account_id}:*"]
+    }
+  }
+}
+
+resource "aws_iam_role" "agentcore_runtime" {
+  name               = "AgentCoreRuntimeExecutionRole"
+  assume_role_policy = data.aws_iam_policy_document.agentcore_runtime_assume.json
+}
+
+data "aws_iam_policy_document" "agentcore_runtime" {
+  statement {
+    sid       = "AllowEcrImagePullAuthentication"
+    effect    = "Allow"
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "AllowEcrImagePull"
+    effect = "Allow"
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer"
+    ]
+    resources = [aws_ecr_repository.agent_host.arn]
+  }
+
+  statement {
+    sid    = "AllowBedrockInvokeModel"
+    effect = "Allow"
+    actions = [
+      "bedrock:InvokeModel",
+      "bedrock:InvokeModelWithResponseStream"
+    ]
+    resources = [
+      "arn:aws:bedrock:*::foundation-model/*",
+      "arn:aws:bedrock:${local.effective_aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/*"
+    ]
+  }
+
+  statement {
+    sid    = "AllowS3VectorsSearch"
+    effect = "Allow"
+    actions = [
+      "s3vectors:QueryVectors",
+      "s3vectors:GetVectors",
+      "s3vectors:ListVectors"
+    ]
+    resources = [
+      "arn:aws:s3vectors:${local.effective_aws_region}:${data.aws_caller_identity.current.account_id}:bucket/${module.s3_vectors.vector_bucket_name}/index/${module.s3_vectors.vector_index_name}"
+    ]
+  }
+
+  statement {
+    sid    = "AllowRuntimeLogs"
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents"
+    ]
+    resources = [
+      "arn:aws:logs:${local.effective_aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/bedrock-agentcore/runtimes/*"
+    ]
+  }
+
+  statement {
+    sid    = "AllowXRayTracing"
+    effect = "Allow"
+    actions = [
+      "xray:PutTraceSegments",
+      "xray:PutTelemetryRecords",
+      "xray:GetSamplingRules",
+      "xray:GetSamplingTargets"
+    ]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role_policy" "agentcore_runtime" {
+  name   = "AgentCoreRuntimeExecution"
+  role   = aws_iam_role.agentcore_runtime.name
+  policy = data.aws_iam_policy_document.agentcore_runtime.json
+}
+
 # ── Observability ─────────────────────────────────────────────────────────────
 
 resource "aws_cloudwatch_log_group" "api" {
@@ -418,6 +536,55 @@ resource "aws_ecr_repository" "api" {
   }
 }
 
+resource "aws_ecr_repository" "agent_host" {
+  name                 = local.agentcore_ecr_repository_name
+  image_tag_mutability = "IMMUTABLE"
+  force_delete         = true
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+}
+
+# ── AgentCore Runtime ────────────────────────────────────────────────────────
+
+resource "aws_bedrockagentcore_agent_runtime" "agent" {
+  agent_runtime_name = local.agentcore_runtime_name
+  description        = "Stateless RAG agent workflow"
+  role_arn           = aws_iam_role.agentcore_runtime.arn
+
+  agent_runtime_artifact {
+    container_configuration {
+      container_uri = "${aws_ecr_repository.agent_host.repository_url}:latest"
+    }
+  }
+
+  network_configuration {
+    network_mode = "PUBLIC"
+  }
+
+  protocol_configuration {
+    server_protocol = "HTTP"
+  }
+
+  environment_variables = {
+    ASPNETCORE_URLS       = "http://+:8080"
+    AWS__Region           = local.effective_aws_region
+    AWS__VectorBucketName = module.s3_vectors.vector_bucket_name
+    AWS__VectorIndexName  = module.s3_vectors.vector_index_name
+    AWS__EmbeddingModelId = var.embedding_model_id
+    AWS__ChatModelId      = var.chat_model_id
+    DataSource__Provider  = "HackerNews"
+  }
+
+  lifecycle {
+    # The deployment workflow owns runtime image updates; Terraform must not roll it back.
+    ignore_changes = [agent_runtime_artifact]
+  }
+
+  depends_on = [aws_iam_role_policy.agentcore_runtime]
+}
+
 # ── ECS ───────────────────────────────────────────────────────────────────────
 
 resource "aws_ecs_cluster" "api" {
@@ -453,6 +620,14 @@ resource "aws_ecs_task_definition" "api" {
     }
 
     environment = [
+      {
+        name  = "Agent__Host"
+        value = "InProcess"
+      },
+      {
+        name  = "Agent__AgentCore__RuntimeArn"
+        value = aws_bedrockagentcore_agent_runtime.agent.agent_runtime_arn
+      },
       {
         name  = "Guardrails__Provider"
         value = "Bedrock"

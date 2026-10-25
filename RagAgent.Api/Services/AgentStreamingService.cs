@@ -12,8 +12,7 @@ namespace RagAgent.Api.Services;
 /// token-level SSE streaming: research → stream write (plain-text prose, no critic loop).
 /// </summary>
 public sealed class AgentStreamingService(
-    IResearcherAgent researcherAgent,
-    IWriterAgent writerAgent,
+    IAgentAnswerService agentAnswerService,
     IConversationStore conversationStore,
     IGuardrailsService guardrailsService) : IAgentStreamingService
 {
@@ -44,24 +43,71 @@ public sealed class AgentStreamingService(
         var history = await conversationStore.GetHistoryAsync(conversationId);
         await conversationStore.AppendAsync(conversationId, new ConversationMessage("user", request.Question));
 
-        // ── Research ─────────────────────────────────────────────────────────
-        yield return StreamEventDto.ForStatus("Searching for relevant sources…");
-
-        var research = await researcherAgent.ResearchAsync(request.Question, topK);
-
-        activity?.SetTag("rag.sources_count", research.Sources.Count);
-
-        yield return StreamEventDto.ForSources(research.Sources.Select(SourceMapper.ToDto).ToList());
-
-        // ── Stream the answer ─────────────────────────────────────────────────
-        yield return StreamEventDto.ForStatus("Generating answer…");
-
         var buffer = new System.Text.StringBuilder();
+        IReadOnlyList<AgentSource> sources = [];
+        var grounded = false;
+        await using var agentEvents = agentAnswerService
+            .StreamAsync(
+                new AgentAnswerRequest(
+                    request.Question,
+                    topK,
+                    history,
+                    ConversationSessionId.Create(conversationId)),
+                ct)
+            .GetAsyncEnumerator(ct);
 
-        await foreach (var token in writerAgent.StreamAsync(request.Question, research, history, ct))
+        while (true)
         {
-            buffer.Append(token);
-            yield return StreamEventDto.ForToken(token);
+            AgentStreamEvent? agentEvent = null;
+            string? streamError = null;
+            try
+            {
+                if (!await agentEvents.MoveNextAsync())
+                {
+                    break;
+                }
+
+                agentEvent = agentEvents.Current;
+            }
+            catch (Exception exception) when (!ct.IsCancellationRequested)
+            {
+                streamError = exception.Message;
+            }
+
+            if (streamError is not null)
+            {
+                yield return StreamEventDto.ForError(streamError);
+                yield break;
+            }
+
+            if (agentEvent is null)
+            {
+                throw new InvalidOperationException("The agent stream advanced without producing an event.");
+            }
+
+            switch (agentEvent.Type)
+            {
+                case "status":
+                    yield return StreamEventDto.ForStatus(agentEvent.Message ?? string.Empty);
+                    break;
+                case "sources":
+                    sources = agentEvent.Sources ?? [];
+                    activity?.SetTag("rag.sources_count", sources.Count);
+                    yield return StreamEventDto.ForSources(sources.Select(SourceMapper.ToDto).ToList());
+                    break;
+                case "token":
+                    var token = agentEvent.Content ?? string.Empty;
+                    buffer.Append(token);
+                    yield return StreamEventDto.ForToken(token);
+                    break;
+                case "done":
+                    sources = agentEvent.Sources ?? sources;
+                    grounded = agentEvent.Grounded ?? sources.Count > 0;
+                    break;
+                case "error":
+                    yield return StreamEventDto.ForError(agentEvent.Error ?? "The agent runtime failed.");
+                    yield break;
+            }
         }
 
         var answer = buffer.ToString().Trim();
@@ -72,16 +118,16 @@ public sealed class AgentStreamingService(
             answer = answer[..AgentPipelineConstants.MaxAnswerLength] + " … [response truncated]";
         }
 
-        var outputEvaluation = await guardrailsService.ValidateAnswerAsync(answer, research.Sources, ct);
+        var outputEvaluation = await guardrailsService.ValidateAnswerAsync(answer, sources, ct);
         var persistedAnswer = outputEvaluation.SanitisedOutput ?? answer;
         await conversationStore.AppendAsync(conversationId, new ConversationMessage("assistant", persistedAnswer));
 
-        activity?.SetTag("rag.grounded", research.Sources.Count > 0);
+        activity?.SetTag("rag.grounded", grounded);
 
         yield return StreamEventDto.ForDone(
             conversationId,
-            grounded: research.Sources.Count > 0,
-            sources: research.Sources.Select(SourceMapper.ToDto).ToList());
+            grounded,
+            sources.Select(SourceMapper.ToDto).ToList());
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
