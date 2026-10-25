@@ -83,6 +83,12 @@
       }
     },
     {
+      "Sid": "BedrockAgentCoreServiceLinkedRoleRead",
+      "Effect": "Allow",
+      "Action": "iam:GetRole",
+      "Resource": "arn:aws:iam::__AWS_ACCOUNT_ID__:role/aws-service-role/bedrock-agentcore.amazonaws.com/*"
+    },
+    {
       "Sid": "BedrockAgentCoreRuntime",
       "Effect": "Allow",
       "Action": [
