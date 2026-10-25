@@ -548,6 +548,10 @@ resource "aws_ecr_repository" "agent_host" {
 
 # ── AgentCore Runtime ────────────────────────────────────────────────────────
 
+resource "aws_iam_service_linked_role" "agentcore" {
+  aws_service_name = "bedrock-agentcore.amazonaws.com"
+}
+
 resource "aws_bedrockagentcore_agent_runtime" "agent" {
   agent_runtime_name = local.agentcore_runtime_name
   description        = "Stateless RAG agent workflow"
@@ -582,7 +586,10 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
     ignore_changes = [agent_runtime_artifact]
   }
 
-  depends_on = [aws_iam_role_policy.agentcore_runtime]
+  depends_on = [
+    aws_iam_role_policy.agentcore_runtime,
+    aws_iam_service_linked_role.agentcore
+  ]
 }
 
 # ── ECS ───────────────────────────────────────────────────────────────────────
