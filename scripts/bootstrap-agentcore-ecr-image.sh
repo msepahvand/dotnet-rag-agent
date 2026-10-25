@@ -19,7 +19,7 @@ if [ "$IMAGE_COUNT" = "0" ] || [ "$IMAGE_COUNT" = "None" ]; then
   docker buildx build \
     --platform linux/arm64 \
     --build-arg APP_VERSION=bootstrap \
-    --file RagAgent.AgentHost/Dockerfile \
+    --file src/RagAgent.AgentHost/Dockerfile \
     --tag "$ECR_URI:latest" \
     --push \
     .

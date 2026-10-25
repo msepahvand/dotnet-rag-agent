@@ -26,41 +26,20 @@ POST /api/agent/ask/stream   (SSE streaming — lower latency, ~1 s to first tok
 ## Project Structure
 
 ```
-RagAgent.Core/                      # Provider-agnostic contracts
-├── IVectorStore.cs, IVectorService.cs, IEmbeddingService.cs
-├── IPostService.cs, IAgentAnswerService.cs, IConversationStore.cs
-└── Models/                         # Post, ConversationMessage, AgentAnswerResult, ConversationEvent, AgentSource
-
-RagAgent.Agents/                    # Model agents and orchestration
-├── Workflow/                       # Microsoft Agent Framework workflow
-│   ├── AgentAnswerWorkflowService.cs
-│   └── *Executor.cs                # Research → Write → Critic → Output
-├── ResearcherAgent.cs              # ChatClientAgent with bounded search_posts tool
-├── WriterAgent.cs                  # Synthesises sources → grounded answer via Bedrock Claude
-├── CriticAgent.cs                  # Reviews draft answer, approves or requests revision
-├── EvaluationAgent.cs              # Runs question set and computes evaluation metrics
-├── EmbeddingService.cs             # Cohere embed-english-v3 via IEmbeddingGenerator (Channel-based streaming)
-├── SemanticSearchPlugin.cs         # embed query → vector search → enrich snippets
-├── HackerNewsService.cs
-└── VectorSearchOptionsValidator.cs
-
-RagAgent.InMemory/                  # In-memory conversation store (30-minute TTL, 40-message cap)
-RagAgent.AgentCore/                 # Durable AgentCore Memory conversation store (opt-in)
-RagAgent.Redis/                     # RedisVectorStore.cs
-RagAgent.Qdrant/                    # QdrantVectorStore.cs
-RagAgent.S3Vectors/                 # S3VectorStore.cs and S3VectorService.cs
-RagAgent.Api/                       # Controllers + thin services
-├── Controllers/                    # Agent, Conversations, Evaluation, Index, Posts, Search
-├── Services/
-│   ├── AgentOrchestrationService.cs    # Loads history, calls IAgentAnswerService, persists messages
-│   ├── IngestionBackgroundService.cs   # Polls HackerNews, indexes new posts automatically
-│   ├── IngestionTracker.cs             # Tracks which post IDs have been indexed this process lifetime
-│   ├── IndexingStartupService.cs       # Seeds IngestionTracker on startup
-│   ├── PostIndexingService.cs          # Streams embeddings with backpressure (max 3 concurrent)
-│   ├── PostsQueryService.cs
-│   └── SemanticSearchService.cs
-RagAgent.UnitTests/                 # Unit tests (business logic, orchestration, agents)
-RagAgent.IntegrationTests/          # Integration tests (end-to-end API via Testcontainers)
+src/
+├── RagAgent.AgentCore/             # AgentCore Memory and Runtime integration
+├── RagAgent.AgentHost/             # AgentCore Runtime host
+├── RagAgent.Agents/                # Model agents and orchestration
+│   └── Workflow/                   # Microsoft Agent Framework workflow
+├── RagAgent.Api/                   # Controllers and thin services
+├── RagAgent.Core/                  # Provider-agnostic contracts and models
+├── RagAgent.HackerNews/            # Hacker News data source
+├── RagAgent.InMemory/              # In-memory conversation store
+├── RagAgent.IntegrationTests/      # End-to-end API tests via Testcontainers
+├── RagAgent.Qdrant/                # Qdrant vector store
+├── RagAgent.Redis/                 # Redis vector store
+├── RagAgent.S3Vectors/             # S3 Vectors vector store
+└── RagAgent.UnitTests/             # Business logic, orchestration and agent tests
 ```
 
 ---
@@ -84,7 +63,7 @@ Invoke-RestMethod -Method Post `
 ```
 
 ```powershell
-dotnet test RagAgent.IntegrationTests                         # run tests
+dotnet test src/RagAgent.IntegrationTests                      # run tests
 ```
 
 **UIs**: RedisInsight http://localhost:8001 · Qdrant Dashboard http://localhost:6333/dashboard
@@ -223,7 +202,7 @@ Post titles and bodies are embedded as overlapping chunks of up to 2,048 charact
 ### Docker
 
 ```powershell
-docker build -t rag-agent-api -f RagAgent.Api/Dockerfile .
+docker build -t rag-agent-api -f src/RagAgent.Api/Dockerfile .
 docker run -p 8080:8080 rag-agent-api
 ```
 
@@ -261,7 +240,7 @@ Auth: **OIDC role assumption** (no static keys). Images are tagged `<sha>-<run>-
 4. **Configure credentials** — `aws configure` or IAM role
 5. **Test**:
    ```powershell
-   dotnet run --project RagAgent.Api
+   dotnet run --project src/RagAgent.Api
    curl -X POST http://localhost:5000/api/index/all
    curl "http://localhost:5000/api/search?query=technology&topK=10"
    curl -X POST http://localhost:5000/api/agent/ask -H "Content-Type: application/json" \

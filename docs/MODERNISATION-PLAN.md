@@ -47,19 +47,19 @@ The rules in `CLAUDE.md` still apply: **Core stays provider-agnostic**, controll
 
 | Concern | Current implementation | File(s) |
 |---|---|---|
-| Runtime | .NET 10 with SDK pinned in `global.json`, central package management and multi-architecture .NET 10 container builds. | `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `RagAgent.Api/Dockerfile` |
-| Chat model | Bedrock Converse exposed through MEAI `IChatClient`; researcher, writer and critic are MAF `ChatClientAgent`s. | `RagAgent.Agents/ServiceCollectionExtensions.cs`, `ResearcherAgent.cs`, `WriterAgent.cs`, `CriticAgent.cs` |
+| Runtime | .NET 10 with SDK pinned in `global.json`, central package management and multi-architecture .NET 10 container builds. | `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `src/RagAgent.Api/Dockerfile` |
+| Chat model | Bedrock Converse exposed through MEAI `IChatClient`; researcher, writer and critic are MAF `ChatClientAgent`s. | `src/RagAgent.Agents/ServiceCollectionExtensions.cs`, `ResearcherAgent.cs`, `WriterAgent.cs`, `CriticAgent.cs` |
 | Embeddings | MEAI `IEmbeddingGenerator` calls Cohere Embed v3 through `InvokeModel` (1024 dimensions), with OpenTelemetry instrumentation. | `CohereEmbeddingGenerator.cs`, `EmbeddingService.cs`, `ServiceCollectionExtensions.cs` |
 | Tools | `search_posts` is an MEAI `AIFunction` offered to the researcher; results are bounded, merged by post ID, and direct search is the no-tool fallback. | `ResearcherAgent.cs`, `SemanticSearchPlugin.cs` |
-| Orchestration | Typed MAF Workflow: Research → Write → Critic → revise; the third draft routes directly to output. | `Workflow/AgentAnswerWorkflowService.cs`, `Workflow/*Executor.cs` |
-| Streaming | Separate research → prose-stream path without critic or structured citations. `IAgentAnswerService` streams provider-neutral events from in-process or AgentCore; the API retains guardrails, history and the existing SSE contract. | `RagAgent.Api/Services/AgentStreamingService.cs`, `RagAgent.Agents/Workflow/AgentAnswerWorkflowService.cs`, `RagAgent.AgentCore/AgentCoreRuntimeAnswerService.cs` |
-| Guardrails | `Guardrails__Provider` selects the regex `GuardrailsService` (local default) or `BedrockGuardrailsService`; production runs `Bedrock` in `Shadow` mode, where regex keeps enforcing and Bedrock `ApplyGuardrail` runs alongside it, emitting `guardrail.shadow.{agree,disagree}` metrics. Questions are checked at the request boundary; final answers are sanitised for invalid citations and length, then checked by `ValidateAnswerAsync` (batch and streaming). No SK filter pipeline remains. | `RagAgent.Agents/GuardrailsService.cs`, `BedrockGuardrailsService.cs`, `GuardrailsRegistrationExtensions.cs`, `RagAgent.Api/Services/AgentOrchestrationService.cs`, `AgentStreamingService.cs`, `infra/main.tf` |
-| Conversation state | `InMemoryConversationStore` remains the default/local provider. The deployed opt-in AgentCore Memory provider preserves the 30-minute logical expiry, 40-message history and free-text client IDs; AWS acceptance is pending. | `RagAgent.InMemory/InMemoryConversationStore.cs`, `RagAgent.AgentCore/AgentCoreMemoryConversationStore.cs` |
-| Observability | OpenTelemetry subscribes to ASP.NET Core, HTTP client, MEAI, MAF and application agent sources. ECS ADOT forwards traces to X-Ray; the runtime client propagates W3C `traceparent` (live continuity not yet verified). | `RagAgent.Api/Program.cs`, `RagAgent.Agents/Workflow/AgentAnswerWorkflowService.cs`, `RagAgent.AgentCore/AgentCoreRuntimeAnswerService.cs`, `infra/otel-collector-config.yaml` |
-| Evaluation | Hit@k, citation validity, writer-reported groundedness, average/P50/P95 latency, and optional independent groundedness/relevance judges. Snapshot-backed evaluation is available. | `RagAgent.Agents/EvaluationAgent.cs`, `RagAgent.Core/Models/EvaluationReport.cs`, `RagAgent.HackerNews/SnapshotPostService.cs` |
+| Orchestration | Typed MAF Workflow: Research → Write → Critic → revise; the third draft routes directly to output. | `src/RagAgent.Agents/Workflow/AgentAnswerWorkflowService.cs`, `src/RagAgent.Agents/Workflow/*Executor.cs` |
+| Streaming | Separate research → prose-stream path without critic or structured citations. `IAgentAnswerService` streams provider-neutral events from in-process or AgentCore; the API retains guardrails, history and the existing SSE contract. | `src/RagAgent.Api/Services/AgentStreamingService.cs`, `src/RagAgent.Agents/Workflow/AgentAnswerWorkflowService.cs`, `src/RagAgent.AgentCore/AgentCoreRuntimeAnswerService.cs` |
+| Guardrails | `Guardrails__Provider` selects the regex `GuardrailsService` (local default) or `BedrockGuardrailsService`; production runs `Bedrock` in `Shadow` mode, where regex keeps enforcing and Bedrock `ApplyGuardrail` runs alongside it, emitting `guardrail.shadow.{agree,disagree}` metrics. Questions are checked at the request boundary; final answers are sanitised for invalid citations and length, then checked by `ValidateAnswerAsync` (batch and streaming). No SK filter pipeline remains. | `src/RagAgent.Agents/GuardrailsService.cs`, `BedrockGuardrailsService.cs`, `GuardrailsRegistrationExtensions.cs`, `src/RagAgent.Api/Services/AgentOrchestrationService.cs`, `AgentStreamingService.cs`, `infra/main.tf` |
+| Conversation state | `InMemoryConversationStore` remains the default/local provider. The deployed opt-in AgentCore Memory provider preserves the 30-minute logical expiry, 40-message history and free-text client IDs; AWS acceptance is pending. | `src/RagAgent.InMemory/InMemoryConversationStore.cs`, `src/RagAgent.AgentCore/AgentCoreMemoryConversationStore.cs` |
+| Observability | OpenTelemetry subscribes to ASP.NET Core, HTTP client, MEAI, MAF and application agent sources. ECS ADOT forwards traces to X-Ray; the runtime client propagates W3C `traceparent` (live continuity not yet verified). | `src/RagAgent.Api/Program.cs`, `src/RagAgent.Agents/Workflow/AgentAnswerWorkflowService.cs`, `src/RagAgent.AgentCore/AgentCoreRuntimeAnswerService.cs`, `infra/otel-collector-config.yaml` |
+| Evaluation | Hit@k, citation validity, writer-reported groundedness, average/P50/P95 latency, and optional independent groundedness/relevance judges. Snapshot-backed evaluation is available. | `src/RagAgent.Agents/EvaluationAgent.cs`, `src/RagAgent.Core/Models/EvaluationReport.cs`, `src/RagAgent.HackerNews/SnapshotPostService.cs` |
 | Hosting | ECS Fargate behind an ALB, plus a stateless ARM64 AgentCore Runtime host, provisioned with Terraform. ECS defaults to in-process; CI deploys the runtime image and verifies its `APP_VERSION`. | `infra/main.tf`, `.github/workflows/ci-cd.yml`, `scripts/deploy-agentcore.sh` |
 | IAM | ECS task role grants Bedrock model/guardrail, AgentCore Memory and runtime invocation access; the runtime role grants model, S3 Vectors, ECR, logs and X-Ray access. | `infra/main.tf`, `infra/deploy-role-policy.json` |
-| Tests | Unit tests cover workflow routing, streaming, runtime invocation and session IDs. Integration tests include the real `IAgentAnswerService` with a scripted chat client, AgentHost batch/SSE contracts and Testcontainers vector providers. | `RagAgent.UnitTests/*`, `RagAgent.IntegrationTests/*` |
+| Tests | Unit tests cover workflow routing, streaming, runtime invocation and session IDs. Integration tests include the real `IAgentAnswerService` with a scripted chat client, AgentHost batch/SSE contracts and Testcontainers vector providers. | `src/RagAgent.UnitTests/*`, `src/RagAgent.IntegrationTests/*` |
 
 ---
 
@@ -252,7 +252,7 @@ The runtime host and deployment path are implemented, but ECS remains configured
 6. [x] **Conversation state:** keep passing `IConversationStore` history in as messages for each run. Don't adopt `AgentSession` persistence, because the API owns history (see Ownership rule).
 7. [x] **Telemetry:** subscribe to MEAI, MAF and application agent sources; enable workflow telemetry with sensitive payload capture disabled. **No guardrails in middleware.**
 8. [x] Remove all `Microsoft.SemanticKernel*` packages and `Process/`. Change the OTel sources to `"Microsoft.Extensions.AI"`, `"Microsoft.Agents.AI*"` and `AgentActivitySource.Name`.
-9. [x] Update `CLAUDE.md`, `RagAgent.Core/CLAUDE.md`, `README.md` and `Best next integrations.md` so they refer to MAF.
+9. [x] Update `CLAUDE.md`, `src/RagAgent.Core/CLAUDE.md`, `README.md` and `Best next integrations.md` so they refer to MAF.
 
 **Completion evidence:** Phase 3 is complete and merged in PR #24. No Semantic Kernel packages or runtime references remain. Workflow tests cover approval, revision, critic-skip on the third draft and `topK` normalisation; researcher tests cover bounded multi-search merging and no-tool-call fallback. CI's Build & Test job passed, including formatting verification, unit tests and the real-pipeline integration test with both vector-store providers.
 **Rollback:** revert the commit. There's no infrastructure or data change. Keep the Phase 2 commit as a known-good point.
@@ -395,7 +395,7 @@ Do this once there's a second tool consumer (the ingestion or evaluation agents 
 
 ## Phase 9: Evaluation: M.E.AI.Evaluation in CI + AgentCore Evaluations online *(~2 days)*
 
-1. **CI gate:** run the Phase 0 frozen-corpus eval (5 runs, cached judge responses) nightly and on PRs that touch `RagAgent.Agents/**`. It fails when a metric's mean falls below the baseline CI's lower bound, and it publishes the M.E.AI.Evaluation HTML report as an artefact.
+1. **CI gate:** run the Phase 0 frozen-corpus eval (5 runs, cached judge responses) nightly and on PRs that touch `src/RagAgent.Agents/**`. It fails when a metric's mean falls below the baseline CI's lower bound, and it publishes the M.E.AI.Evaluation HTML report as an artefact.
 2. **Online:** AgentCore Evaluations on sampled production traces (built-in evaluators such as correctness, faithfulness, tool-selection accuracy and harmfulness), with CloudWatch alarms on drift.
 3. This finishes the "Evaluation agent" roadmap item in `CLAUDE.md`.
 
@@ -442,7 +442,7 @@ P0 ─▶ P1 ─▶ P2 ─▶ P3 ─┬─▶ P4 (shadow ▶ enforce) ─┐
 ## Per-phase checklist (from `CLAUDE.md`)
 
 - [ ] `dotnet format RagAgent.sln --severity warn`
-- [ ] `dotnet test RagAgent.UnitTests` and `dotnet test RagAgent.IntegrationTests` are green, including the invariant tests (I1–I10)
+- [ ] `dotnet test src/RagAgent.UnitTests` and `dotnet test src/RagAgent.IntegrationTests` are green, including the invariant tests (I1–I10)
 - [ ] For Terraform changes, `terraform fmt -recursive` and `terraform validate` via Docker
 - [ ] The eval is within the baseline confidence interval, and p95 is within budget
 - [ ] Any contract change (OpenAPI path, Core interface, auth) is called out in the PR description
