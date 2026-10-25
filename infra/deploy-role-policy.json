@@ -97,7 +97,10 @@
       "Sid": "BedrockAgentCoreCreateWorkloadIdentity",
       "Effect": "Allow",
       "Action": "bedrock-agentcore:CreateWorkloadIdentity",
-      "Resource": "arn:aws:bedrock-agentcore:__AWS_REGION__:__AWS_ACCOUNT_ID__:workload-identity-directory/default"
+      "Resource": [
+        "arn:aws:bedrock-agentcore:__AWS_REGION__:__AWS_ACCOUNT_ID__:workload-identity-directory/default",
+        "arn:aws:bedrock-agentcore:__AWS_REGION__:__AWS_ACCOUNT_ID__:workload-identity-directory/default/workload-identity/*"
+      ]
     },
     {
       "Sid": "ECSServiceLinkedRole",
