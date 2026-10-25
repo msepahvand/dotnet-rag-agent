@@ -86,22 +86,45 @@ dotnet test src/RagAgent.IntegrationTests                      # run tests
 
 ```mermaid
 flowchart LR
-  A[POST /agent/ask] --> ORC[AgentOrchestrationService]
-  ORC --> PAS[AgentAnswerWorkflowService]
-  PAS --> RS[ResearchExecutor]
-  RS --> RA[Researcher ChatClientAgent]
-  RA --> SP[search_posts AIFunction]
-  SP --> BRT[Cohere Embed]
-  BRT --> VS[(Vector Store)]
-  PAS --> WS[WriteExecutor / Writer ChatClientAgent]
-  WS --> BRC[Bedrock Claude]
-  PAS --> CS2[CriticExecutor / Critic ChatClientAgent]
-  CS2 --> BRC
-  PAS --> OS[OutputExecutor]
-  ORC --> CS[InMemoryConversationStore]
+  ASK[POST /api/agent/ask] --> ORCH[AgentOrchestrationService<br/>input/output guardrails + conversation history]
+  STREAM[POST /api/agent/ask/stream] --> STREAMSVC[AgentStreamingService<br/>SSE events]
+  ORCH --> ANSWER[IAgentAnswerService]
+  STREAMSVC --> ANSWER
 
-  SC[GET /search] --> BRT
-  SC --> VS
+  ANSWER -->|Agent:Host = InProcess| INPROCESS[In-process agent service]
+  ANSWER -->|Agent:Host = AgentCore| RUNTIME[Bedrock AgentCore Runtime<br/>RagAgent.AgentHost]
+  INPROCESS -->|AnswerAsync| WORKFLOW[AgentAnswerWorkflowService<br/>MAF batch workflow]
+  INPROCESS -->|StreamAsync| STREAMPIPE[Research → streaming writer<br/>no critic loop]
+  RUNTIME --> AGENTHOST[RagAgent.AgentHost<br/>batch or streaming invocation]
+  AGENTHOST --> WORKFLOW
+  AGENTHOST --> STREAMPIPE
+  WORKFLOW --> RESEARCH[Researcher ChatClientAgent]
+  RESEARCH -->|search_posts tool| SEARCHPLUGIN[SemanticSearchPlugin]
+  STREAMPIPE --> STREAMRESEARCH[Researcher ChatClientAgent]
+  STREAMRESEARCH -->|search_posts tool| SEARCHPLUGIN
+  SEARCHPLUGIN --> EMBED[Cohere embeddings<br/>via Bedrock]
+  EMBED --> VECTOR[(Configured vector store<br/>Qdrant / Redis / S3 Vectors)]
+  WORKFLOW --> WRITER[Writer ChatClientAgent]
+  WORKFLOW --> CRITIC[Critic ChatClientAgent<br/>batch only]
+  OUTPUT[OutputExecutor<br/>final answer]
+  WRITER --> CRITIC
+  CRITIC -->|request revision| WRITER
+  CRITIC -->|approve| OUTPUT
+  WRITER -->|third draft bypasses critic| OUTPUT
+  STREAMPIPE --> STREAMWRITER[Streaming writer]
+  WRITER --> BEDROCK[Bedrock Converse]
+  CRITIC --> BEDROCK
+  STREAMWRITER --> BEDROCK
+  ORCH --> CONVERSATION[(Conversation store<br/>InMemory or AgentCore Memory)]
+  STREAMSVC --> CONVERSATION
+
+  GETSEARCH[GET /api/search] --> SEARCH[SemanticSearchService]
+  SEARCH --> EMBED
+  SEARCH --> VECTOR
+  HN[Hacker News data source] --> INGESTION[Startup indexing + periodic ingestion]
+  POSTINDEX[POST /api/index/all or /api/index/:id] --> INDEXING[PostIndexingService]
+  INGESTION --> INDEXING
+  INDEXING --> EMBED
 ```
 
 ### Model and process integration
