@@ -83,6 +83,17 @@
       }
     },
     {
+      "Sid": "ECSServiceLinkedRole",
+      "Effect": "Allow",
+      "Action": "iam:CreateServiceLinkedRole",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "iam:AWSServiceName": "ecs.amazonaws.com"
+        }
+      }
+    },
+    {
       "Sid": "BedrockAgentCoreServiceLinkedRoleRead",
       "Effect": "Allow",
       "Action": "iam:GetRole",
