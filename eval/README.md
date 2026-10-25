@@ -27,7 +27,7 @@ export VectorStore__Qdrant__CollectionName=rag-agent-eval
 export VectorStore__Qdrant__VectorSize=1024
 export Evaluation__EnableQualityJudges=true
 export Agent__Temperature=0
-dotnet run --project RagAgent.Api
+dotnet run --project src/RagAgent.Api
 ```
 
 The API startup indexing seeds the local evaluation collection from the frozen snapshot. Do not point this run at a production vector bucket, index or collection. Bedrock chat and embedding calls still use AWS credentials and incur AWS charges.

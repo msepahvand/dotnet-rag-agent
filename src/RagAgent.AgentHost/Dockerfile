@@ -5,19 +5,19 @@ ARG APP_VERSION=local
 WORKDIR /src
 
 COPY ["global.json", "NuGet.config", "Directory.Build.props", "Directory.Packages.props", "stylecop.json", "rules.ruleset", "./"]
-COPY ["RagAgent.AgentHost/RagAgent.AgentHost.csproj", "RagAgent.AgentHost/"]
-COPY ["RagAgent.Agents/RagAgent.Agents.csproj", "RagAgent.Agents/"]
-COPY ["RagAgent.Core/RagAgent.Core.csproj", "RagAgent.Core/"]
-COPY ["RagAgent.HackerNews/RagAgent.HackerNews.csproj", "RagAgent.HackerNews/"]
-COPY ["RagAgent.Qdrant/RagAgent.Qdrant.csproj", "RagAgent.Qdrant/"]
-COPY ["RagAgent.Redis/RagAgent.Redis.csproj", "RagAgent.Redis/"]
-COPY ["RagAgent.S3Vectors/RagAgent.S3Vectors.csproj", "RagAgent.S3Vectors/"]
-RUN dotnet restore "RagAgent.AgentHost/RagAgent.AgentHost.csproj" -a "$TARGETARCH"
+COPY ["src/RagAgent.AgentHost/RagAgent.AgentHost.csproj", "src/RagAgent.AgentHost/"]
+COPY ["src/RagAgent.Agents/RagAgent.Agents.csproj", "src/RagAgent.Agents/"]
+COPY ["src/RagAgent.Core/RagAgent.Core.csproj", "src/RagAgent.Core/"]
+COPY ["src/RagAgent.HackerNews/RagAgent.HackerNews.csproj", "src/RagAgent.HackerNews/"]
+COPY ["src/RagAgent.Qdrant/RagAgent.Qdrant.csproj", "src/RagAgent.Qdrant/"]
+COPY ["src/RagAgent.Redis/RagAgent.Redis.csproj", "src/RagAgent.Redis/"]
+COPY ["src/RagAgent.S3Vectors/RagAgent.S3Vectors.csproj", "src/RagAgent.S3Vectors/"]
+RUN dotnet restore "src/RagAgent.AgentHost/RagAgent.AgentHost.csproj" -a "$TARGETARCH"
 
 COPY . .
 
 FROM build AS publish
-RUN dotnet publish "RagAgent.AgentHost/RagAgent.AgentHost.csproj" \
+RUN dotnet publish "src/RagAgent.AgentHost/RagAgent.AgentHost.csproj" \
     --configuration "$BUILD_CONFIGURATION" \
     --arch "$TARGETARCH" \
     --no-restore \

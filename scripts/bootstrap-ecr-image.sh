@@ -19,7 +19,7 @@ if [ "$IMAGE_COUNT" = "0" ] || [ "$IMAGE_COUNT" = "None" ]; then
     | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
   docker buildx build \
     --platform linux/amd64,linux/arm64 \
-    --file RagAgent.Api/Dockerfile \
+    --file src/RagAgent.Api/Dockerfile \
     --tag "$ECR_URI:latest" \
     --push \
     .

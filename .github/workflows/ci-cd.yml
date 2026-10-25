@@ -54,10 +54,10 @@ jobs:
         run: |
           dotnet build RagAgent.sln --configuration Release
           dotnet format RagAgent.sln --verify-no-changes --severity warn
-          dotnet test RagAgent.UnitTests/RagAgent.UnitTests.csproj \
+          dotnet test src/RagAgent.UnitTests/RagAgent.UnitTests.csproj \
             --configuration Release --no-build --verbosity normal \
             --collect:"XPlat Code Coverage" --results-directory coverage
-          dotnet test RagAgent.IntegrationTests/RagAgent.IntegrationTests.csproj \
+          dotnet test src/RagAgent.IntegrationTests/RagAgent.IntegrationTests.csproj \
             --configuration Release --no-build --verbosity normal
 
       - name: Report coverage
@@ -200,7 +200,7 @@ jobs:
           echo "ECS_SERVICE_NAME=${{ secrets.ECS_SERVICE_NAME || env.ECS_SERVICE_DEFAULT }}" >> $GITHUB_ENV
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
-            --file RagAgent.Api/Dockerfile \
+            --file src/RagAgent.Api/Dockerfile \
             --tag "$IMAGE_URI" \
             --push \
             .
@@ -217,7 +217,7 @@ jobs:
           docker buildx build \
             --platform linux/arm64 \
             --build-arg APP_VERSION="$IMAGE_TAG" \
-            --file RagAgent.AgentHost/Dockerfile \
+            --file src/RagAgent.AgentHost/Dockerfile \
             --tag "$AGENTCORE_IMAGE_URI" \
             --push \
             .

@@ -3,29 +3,29 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.36930.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.Api", "RagAgent.Api\RagAgent.Api.csproj", "{5F52BB67-6978-4622-9E91-FF90C248D6C4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.Api", "src\RagAgent.Api\RagAgent.Api.csproj", "{5F52BB67-6978-4622-9E91-FF90C248D6C4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.Agents", "RagAgent.Agents\RagAgent.Agents.csproj", "{DD9C64DA-DFCD-44E2-B702-9DE303E685C4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.Agents", "src\RagAgent.Agents\RagAgent.Agents.csproj", "{DD9C64DA-DFCD-44E2-B702-9DE303E685C4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.Redis", "RagAgent.Redis\RagAgent.Redis.csproj", "{4B07FD59-6AB2-4F8A-9460-445B92B1D3EB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.Redis", "src\RagAgent.Redis\RagAgent.Redis.csproj", "{4B07FD59-6AB2-4F8A-9460-445B92B1D3EB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.IntegrationTests", "RagAgent.IntegrationTests\RagAgent.IntegrationTests.csproj", "{CF63AD65-11F0-4206-B0A4-55826D2D9BC6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.IntegrationTests", "src\RagAgent.IntegrationTests\RagAgent.IntegrationTests.csproj", "{CF63AD65-11F0-4206-B0A4-55826D2D9BC6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.Core", "RagAgent.Core\RagAgent.Core.csproj", "{C97FE870-EC08-49BC-A760-5798B19387E2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.Core", "src\RagAgent.Core\RagAgent.Core.csproj", "{C97FE870-EC08-49BC-A760-5798B19387E2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.UnitTests", "RagAgent.UnitTests\RagAgent.UnitTests.csproj", "{8C09808D-F6F4-4926-AD22-BCD0D0998B70}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.UnitTests", "src\RagAgent.UnitTests\RagAgent.UnitTests.csproj", "{8C09808D-F6F4-4926-AD22-BCD0D0998B70}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.Qdrant", "RagAgent.Qdrant\RagAgent.Qdrant.csproj", "{21FCA638-6A00-491A-A50C-C8DE72288CA8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.Qdrant", "src\RagAgent.Qdrant\RagAgent.Qdrant.csproj", "{21FCA638-6A00-491A-A50C-C8DE72288CA8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.S3Vectors", "RagAgent.S3Vectors\RagAgent.S3Vectors.csproj", "{696F5250-B17F-4888-81C6-3F6A4669430E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.S3Vectors", "src\RagAgent.S3Vectors\RagAgent.S3Vectors.csproj", "{696F5250-B17F-4888-81C6-3F6A4669430E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.HackerNews", "RagAgent.HackerNews\RagAgent.HackerNews.csproj", "{E0BD7E86-5DCB-4A40-9AE6-73C712C69135}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.HackerNews", "src\RagAgent.HackerNews\RagAgent.HackerNews.csproj", "{E0BD7E86-5DCB-4A40-9AE6-73C712C69135}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.InMemory", "RagAgent.InMemory\RagAgent.InMemory.csproj", "{CF675CFA-BDBE-4586-908C-B07AD9AE1C32}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.InMemory", "src\RagAgent.InMemory\RagAgent.InMemory.csproj", "{CF675CFA-BDBE-4586-908C-B07AD9AE1C32}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.AgentCore", "RagAgent.AgentCore\RagAgent.AgentCore.csproj", "{C77124F0-9AEF-4A61-A192-9F1DEE33730E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.AgentCore", "src\RagAgent.AgentCore\RagAgent.AgentCore.csproj", "{C77124F0-9AEF-4A61-A192-9F1DEE33730E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.AgentHost", "RagAgent.AgentHost\RagAgent.AgentHost.csproj", "{545189AF-31E9-47E4-B931-DB6E9356BB27}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgent.AgentHost", "src\RagAgent.AgentHost\RagAgent.AgentHost.csproj", "{545189AF-31E9-47E4-B931-DB6E9356BB27}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
