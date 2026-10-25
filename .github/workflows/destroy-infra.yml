@@ -99,6 +99,8 @@ jobs:
           SUBNET_0_ADDRESS="aws_subnet.public[0]"
           SUBNET_1_ADDRESS="aws_subnet.public[1]"
           IGW_ADDRESS="aws_internet_gateway.main"
+          ROUTE_TABLE_ADDRESS="aws_route_table.public"
+          ROUTE_TABLE_ID=""
           VECTOR_BUCKET_EXISTS="false"
 
           if ! terraform state show "$AGENTCORE_MEMORY_ADDRESS" >/dev/null 2>&1; then
@@ -233,22 +235,57 @@ jobs:
           fi
 
           if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
+            SUBNET_0_ID=$(aws ec2 describe-subnets --region "$AWS_REGION" \
+              --filters "Name=tag:Name,Values=${ECS_SERVICE_NAME}-public-0" "Name=vpc-id,Values=$VPC_ID" \
+              --query "Subnets[0].SubnetId" --output text 2>/dev/null || true)
+            SUBNET_1_ID=$(aws ec2 describe-subnets --region "$AWS_REGION" \
+              --filters "Name=tag:Name,Values=${ECS_SERVICE_NAME}-public-1" "Name=vpc-id,Values=$VPC_ID" \
+              --query "Subnets[0].SubnetId" --output text 2>/dev/null || true)
+
             if ! terraform state show "$SUBNET_0_ADDRESS" >/dev/null 2>&1; then
-              SUBNET_0_ID=$(aws ec2 describe-subnets --region "$AWS_REGION" \
-                --filters "Name=tag:Name,Values=${ECS_SERVICE_NAME}-public-0" "Name=vpc-id,Values=$VPC_ID" \
-                --query "Subnets[0].SubnetId" --output text 2>/dev/null || true)
               if [ "$SUBNET_0_ID" != "None" ] && [ -n "$SUBNET_0_ID" ]; then
                 terraform import "$SUBNET_0_ADDRESS" "$SUBNET_0_ID"
               fi
             fi
 
             if ! terraform state show "$SUBNET_1_ADDRESS" >/dev/null 2>&1; then
-              SUBNET_1_ID=$(aws ec2 describe-subnets --region "$AWS_REGION" \
-                --filters "Name=tag:Name,Values=${ECS_SERVICE_NAME}-public-1" "Name=vpc-id,Values=$VPC_ID" \
-                --query "Subnets[0].SubnetId" --output text 2>/dev/null || true)
               if [ "$SUBNET_1_ID" != "None" ] && [ -n "$SUBNET_1_ID" ]; then
                 terraform import "$SUBNET_1_ADDRESS" "$SUBNET_1_ID"
               fi
+            fi
+
+            if ! terraform state show "$ROUTE_TABLE_ADDRESS" >/dev/null 2>&1; then
+              ROUTE_TABLE_ID=$(aws ec2 describe-route-tables --region "$AWS_REGION" \
+                --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=${ECS_SERVICE_NAME}-public" \
+                --query "RouteTables[0].RouteTableId" --output text 2>/dev/null || true)
+              if [ "$ROUTE_TABLE_ID" != "None" ] && [ -n "$ROUTE_TABLE_ID" ]; then
+                terraform import "$ROUTE_TABLE_ADDRESS" "$ROUTE_TABLE_ID"
+              fi
+            else
+              ROUTE_TABLE_ID=$(terraform state show "$ROUTE_TABLE_ADDRESS" 2>/dev/null \
+                | grep '^\s*id\s*=' | awk '{print $3}' | tr -d '"' || true)
+            fi
+
+            if [ -n "$ROUTE_TABLE_ID" ] && [ "$ROUTE_TABLE_ID" != "None" ]; then
+              for SUBNET_INDEX in 0 1; do
+                if [ "$SUBNET_INDEX" = "0" ]; then
+                  SUBNET_ID="$SUBNET_0_ID"
+                  ASSOCIATION_ADDRESS="aws_route_table_association.public[0]"
+                else
+                  SUBNET_ID="$SUBNET_1_ID"
+                  ASSOCIATION_ADDRESS="aws_route_table_association.public[1]"
+                fi
+
+                if [ -n "$SUBNET_ID" ] && [ "$SUBNET_ID" != "None" ] \
+                    && ! terraform state show "$ASSOCIATION_ADDRESS" >/dev/null 2>&1; then
+                  ASSOCIATED_ROUTE_TABLE_ID=$(aws ec2 describe-route-tables --region "$AWS_REGION" \
+                    --filters "Name=association.subnet-id,Values=$SUBNET_ID" \
+                    --query "RouteTables[0].RouteTableId" --output text 2>/dev/null || true)
+                  if [ "$ASSOCIATED_ROUTE_TABLE_ID" = "$ROUTE_TABLE_ID" ]; then
+                    terraform import "$ASSOCIATION_ADDRESS" "$SUBNET_ID/$ROUTE_TABLE_ID"
+                  fi
+                fi
+              done
             fi
 
             if ! terraform state show "$IGW_ADDRESS" >/dev/null 2>&1; then
