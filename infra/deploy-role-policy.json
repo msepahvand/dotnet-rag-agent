@@ -89,6 +89,18 @@
       "Resource": "arn:aws:iam::__AWS_ACCOUNT_ID__:role/aws-service-role/bedrock-agentcore.amazonaws.com/*"
     },
     {
+      "Sid": "BedrockAgentCoreServiceLinkedRoleDelete",
+      "Effect": "Allow",
+      "Action": "iam:DeleteServiceLinkedRole",
+      "Resource": "arn:aws:iam::__AWS_ACCOUNT_ID__:role/aws-service-role/bedrock-agentcore.amazonaws.com/*"
+    },
+    {
+      "Sid": "BedrockAgentCoreServiceLinkedRoleDeletionStatus",
+      "Effect": "Allow",
+      "Action": "iam:GetServiceLinkedRoleDeletionStatus",
+      "Resource": "*"
+    },
+    {
       "Sid": "BedrockAgentCoreRuntime",
       "Effect": "Allow",
       "Action": [
