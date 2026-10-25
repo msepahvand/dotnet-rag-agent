@@ -4,5 +4,7 @@ namespace RagAgent.Core;
 
 public interface IAgentAnswerService
 {
-    Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ConversationMessage> history);
+    Task<AgentAnswerResult> AnswerAsync(AgentAnswerRequest request);
+
+    IAsyncEnumerable<AgentStreamEvent> StreamAsync(AgentAnswerRequest request, CancellationToken cancellationToken = default);
 }

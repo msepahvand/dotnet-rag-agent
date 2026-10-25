@@ -229,16 +229,16 @@ public class GuardrailTests
     private static InMemoryConversationStore CreateStore() =>
         new(new MemoryCache(new MemoryCacheOptions()));
 
-    private sealed class StubAgentAnswerService(AgentAnswerResult result) : IAgentAnswerService
+    private sealed class StubAgentAnswerService(AgentAnswerResult result) : AgentAnswerServiceTestDouble
     {
-        public Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ConversationMessage> history) =>
+        public override Task<AgentAnswerResult> AnswerAsync(AgentAnswerRequest request) =>
             Task.FromResult(result);
     }
 
     /// <summary>Asserts the agent pipeline is never reached (input guardrail should have fired).</summary>
-    private sealed class NeverCalledStub : IAgentAnswerService
+    private sealed class NeverCalledStub : AgentAnswerServiceTestDouble
     {
-        public Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ConversationMessage> history) =>
+        public override Task<AgentAnswerResult> AnswerAsync(AgentAnswerRequest request) =>
             throw new InvalidOperationException("Agent pipeline should not be reached when a guardrail fires.");
     }
 }

@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Amazon.BedrockAgentCore.Model;
 using Amazon.Runtime.Documents;
 using Microsoft.Extensions.Logging;
@@ -168,10 +166,7 @@ public sealed class AgentCoreMemoryConversationStore(
     }
 
     public static string GetSessionId(string conversationId)
-    {
-        ArgumentNullException.ThrowIfNull(conversationId);
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(conversationId))).ToLowerInvariant();
-    }
+        => ConversationSessionId.Create(conversationId);
 
     private async Task CreateActivityEventAsync(
         string conversationId,

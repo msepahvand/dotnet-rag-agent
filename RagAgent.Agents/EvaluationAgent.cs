@@ -38,7 +38,8 @@ public sealed class EvaluationAgent : IEvaluationAgent
         foreach (var q in questions)
         {
             var startedAt = _timeProvider.GetTimestamp();
-            var answer = await _answerService.AnswerAsync(q.Question, topK, []);
+            var answer = await _answerService.AnswerAsync(
+                new AgentAnswerRequest(q.Question, topK, [], ConversationSessionId.Create(Guid.NewGuid().ToString())));
             var latencyMs = _timeProvider.GetElapsedTime(startedAt).TotalMilliseconds;
 
             var retrievedIds = answer.Sources.Select(s => s.PostId).ToHashSet();

@@ -14,7 +14,7 @@ public sealed class AgentAnswerWorkflowServiceTests
         var critic = new StubCritic([true]);
         var sut = CreateService(writer, critic);
 
-        var result = await sut.AnswerAsync("Question", 5, []);
+        var result = await sut.AnswerAsync(CreateRequest(5));
 
         result.Iterations.Should().Be(1);
         writer.CallCount.Should().Be(1);
@@ -28,7 +28,7 @@ public sealed class AgentAnswerWorkflowServiceTests
         var critic = new StubCritic([false, true]);
         var sut = CreateService(writer, critic);
 
-        var result = await sut.AnswerAsync("Question", 5, []);
+        var result = await sut.AnswerAsync(CreateRequest(5));
 
         result.Iterations.Should().Be(2);
         writer.CallCount.Should().Be(2);
@@ -43,7 +43,7 @@ public sealed class AgentAnswerWorkflowServiceTests
         var critic = new StubCritic([false, false]);
         var sut = CreateService(writer, critic);
 
-        var result = await sut.AnswerAsync("Question", 5, []);
+        var result = await sut.AnswerAsync(CreateRequest(5));
 
         result.Iterations.Should().Be(3);
         result.Answer.Should().Be("Draft 3");
@@ -57,9 +57,24 @@ public sealed class AgentAnswerWorkflowServiceTests
         var researcher = new StubResearcher();
         var sut = CreateService(new StubWriter(), new StubCritic([true]), researcher);
 
-        await sut.AnswerAsync("Question", 100, []);
+        await sut.AnswerAsync(CreateRequest(100));
 
         researcher.TopK.Should().Be(TopKNormaliser.Max);
+    }
+
+    [Fact]
+    public async Task StreamAsync_EmitsResearchAndWriterEventsInContractOrderAsync()
+    {
+        var writer = new StubWriter { StreamTokens = ["An ", "answer"] };
+        var sut = CreateService(writer, new StubCritic([]));
+
+        var events = await sut.StreamAsync(CreateRequest(5)).ToListAsync();
+
+        events.Select(agentEvent => agentEvent.Type)
+            .Should().Equal("status", "sources", "status", "token", "token", "done");
+        events[3].Content.Should().Be("An ");
+        events[4].Content.Should().Be("answer");
+        events[^1].Grounded.Should().BeFalse();
     }
 
     private static AgentAnswerWorkflowService CreateService(
@@ -67,6 +82,9 @@ public sealed class AgentAnswerWorkflowServiceTests
         StubCritic critic,
         StubResearcher? researcher = null) =>
         new(researcher ?? new StubResearcher(), writer, critic);
+
+    private static AgentAnswerRequest CreateRequest(int topK) =>
+        new("Question", topK, [], ConversationSessionId.Create("test-session"));
 
     private sealed class StubResearcher : IResearcherAgent
     {
@@ -83,6 +101,7 @@ public sealed class AgentAnswerWorkflowServiceTests
     {
         public int CallCount { get; private set; }
         public List<string?> Feedbacks { get; } = [];
+        public IReadOnlyList<string> StreamTokens { get; init; } = [];
 
         public Task<AgentAnswerResult> WriteAsync(
             string question,
@@ -102,7 +121,10 @@ public sealed class AgentAnswerWorkflowServiceTests
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
             await Task.CompletedTask;
-            yield break;
+            foreach (var token in StreamTokens)
+            {
+                yield return token;
+            }
         }
     }
 

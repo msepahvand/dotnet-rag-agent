@@ -38,6 +38,26 @@ output "conversation_lock_table_name" {
   value       = aws_dynamodb_table.conversation_locks.name
 }
 
+output "agentcore_runtime_arn" {
+  description = "ARN of the stateless AgentCore Runtime"
+  value       = aws_bedrockagentcore_agent_runtime.agent.agent_runtime_arn
+}
+
+output "agentcore_runtime_id" {
+  description = "ID of the stateless AgentCore Runtime"
+  value       = aws_bedrockagentcore_agent_runtime.agent.agent_runtime_id
+}
+
+output "agentcore_ecr_repository_name" {
+  description = "ECR repository name used for the AgentCore Runtime host"
+  value       = aws_ecr_repository.agent_host.name
+}
+
+output "agentcore_ecr_repository_url" {
+  description = "ECR repository URL used for the AgentCore Runtime host"
+  value       = aws_ecr_repository.agent_host.repository_url
+}
+
 output "ecr_repository_name" {
   description = "ECR repository name used by the API"
   value       = aws_ecr_repository.api.name

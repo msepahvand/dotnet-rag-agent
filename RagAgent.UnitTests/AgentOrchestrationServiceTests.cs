@@ -106,6 +106,20 @@ public class AgentOrchestrationServiceTests
         capturedTopK.Should().Be(expected);
     }
 
+    [Fact]
+    public async Task AskAsync_PassesHashedConversationIdAsRuntimeSessionIdAsync()
+    {
+        AgentAnswerRequest? capturedRequest = null;
+        var stub = new CapturingRequestStubAgentAnswerService(request => capturedRequest = request);
+        var sut = new AgentOrchestrationService(stub, CreateStore(), new NoopGuardrailsService());
+
+        await sut.AskAsync(new AgentAskRequest { Question = "Question", ConversationId = "conversation-1" });
+
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.SessionId.Should().Be(ConversationSessionId.Create("conversation-1"));
+        capturedRequest.SessionId.Should().HaveLength(64);
+    }
+
     // ── ConversationId ──────────────────────────────────────────────────────
     [Fact]
     public async Task AskAsync_WithNoConversationId_GeneratesNewConversationIdAsync()
@@ -266,26 +280,35 @@ public class AgentOrchestrationServiceTests
     }
 
     // ── Stubs ───────────────────────────────────────────────────────────────
-    private sealed class StubAgentAnswerService(AgentAnswerResult result) : IAgentAnswerService
+    private sealed class StubAgentAnswerService(AgentAnswerResult result) : AgentAnswerServiceTestDouble
     {
-        public Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ConversationMessage> history) =>
+        public override Task<AgentAnswerResult> AnswerAsync(AgentAnswerRequest request) =>
             Task.FromResult(result);
     }
 
-    private sealed class CapturingStubAgentAnswerService(Action<int> onAnswer) : IAgentAnswerService
+    private sealed class CapturingStubAgentAnswerService(Action<int> onAnswer) : AgentAnswerServiceTestDouble
     {
-        public Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ConversationMessage> history)
+        public override Task<AgentAnswerResult> AnswerAsync(AgentAnswerRequest request)
         {
-            onAnswer(topK);
+            onAnswer(request.TopK);
             return Task.FromResult(new AgentAnswerResult { Answer = "x", Grounded = false });
         }
     }
 
-    private sealed class CapturingHistoryStubAgentAnswerService(Action<IReadOnlyList<ConversationMessage>> onAnswer) : IAgentAnswerService
+    private sealed class CapturingRequestStubAgentAnswerService(Action<AgentAnswerRequest> onAnswer) : AgentAnswerServiceTestDouble
     {
-        public Task<AgentAnswerResult> AnswerAsync(string question, int topK, IReadOnlyList<ConversationMessage> history)
+        public override Task<AgentAnswerResult> AnswerAsync(AgentAnswerRequest request)
         {
-            onAnswer(history);
+            onAnswer(request);
+            return Task.FromResult(new AgentAnswerResult { Answer = "x", Grounded = false });
+        }
+    }
+
+    private sealed class CapturingHistoryStubAgentAnswerService(Action<IReadOnlyList<ConversationMessage>> onAnswer) : AgentAnswerServiceTestDouble
+    {
+        public override Task<AgentAnswerResult> AnswerAsync(AgentAnswerRequest request)
+        {
+            onAnswer(request.History);
             return Task.FromResult(new AgentAnswerResult { Answer = "answer", Grounded = true });
         }
     }

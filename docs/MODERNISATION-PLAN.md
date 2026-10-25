@@ -1,6 +1,6 @@
 # Modernisation Plan: .NET 10, Microsoft.Extensions.AI, Agent Framework and Bedrock AgentCore
 
-**Status:** Phases 0–3 complete; Phase 4 implementation is awaiting live shadow review; Phase 5 is implemented and deployed, with AWS acceptance pending; Phases 6, 8 and 9 remain planned; Phase 7 and Phase 10 are deferred · **Updated:** 2026-10-16
+**Status:** Phases 0–3 complete; Phase 4 implementation is awaiting live shadow review; Phase 5 is implemented and deployed, with AWS acceptance pending; Phase 6 is implemented, with runtime rollout and acceptance pending; Phases 8–9 are partly implemented/planned; Phase 7 and Phase 10 are deferred · **Updated:** 2026-10-24
 
 ### Authoritative phase status
 
@@ -12,9 +12,9 @@
 | 3 — Orchestration on Microsoft Agent Framework | **Complete** | MAF workflow and `ChatClientAgent`s merged in PR #24; CI Build & Test passed. | `/ask/stream` intentionally remains a separate research-to-prose path without the critic. |
 | 4 — Managed Bedrock Guardrails | **Implemented; live verification pending** | Regex + Bedrock dual-run, shadow metrics, Terraform guardrail and IAM are present. | Review production shadow agreement/disagreement and output grounding results; decide whether to enable enforcement. No live shadow-review or grounding evidence is recorded yet. |
 | 5 — AgentCore Memory | **Implemented and deployed; AWS acceptance pending** | Provider, renewable cross-task DynamoDB conversation locks, 15-minute expired-session cleanup, Terraform resource/IAM wiring and production list-endpoint gate are merged in PRs [#29](https://github.com/msepahvand/dotnet-rag-agent/pull/29)–[#32](https://github.com/msepahvand/dotnet-rag-agent/pull/32). CI run [37127333792](https://github.com/msepahvand/dotnet-rag-agent/actions/runs/37127333792) passed Build & Test, infrastructure provisioning and ECS deployment. | Verify persistence across redeploy, 30-minute logical expiry and 15-minute cleanup, cross-task lease contention/recovery, and the 40-message cap in AWS. Deployment success is not evidence that these behaviours passed acceptance. |
-| 6 — AgentCore Runtime | **Planned** | Not implemented. | Build the stateless host, runtime client, deployment pipeline and production load/rollback checks. |
+| 6 — AgentCore Runtime | **Implemented; runtime rollout/acceptance pending** | Stateless host, batch/stream runtime client, session IDs, Terraform/IAM, ARM64 image deployment and version health check are implemented. ECS remains on `Agent__Host=InProcess`. | Merge and deploy; verify live batch/stream calls, runtime health, first-turn/follow-up latency, expected-concurrency load and rollback before enabling runtime traffic. |
 | 7 — Gateway, identity and policy | **Optional / deferred** | Not implemented. | Only start when a second tool consumer justifies it; identity is a separately announced breaking API change. |
-| 8 — AgentCore Observability | **Planned; partly overlaps current OTel** | Base OTel and ECS ADOT are present; AgentCore trace continuity is not. | Add runtime trace propagation and CloudWatch metrics/alarms alongside Phase 6. |
+| 8 — AgentCore Observability | **Partly implemented; live verification pending** | Base OTel, ECS ADOT and W3C `traceparent` propagation on runtime calls are present. | Verify end-to-end trace continuity after deployment; add and validate runtime CloudWatch metrics/alarms. |
 | 9 — Evaluation automation | **Planned; evaluation building blocks exist** | Snapshot evaluation and optional quality judges are present. | Add the CI regression gate and sampled online AgentCore evaluations. |
 | 10 — Optional extras | **Deferred** | Not implemented. | Aspire/vector-data/A2A/ingestion-agent work is not required to finish the core migration. |
 
@@ -24,20 +24,20 @@
 
 1. Complete Phase 5 AWS acceptance: verify durable conversation history across redeploy, 30-minute application expiry and 15-minute cleanup, cross-task lock contention/lease recovery, and the 40-message cap.
 2. Review Phase 4's live shadow metrics and grounding evaluation; only then decide whether managed output checks should be enforced.
-3. Implement and roll out Phase 6 AgentCore Runtime, with Phase 8 trace continuity and Phase 9 evaluation gates completed alongside it.
+3. Merge and deploy Phase 6 AgentCore Runtime, validate its batch and streaming paths, then opt in only after load/rollback acceptance. Complete Phase 8 live trace/metrics checks and Phase 9 evaluation gates alongside rollout.
 4. Leave Phase 7 and Phase 10 deferred unless a product requirement makes them necessary.
 
 ## Decisions and intended direction
 
-MEAI model access and MAF orchestration are implemented. AgentCore Memory is deployed as an optional conversation-store provider, with its AWS operational acceptance checks still outstanding; AgentCore Runtime remains a later phase.
+MEAI model access and MAF orchestration are implemented. AgentCore Memory is deployed as an optional conversation-store provider, with its AWS operational acceptance checks still outstanding. The AgentCore Runtime host, client and deployment path are implemented, but production API traffic remains on the in-process host until rollout acceptance.
 
 | Question | Answer | Why it's worth it here |
 |---|---|---|
 | Replace Semantic Kernel with **Microsoft.Extensions.AI (MEAI)**? | **Implemented.** Bedrock chat and Cohere embeddings use MEAI abstractions. | MEAI provides provider-oriented `IChatClient` and `IEmbeddingGenerator` APIs; see Phase 2 for migration rationale. |
 | Replace SK Agents/Process with **Microsoft Agent Framework (MAF)**? | **Implemented.** Researcher, writer and critic use `ChatClientAgent`; batch orchestration uses a typed MAF Workflow. | Research uses MEAI `AIFunction` function invocation; the workflow preserves the bounded critic/revision loop. |
-| Use **Amazon Bedrock AgentCore**? | **Memory implemented and deployed; AWS acceptance pending; Runtime planned.** | Memory makes API conversation state durable while preserving the current API contract. Runtime hosting, Gateway/identity, observability and online evaluation remain separate phases. |
+| Use **Amazon Bedrock AgentCore**? | **Memory implemented and deployed; AWS acceptance pending. Runtime implemented; rollout pending.** | Memory makes API conversation state durable while preserving the current API contract. Runtime hosting is built behind an opt-in API switch; Gateway/identity and online evaluation remain separate phases. |
 
-**Longer-term target:** a thin ECS API that owns the HTTP contract, guardrails and conversation history, calling a stateless MAF Workflow hosted on AgentCore Runtime. Models use MEAI on Bedrock. AgentCore Memory is the opt-in durable store; Runtime, Observability and Evaluations remain follow-on work.
+**Current deployment target:** a thin ECS API owns the HTTP contract, guardrails and conversation history, and can call a stateless MAF Workflow hosted on AgentCore Runtime. Models use MEAI on Bedrock. The runtime path is deployed independently and remains opt-in (`Agent__Host=InProcess`) until live acceptance; AgentCore Memory remains the opt-in durable store.
 
 The rules in `CLAUDE.md` still apply: **Core stays provider-agnostic**, controllers stay thin, and each phase is committed on its own with all tests passing.
 
@@ -52,14 +52,14 @@ The rules in `CLAUDE.md` still apply: **Core stays provider-agnostic**, controll
 | Embeddings | MEAI `IEmbeddingGenerator` calls Cohere Embed v3 through `InvokeModel` (1024 dimensions), with OpenTelemetry instrumentation. | `CohereEmbeddingGenerator.cs`, `EmbeddingService.cs`, `ServiceCollectionExtensions.cs` |
 | Tools | `search_posts` is an MEAI `AIFunction` offered to the researcher; results are bounded, merged by post ID, and direct search is the no-tool fallback. | `ResearcherAgent.cs`, `SemanticSearchPlugin.cs` |
 | Orchestration | Typed MAF Workflow: Research → Write → Critic → revise; the third draft routes directly to output. | `Workflow/AgentAnswerWorkflowService.cs`, `Workflow/*Executor.cs` |
-| Streaming | Separate research → prose-stream path without critic or structured citations. Guardrail violations yield one SSE `error` event; `done.grounded` reflects whether sources were retrieved. | `RagAgent.Api/Services/AgentStreamingService.cs` |
+| Streaming | Separate research → prose-stream path without critic or structured citations. `IAgentAnswerService` streams provider-neutral events from in-process or AgentCore; the API retains guardrails, history and the existing SSE contract. | `RagAgent.Api/Services/AgentStreamingService.cs`, `RagAgent.Agents/Workflow/AgentAnswerWorkflowService.cs`, `RagAgent.AgentCore/AgentCoreRuntimeAnswerService.cs` |
 | Guardrails | `Guardrails__Provider` selects the regex `GuardrailsService` (local default) or `BedrockGuardrailsService`; production runs `Bedrock` in `Shadow` mode, where regex keeps enforcing and Bedrock `ApplyGuardrail` runs alongside it, emitting `guardrail.shadow.{agree,disagree}` metrics. Questions are checked at the request boundary; final answers are sanitised for invalid citations and length, then checked by `ValidateAnswerAsync` (batch and streaming). No SK filter pipeline remains. | `RagAgent.Agents/GuardrailsService.cs`, `BedrockGuardrailsService.cs`, `GuardrailsRegistrationExtensions.cs`, `RagAgent.Api/Services/AgentOrchestrationService.cs`, `AgentStreamingService.cs`, `infra/main.tf` |
 | Conversation state | `InMemoryConversationStore` remains the default/local provider. The deployed opt-in AgentCore Memory provider preserves the 30-minute logical expiry, 40-message history and free-text client IDs; AWS acceptance is pending. | `RagAgent.InMemory/InMemoryConversationStore.cs`, `RagAgent.AgentCore/AgentCoreMemoryConversationStore.cs` |
-| Observability | OpenTelemetry subscribes to ASP.NET Core, HTTP client, MEAI, MAF and application agent sources. Agent/workflow/model instrumentation disables sensitive payload capture; ECS ADOT forwards traces to X-Ray. | `RagAgent.Api/Program.cs`, `RagAgent.Agents/Workflow/AgentAnswerWorkflowService.cs`, `infra/otel-collector-config.yaml` |
+| Observability | OpenTelemetry subscribes to ASP.NET Core, HTTP client, MEAI, MAF and application agent sources. ECS ADOT forwards traces to X-Ray; the runtime client propagates W3C `traceparent` (live continuity not yet verified). | `RagAgent.Api/Program.cs`, `RagAgent.Agents/Workflow/AgentAnswerWorkflowService.cs`, `RagAgent.AgentCore/AgentCoreRuntimeAnswerService.cs`, `infra/otel-collector-config.yaml` |
 | Evaluation | Hit@k, citation validity, writer-reported groundedness, average/P50/P95 latency, and optional independent groundedness/relevance judges. Snapshot-backed evaluation is available. | `RagAgent.Agents/EvaluationAgent.cs`, `RagAgent.Core/Models/EvaluationReport.cs`, `RagAgent.HackerNews/SnapshotPostService.cs` |
-| Hosting | ECS Fargate behind an ALB, provisioned with Terraform. PRs run build, format, unit and integration checks; pushes to `main`/`master` deploy only for non-Markdown changes. | `infra/main.tf`, `.github/workflows/ci-cd.yml` |
-| IAM | ECS task role grants Bedrock model/guardrail and AgentCore Memory access; deploy-role read permissions for Memory and DynamoDB were added in PRs #30–#32. | `infra/main.tf`, `infra/deploy-role-policy.json` |
-| Tests | Unit tests cover workflow routing and researcher tool behaviour. Integration tests include the real `IAgentAnswerService` with a scripted chat client and Testcontainers vector providers. | `RagAgent.UnitTests/*`, `RagAgent.IntegrationTests/VectorSearchWebApplicationFactory.cs` |
+| Hosting | ECS Fargate behind an ALB, plus a stateless ARM64 AgentCore Runtime host, provisioned with Terraform. ECS defaults to in-process; CI deploys the runtime image and verifies its `APP_VERSION`. | `infra/main.tf`, `.github/workflows/ci-cd.yml`, `scripts/deploy-agentcore.sh` |
+| IAM | ECS task role grants Bedrock model/guardrail, AgentCore Memory and runtime invocation access; the runtime role grants model, S3 Vectors, ECR, logs and X-Ray access. | `infra/main.tf`, `infra/deploy-role-policy.json` |
+| Tests | Unit tests cover workflow routing, streaming, runtime invocation and session IDs. Integration tests include the real `IAgentAnswerService` with a scripted chat client, AgentHost batch/SSE contracts and Testcontainers vector providers. | `RagAgent.UnitTests/*`, `RagAgent.IntegrationTests/*` |
 
 ---
 
@@ -82,7 +82,9 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 
 ---
 
-## Long-term target architecture (future phases)
+## Current architecture and staged rollout
+
+The runtime host and deployment path are implemented, but ECS remains configured with `Agent__Host=InProcess` until runtime batch/stream behaviour and performance are accepted in the target AWS environment.
 
 ```
                  ┌─────────────────────────── ECS Fargate (API: owns contract, guardrails, history) ─┐
@@ -111,14 +113,14 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 
 | Project | Change |
 |---|---|
-| `RagAgent.Core` | Adds `AgentAnswerRequest` and `AgentStreamEvent` in Phase 6, keeps `ConversationMessage`, and splits `Subscribe` out of `IConversationStore` into `IConversationEventStream` in Phase 5. No AWS/MAF/SK references. |
+| `RagAgent.Core` | Adds provider-neutral `AgentAnswerRequest` and `AgentStreamEvent` in Phase 6, keeps `ConversationMessage`, and splits `Subscribe` out of `IConversationStore` into `IConversationEventStream` in Phase 5. No AWS/MAF/SK references. |
 | `RagAgent.Agents` | SK removed. MEAI + MAF: agents, `AIFunction` tools, workflow. Provider-neutral and unit-tested against `FakeChatClient`. |
 | `RagAgent.Bedrock` *(optional, not yet created)* | Bedrock wiring: `IChatClient`/`IEmbeddingGenerator` registration, `BedrockGuardrailsService : IGuardrailsService`. These currently live in `RagAgent.Agents` (`ServiceCollectionExtensions.cs`, `CohereEmbeddingGenerator.cs`, `BedrockGuardrailsService.cs`); extracting them is a tidy-up, not a blocker for later phases. |
-| `RagAgent.AgentCore` | `AgentCoreMemoryConversationStore : IConversationStore` is implemented and deployed in Phase 5; runtime client remains Phase 6 work. |
-| `RagAgent.AgentHost` *(new)* | Minimal ASP.NET Core host for AgentCore Runtime (`/invocations`, `/ping`, port 8080, `linux/arm64`). |
+| `RagAgent.AgentCore` | `AgentCoreMemoryConversationStore : IConversationStore` and `AgentCoreRuntimeAnswerService : IAgentAnswerService` are implemented; AWS acceptance/rollout remain pending. |
+| `RagAgent.AgentHost` | Minimal ASP.NET Core host for AgentCore Runtime (`/invocations`, `/ping`, port 8080, `linux/arm64`). |
 | `RagAgent.Api` | Agent endpoints unchanged. Picks in-process or runtime `IAgentAnswerService` via `Agent__Host`. |
 | `RagAgent.InMemory`, `RagAgent.Qdrant`, `RagAgent.Redis` | Kept for local dev / integration tests. |
-| Tests | `RagAgent.UnitTests` tests provider behaviour through narrow client adapters, with no live AWS credentials. Integration tests add **one real-pipeline test** (real `IAgentAnswerService` + `FakeChatClient`) and one AgentHost `/invocations` contract test in Phase 6. |
+| Tests | `RagAgent.UnitTests` tests provider behaviour through narrow client adapters, with no live AWS credentials. Integration tests cover the real pipeline (real `IAgentAnswerService` + `FakeChatClient`) and AgentHost batch/SSE `/invocations` contracts. |
 
 ---
 
@@ -127,7 +129,7 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 1. **Strangler, not big-bang.** Each phase ships behind the existing Core interfaces, and the invariants above are the regression criteria.
 2. **Measure with a frozen corpus** (Phase 0), not live HN data, and gate on confidence intervals, not a flat ±5%.
 3. **Local first.** Every managed capability has a local implementation, so the Testcontainers suite stays credential-free.
-4. **Runtime-switchable.** Switches are **environment variables set in the ECS task definition** (`deploy-ecs.sh` already injects env vars), not values baked into `appsettings.json`. Rolling back means registering a task definition again, not rebuilding the image: `Agent__Host`, `ConversationStore__Provider`, `Guardrails__Provider`, `Guardrails__Mode`.
+4. **Runtime-switchable.** Switches are **environment variables set in the ECS task definition** (`deploy-ecs.sh` already injects env vars), not values baked into `appsettings.json`. Rolling back means registering a task definition again, not rebuilding the image: `Agent__Host`, `ConversationStore__Provider`, `Guardrails__Provider`, `Guardrails__Mode`. The `AGENT_HOST` GitHub Actions variable selects `InProcess` (default) or `AgentCore`; the workflow deploys and health-checks the runtime before updating ECS.
 5. **Every phase has a rollback line.** It says which flag to flip, which Terraform resources can safely stay, and what data is left behind.
 
 ---
@@ -327,6 +329,8 @@ Unless a phase explicitly and visibly changes one of these (with a contract note
 ## Phase 6: Agent hosting: AgentCore Runtime *(~4–5 days)*
 
 **Goal:** run the agent workflow on AgentCore Runtime as **stateless compute**. The API keeps the contract, guardrails and history (see Ownership rule).
+
+**Implementation status:** Core contracts, AgentHost, runtime client, Terraform/IAM, ARM64 image deployment and version health check are implemented. The API and ECS task definition remain on `InProcess`; live AgentCore deployment, performance acceptance and traffic cutover are not verified.
 
 1. **Core contract change** (own commit): `IAgentAnswerService.AnswerAsync(AgentAnswerRequest request)` and `StreamAsync(AgentAnswerRequest, ct) → IAsyncEnumerable<AgentStreamEvent>`, where `AgentAnswerRequest(Question, TopK, History, SessionId)`.
    - `SessionId` = the hashed conversation ID from Phase 5.
