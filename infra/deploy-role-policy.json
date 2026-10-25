@@ -75,6 +75,7 @@
       "Sid": "BedrockAgentCoreRuntime",
       "Effect": "Allow",
       "Action": [
+        "bedrock-agentcore:CreateAgentRuntimeEndpoint",
         "bedrock-agentcore:DeleteAgentRuntime",
         "bedrock-agentcore:GetAgentRuntime",
         "bedrock-agentcore:ListTagsForResource",
