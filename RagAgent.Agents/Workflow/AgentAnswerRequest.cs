@@ -2,11 +2,6 @@ using RagAgent.Core.Models;
 
 namespace RagAgent.Agents.Workflow;
 
-internal sealed record AgentAnswerRequest(
-    string Question,
-    int TopK,
-    IReadOnlyList<ConversationMessage> History);
-
 internal sealed record AgentWorkflowState(
     AgentAnswerRequest Request,
     ResearchResult Research,

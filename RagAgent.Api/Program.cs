@@ -28,6 +28,16 @@ public class Program
         builder.Services.AddVectorSearch(builder.Configuration);
         builder.Services.AddGuardrails(builder.Configuration);
         builder.Services.AddVectorStoreProvider(builder.Configuration);
+        var agentHost = builder.Configuration["Agent:Host"] ?? "InProcess";
+        if (string.Equals(agentHost, "AgentCore", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.Services.AddAgentCoreRuntimeAnswerService(builder.Configuration);
+        }
+        else if (!string.Equals(agentHost, "InProcess", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Agent:Host must be InProcess or AgentCore.");
+        }
+
         builder.Services.AddScoped<IPostIndexingService, PostIndexingService>();
         builder.Services.AddScoped<ISemanticSearchService, SemanticSearchService>();
         builder.Services.AddScoped<IAgentOrchestrationService, AgentOrchestrationService>();

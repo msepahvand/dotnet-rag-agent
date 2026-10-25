@@ -109,11 +109,15 @@ jobs:
           terraform -chdir=infra init -reconfigure
 
           # Ensure ECR repository exists before pushing any image
-          terraform -chdir=infra apply -auto-approve -target=aws_ecr_repository.api
+          terraform -chdir=infra apply -auto-approve \
+            -target=aws_ecr_repository.api \
+            -target=aws_ecr_repository.agent_host
 
-          # Push a bootstrap image if the repository is empty (ECS requires an image to start)
+          # Push bootstrap images before Terraform creates ECS and AgentCore resources.
           ECR_REPO="${{ secrets.ECR_REPOSITORY || env.ECR_REPO_DEFAULT }}"
           bash scripts/bootstrap-ecr-image.sh "$REGION" "$ACCOUNT_ID" "$ECR_REPO"
+          AGENTCORE_ECR_REPO=$(terraform -chdir=infra output -raw agentcore_ecr_repository_name)
+          bash scripts/bootstrap-agentcore-ecr-image.sh "$REGION" "$ACCOUNT_ID" "$AGENTCORE_ECR_REPO"
 
           # Full infrastructure apply now that a valid image exists in ECR
           terraform -chdir=infra apply -auto-approve
@@ -153,6 +157,9 @@ jobs:
           terraform -chdir=infra init -reconfigure
           echo "AGENTCORE_MEMORY_ID=$(terraform -chdir=infra output -raw agentcore_memory_id)" >> "$GITHUB_ENV"
           echo "CONVERSATION_LOCK_TABLE_NAME=$(terraform -chdir=infra output -raw conversation_lock_table_name)" >> "$GITHUB_ENV"
+          echo "AGENTCORE_RUNTIME_ID=$(terraform -chdir=infra output -raw agentcore_runtime_id)" >> "$GITHUB_ENV"
+          echo "AGENTCORE_RUNTIME_ARN=$(terraform -chdir=infra output -raw agentcore_runtime_arn)" >> "$GITHUB_ENV"
+          echo "AGENTCORE_ECR_REPO=$(terraform -chdir=infra output -raw agentcore_ecr_repository_name)" >> "$GITHUB_ENV"
 
       - name: Build and push Docker image
         run: |
@@ -176,5 +183,28 @@ jobs:
             | jq -e '([.manifests[].platform.architecture] | index("amd64")) and ([.manifests[].platform.architecture] | index("arm64"))' \
             >/dev/null
 
+      - name: Build and push AgentCore Runtime image
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          IMAGE_TAG="${GITHUB_SHA::12}-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          AGENTCORE_IMAGE_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$AGENTCORE_ECR_REPO:$IMAGE_TAG"
+          docker buildx build \
+            --platform linux/arm64 \
+            --build-arg APP_VERSION="$IMAGE_TAG" \
+            --file RagAgent.AgentHost/Dockerfile \
+            --tag "$AGENTCORE_IMAGE_URI" \
+            --push \
+            .
+          docker buildx imagetools inspect --raw "$AGENTCORE_IMAGE_URI" \
+            | jq -e '([.manifests[].platform.architecture] | index("arm64"))' \
+            >/dev/null
+          echo "AGENTCORE_IMAGE_URI=$AGENTCORE_IMAGE_URI" >> "$GITHUB_ENV"
+          echo "AGENTCORE_IMAGE_TAG=$IMAGE_TAG" >> "$GITHUB_ENV"
+
+      - name: Deploy and verify AgentCore Runtime
+        run: bash scripts/deploy-agentcore.sh "$REGION" "$AGENTCORE_RUNTIME_ID" "$AGENTCORE_RUNTIME_ARN" "$AGENTCORE_IMAGE_URI" "$AGENTCORE_IMAGE_TAG"
+
       - name: Deploy to ECS
-        run: bash scripts/deploy-ecs.sh "$REGION" "$ECS_CLUSTER_NAME" "$ECS_SERVICE_NAME" "$IMAGE_URI" "$AGENTCORE_MEMORY_ID" "$CONVERSATION_LOCK_TABLE_NAME"
+        env:
+          AGENT_HOST: ${{ vars.AGENT_HOST }}
+        run: bash scripts/deploy-ecs.sh "$REGION" "$ECS_CLUSTER_NAME" "$ECS_SERVICE_NAME" "$IMAGE_URI" "$AGENTCORE_MEMORY_ID" "$CONVERSATION_LOCK_TABLE_NAME" "$AGENTCORE_RUNTIME_ARN" "$AGENT_HOST"
