@@ -72,6 +72,17 @@
       "Resource": "*"
     },
     {
+      "Sid": "BedrockAgentCoreServiceLinkedRole",
+      "Effect": "Allow",
+      "Action": "iam:CreateServiceLinkedRole",
+      "Resource": "*",
+      "Condition": {
+        "StringLike": {
+          "iam:AWSServiceName": "bedrock-agentcore.amazonaws.com"
+        }
+      }
+    },
+    {
       "Sid": "BedrockAgentCoreRuntime",
       "Effect": "Allow",
       "Action": [
