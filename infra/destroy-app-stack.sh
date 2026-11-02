@@ -123,4 +123,7 @@ terraform destroy -auto-approve \
   -var="vector_bucket_name=$VECTOR_BUCKET_NAME" \
   -var="vector_index_name=$VECTOR_INDEX_NAME"
 
+echo "Scheduling deletion of tagged application KMS keys..."
+bash ./delete-tagged-kms-keys.sh
+
 echo "Teardown complete. Backend state bucket was intentionally preserved."

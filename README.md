@@ -266,6 +266,7 @@ Deploy jobs run only on pushes to `main` or `master` that include non-Markdown c
 ### Destroy
 
 `.github/workflows/destroy-infra.yml` — `workflow_dispatch` with `DESTROY` confirmation. Resilient to re-runs on already-deleted infrastructure.
+The destroy workflow also schedules deletion of customer-managed KMS keys in enabled regions only when tagged `Application=dotnet-rag-agent`. Tag every application key, including each multi-Region replica, at creation; existing keys must be tagged before teardown. AWS requires at least a 7-day waiting period, and a multi-Region primary can only be scheduled after its replicas are deleted, so rerun the workflow after that period to finish deleting the primary. KMS keys are not created by this repository's Terraform.
 
 ---
 
