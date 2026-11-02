@@ -41,6 +41,27 @@
       "Resource": "*"
     },
     {
+      "Sid": "KMSReadKeysAndTags",
+      "Effect": "Allow",
+      "Action": [
+        "kms:DescribeKey",
+        "kms:ListKeys",
+        "kms:ListResourceTags"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ScheduleDeletionOfTaggedApplicationKMSKeys",
+      "Effect": "Allow",
+      "Action": "kms:ScheduleKeyDeletion",
+      "Resource": "arn:aws:kms:*:__AWS_ACCOUNT_ID__:key/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Application": "dotnet-rag-agent"
+        }
+      }
+    },
+    {
       "Sid": "BedrockAgentCoreMemoryManagement",
       "Effect": "Allow",
       "Action": [
